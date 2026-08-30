@@ -7,20 +7,26 @@ import {
   MapPin, 
   ExternalLink, 
   Download, 
-  Share2, 
   Briefcase, 
-  AlertCircle,
-  Plus,
-  Check
+  Plus, 
+  CheckCircle2, 
+  Bell, 
+  Sparkles,
+  RefreshCw,
+  Eye,
+  Gavel
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { CASE_TYPES, CASE_STATUSES } from '../lib/supabase';
+import { syncSessionToGoogleCalendar } from '../lib/googleCalendar';
 
-export default function CalendarPage({ onOpenQuickAction, setActiveTab }) {
+export default function CalendarPage({ onOpenQuickAction }) {
   const { cases } = useData();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date().toISOString().split('T')[0]);
-  const [eventFilter, setEventFilter] = useState('ALL');
+  const [selectedSessionModal, setSelectedSessionModal] = useState(null);
+  const [syncingId, setSyncingId] = useState(null);
+  const [syncNotice, setSyncNotice] = useState('');
 
   // Month navigation
   const nextMonth = () => {
@@ -37,18 +43,16 @@ export default function CalendarPage({ onOpenQuickAction, setActiveTab }) {
     setSelectedDay(today.toISOString().split('T')[0]);
   };
 
-  // Calendar Calculation
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
   const firstDayOfMonth = new Date(year, month, 1);
   const lastDayOfMonth = new Date(year, month + 1, 0);
 
-  // In Arabic/Egyptian calendar, Saturday is day 6 or start of week
-  const startDay = (firstDayOfMonth.getDay() + 1) % 7; // Saturday = 0, Sunday = 1, ...
+  // In Arabic/Egyptian calendar: Saturday is day 6 or start of week
+  const startDay = (firstDayOfMonth.getDay() + 1) % 7;
   const totalDays = lastDayOfMonth.getDate();
 
-  // Active cases with next session date
   const activeCases = cases.filter(c => !c.is_archived);
 
   // Map events by date (YYYY-MM-DD)
@@ -58,8 +62,8 @@ export default function CalendarPage({ onOpenQuickAction, setActiveTab }) {
       const dateKey = c.next_session_date.split('T')[0];
       if (!eventsByDate[dateKey]) eventsByDate[dateKey] = [];
       eventsByDate[dateKey].push({
-        type: 'session',
-        title: `جلسة: دعوى ${c.case_number}/${c.case_year}`,
+        id: c.id,
+        title: `دعوى ${c.case_number}/${c.case_year}`,
         subtitle: c.case_title || c.plaintiff_name,
         court: c.court_name,
         courtRoom: c.court_room,
@@ -69,30 +73,27 @@ export default function CalendarPage({ onOpenQuickAction, setActiveTab }) {
     }
   });
 
-  // Selected Day Events
-  const selectedEvents = (eventsByDate[selectedDay] || []).filter(e => {
-    if (eventFilter === 'ALL') return true;
-    return e.type === eventFilter;
-  });
+  const selectedEvents = eventsByDate[selectedDay] || [];
 
-  // Google Calendar URL Generator
-  const createGoogleCalendarUrl = (event) => {
-    const c = event.caseData;
-    const sessionDateStr = c.next_session_date.split('T')[0].replace(/-/g, '');
-    const startTime = (c.next_session_time || '09:00').replace(':', '') + '00';
-    const endTime = '140000'; // Default 2 PM
-
-    const title = encodeURIComponent(`جلسة قضائية: دعوى رقم ${c.case_number}/${c.case_year} — ${c.court_name}`);
-    const details = encodeURIComponent(
-      `موضوع الدعوى: ${c.case_title || '—'}\n` +
-      `المدعي: ${c.plaintiff_name}\n` +
-      `المدعى عليه: ${c.defendant_name}\n` +
-      `المحكمة: ${c.court_name} (قاعة: ${c.court_room || 'غير محددة'})\n` +
-      `ملاحظات: ${c.notes || 'حضور الجلسة وإبداء الدفاع والمستندات'}`
+  // 1-Click Sync Handler
+  const handleDirectSync = async (sessionEvent) => {
+    setSyncingId(sessionEvent.id);
+    const result = await syncSessionToGoogleCalendar(
+      { session_date: sessionEvent.caseData.next_session_date, session_time: sessionEvent.time },
+      sessionEvent.caseData
     );
-    const location = encodeURIComponent(c.court_name);
 
-    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${sessionDateStr}T${startTime}/${sessionDateStr}T${endTime}&details=${details}&location=${location}&sf=true&output=xml`;
+    setSyncingId(null);
+    if (result.success) {
+      if (result.isFallback && result.fallbackUrl) {
+        window.open(result.fallbackUrl, '_blank');
+      } else {
+        setSyncNotice(`تمت مزامنة جلسة دعوى ${sessionEvent.caseData.case_number} تلقائياً مع Google Calendar!`);
+        setTimeout(() => setSyncNotice(''), 4000);
+      }
+    } else {
+      alert('خطأ أثناء المزامنة: ' + result.error);
+    }
   };
 
   // Export All Upcoming Sessions as iCal (.ics) file
@@ -130,6 +131,11 @@ export default function CalendarPage({ onOpenQuickAction, setActiveTab }) {
         'ACTION:DISPLAY',
         'DESCRIPTION:تذكير: موعد جلسة قضائية غداً',
         'END:VALARM',
+        'BEGIN:VALARM',
+        'TRIGGER:-PT1H',
+        'ACTION:DISPLAY',
+        'DESCRIPTION:تذكير: موعد الجلسة بعد ساعة',
+        'END:VALARM',
         'END:VEVENT'
       );
     });
@@ -143,43 +149,59 @@ export default function CalendarPage({ onOpenQuickAction, setActiveTab }) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    setSyncNotice('تم تنزيل ملف المزامنة لتقويم الهاتف بنجاح!');
+    setTimeout(() => setSyncNotice(''), 4000);
   };
 
-  const weekDayNames = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
+  const weekDays = ['السبت', 'الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة'];
 
   return (
-    <div className="page-wrapper">
+    <div className="page-wrapper" style={{ maxWidth: '1600px' }}>
       {/* Top Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div className="cal-header-bar">
         <div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: '800' }}>التقويم القضائي ومواعيد الجلسات</h1>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: '800', color: 'var(--text-main)' }}>التقويم القضائي ومواعيد الجلسات</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            تقويم شهري تفاعلي ومزامنة فورية مع Google Calendar لتلقي إشعارات الجلسات على هاتفك.
+            تقويم تفاعلي كامل مع ميزة المزامنة التلقائية مع Google Calendar وإشعارات الهاتف الذكي.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <button className="btn btn-secondary" onClick={downloadIcsFile} title="تصدير ملف التقويم للهاتف">
-            <Download size={17} />
-            <span>تصدير لتقويم Google / الهاتف (.ics)</span>
+        <div className="cal-header-actions">
+          <button className="btn btn-secondary" onClick={downloadIcsFile} title="مزامنة شاملة لكل الجلسات">
+            {/* Google Calendar Logo */}
+            <svg width="18" height="18" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10z"/>
+            </svg>
+            <span>مزامنة شاملة للهاتف (.ics)</span>
           </button>
+          
           <button className="btn btn-primary" onClick={onOpenQuickAction}>
-            <Plus size={17} />
+            <Plus size={18} />
             <span>إضافة موعد / جلسة</span>
           </button>
         </div>
       </div>
 
-      {/* Main Grid: Month Calendar & Day Schedule */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: '1.5rem' }}>
+      {syncNotice && (
+        <div style={{ padding: '0.8rem 1.2rem', background: 'var(--status-active-bg)', color: 'var(--status-active)', borderRadius: 'var(--radius-md)', marginBottom: '1.2rem', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.6rem', fontWeight: '600', animation: 'fadeIn 0.2s ease' }}>
+          <CheckCircle2 size={18} />
+          <span>{syncNotice}</span>
+        </div>
+      )}
+
+      {/* Main Full-Width Calendar Layout */}
+      <div className="cal-desktop-container">
         
-        {/* Calendar View Card */}
-        <div className="card" style={{ padding: '1.5rem' }}>
-          {/* Month Switcher Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-              <CalendarIcon size={22} color="var(--primary-600)" />
-              <h2 style={{ fontSize: '1.3rem', fontWeight: '800' }}>
+        {/* Full-Featured Desktop Calendar Card */}
+        <div className="card cal-desktop-card">
+          {/* Controls Bar */}
+          <div className="cal-controls-row">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+              <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: 'var(--primary-100)', color: 'var(--primary-700)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CalendarIcon size={20} />
+              </div>
+              <h2 style={{ fontSize: '1.35rem', fontWeight: '800' }}>
                 {currentDate.toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' })}
               </h2>
             </div>
@@ -188,7 +210,7 @@ export default function CalendarPage({ onOpenQuickAction, setActiveTab }) {
               <button className="btn btn-secondary btn-icon" onClick={prevMonth} title="الشهر السابق">
                 <ChevronRight size={18} />
               </button>
-              <button className="btn btn-secondary" onClick={goToToday} style={{ fontSize: '0.82rem', padding: '0.35rem 0.8rem', minHeight: 'auto' }}>
+              <button className="btn btn-secondary" onClick={goToToday} style={{ fontSize: '0.88rem', padding: '0.4rem 1rem' }}>
                 اليوم
               </button>
               <button className="btn btn-secondary btn-icon" onClick={nextMonth} title="الشهر القادم">
@@ -197,76 +219,65 @@ export default function CalendarPage({ onOpenQuickAction, setActiveTab }) {
             </div>
           </div>
 
-          {/* Week Days Header */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', textAlign: 'center', gap: '4px', marginBottom: '6px', fontWeight: '700', fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-            {weekDayNames.map(day => (
-              <div key={day} style={{ padding: '6px 0' }}>{day}</div>
+          {/* Weekdays Header */}
+          <div className="cal-grid-weekdays">
+            {weekDays.map(day => (
+              <div key={day} className="cal-grid-weekday-title">{day}</div>
             ))}
           </div>
 
-          {/* Days Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '6px' }}>
-            {/* Blank padding days before first of month */}
+          {/* Large Responsive Days Grid */}
+          <div className="cal-grid-cells">
             {Array.from({ length: startDay }).map((_, index) => (
-              <div key={`blank-${index}`} style={{ minHeight: '68px', opacity: 0.2 }}></div>
+              <div key={`blank-${index}`} className="cal-cell cal-cell-blank"></div>
             ))}
 
-            {/* Actual Days */}
             {Array.from({ length: totalDays }).map((_, index) => {
               const dayNum = index + 1;
               const formattedDate = `${year}-${String(month + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
               const dayEvents = eventsByDate[formattedDate] || [];
               const isSelected = selectedDay === formattedDate;
               const isToday = new Date().toISOString().split('T')[0] === formattedDate;
+              const hasEvents = dayEvents.length > 0;
 
               return (
                 <div
                   key={formattedDate}
                   onClick={() => setSelectedDay(formattedDate)}
-                  style={{
-                    minHeight: '74px',
-                    padding: '6px 8px',
-                    borderRadius: 'var(--radius-md)',
-                    background: isSelected 
-                      ? 'linear-gradient(135deg, var(--primary-800), var(--primary-600))' 
-                      : (isToday ? 'var(--primary-50)' : 'var(--bg-card-subtle)'),
-                    color: isSelected ? '#ffffff' : 'var(--text-main)',
-                    border: isToday && !isSelected ? '2px solid var(--accent-gold)' : '1px solid var(--border-color)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    justifyContent: 'space-between',
-                    transition: 'all 0.15s ease',
-                    boxShadow: isSelected ? '0 4px 12px rgba(0, 31, 63, 0.25)' : 'none',
-                  }}
+                  className={`cal-cell ${isSelected ? 'is-selected' : ''} ${isToday ? 'is-today' : ''} ${hasEvents ? 'has-sessions' : ''}`}
                 >
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: isToday || isSelected ? '800' : '600', fontSize: '0.95rem' }}>
-                      {dayNum}
-                    </span>
-                    {isToday && (
-                      <span style={{ fontSize: '0.65rem', background: isSelected ? 'rgba(254, 214, 91, 0.3)' : 'var(--accent-gold-bg)', color: isSelected ? '#fed65b' : 'var(--secondary)', padding: '1px 5px', borderRadius: '4px', fontWeight: 'bold' }}>
-                        اليوم
-                      </span>
+                  <div className="cal-cell-header">
+                    <span className="cal-cell-number">{dayNum}</span>
+                    {isToday && <span className="cal-today-badge">اليوم</span>}
+                  </div>
+
+                  {/* Desktop Events List inside the Cell */}
+                  <div className="cal-cell-events-desktop">
+                    {dayEvents.slice(0, 2).map((evt, idx) => (
+                      <div 
+                        key={idx} 
+                        className="cal-event-pill"
+                        title={`${evt.title} - ${evt.court}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedDay(formattedDate);
+                          setSelectedSessionModal(evt);
+                        }}
+                      >
+                        <span className="event-pill-time">{evt.time}</span>
+                        <span className="event-pill-title">{evt.title}</span>
+                      </div>
+                    ))}
+                    {dayEvents.length > 2 && (
+                      <span className="cal-more-pill">+{dayEvents.length - 2} جلسات أخرى</span>
                     )}
                   </div>
 
-                  {/* Event Badges Indicator */}
-                  {dayEvents.length > 0 && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' }}>
-                      <span style={{
-                        fontSize: '0.68rem',
-                        padding: '2px 4px',
-                        borderRadius: '4px',
-                        background: isSelected ? 'rgba(254, 214, 91, 0.3)' : 'var(--status-adjourned-bg)',
-                        color: isSelected ? '#fed65b' : 'var(--status-adjourned)',
-                        fontWeight: '700',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                      }}>
-                        {dayEvents.length} {dayEvents.length === 1 ? 'جلسة' : 'جلسات'}
-                      </span>
+                  {/* Mobile Indicator Dot */}
+                  {hasEvents && (
+                    <div className="cal-cell-events-mobile">
+                      <span className="mobile-event-dot"></span>
+                      {dayEvents.length > 1 && <span className="mobile-event-count">{dayEvents.length}</span>}
                     </div>
                   )}
                 </div>
@@ -275,94 +286,82 @@ export default function CalendarPage({ onOpenQuickAction, setActiveTab }) {
           </div>
         </div>
 
-        {/* Selected Day Schedule & Google Calendar Sync Panel */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-          
-          {/* Day Schedule Card */}
-          <div className="card" style={{ flex: 1 }}>
-            <div className="card-header">
-              <div className="card-title">
-                <Clock size={18} color="var(--primary-600)" />
-                <span>جلسات يوم {new Date(selectedDay).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-              </div>
+        {/* Selected Day Agenda Sidebar Panel */}
+        <div className="card cal-side-agenda">
+          <div className="card-header" style={{ marginBottom: '1rem' }}>
+            <div className="card-title" style={{ fontSize: '1.05rem' }}>
+              <Clock size={18} color="var(--primary-600)" />
+              <span>جلسات: {new Date(selectedDay).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
             </div>
+            <span className="badge" style={{ background: 'var(--primary-100)', color: 'var(--primary-700)' }}>
+              {selectedEvents.length} جلسات
+            </span>
+          </div>
 
-            {selectedEvents.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--text-muted)' }}>
-                <CalendarIcon size={40} style={{ margin: '0 auto 0.8rem', opacity: 0.4 }} />
-                <h4 style={{ fontSize: '1rem', marginBottom: '0.3rem' }}>لا توجد جلسات مسجلة لهذا التاريخ</h4>
-                <p style={{ fontSize: '0.85rem' }}>يمكنك النقر على زر الإضافة لتحديد موعد جلسة جديدة.</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
-                {selectedEvents.map((evt, idx) => (
-                  <div 
-                    key={idx} 
-                    style={{
-                      padding: '1rem',
-                      background: 'var(--bg-card-subtle)',
-                      borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--border-color)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.6rem'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <strong style={{ fontSize: '0.95rem', color: 'var(--primary-700)' }}>
-                          {evt.title}
-                        </strong>
-                        <div style={{ fontSize: '0.82rem', color: 'var(--text-main)', marginTop: '0.15rem' }}>
-                          {evt.subtitle}
-                        </div>
+          {selectedEvents.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+              <CalendarIcon size={38} style={{ margin: '0 auto 0.8rem', opacity: 0.35 }} />
+              <h4 style={{ fontSize: '1rem', marginBottom: '0.3rem' }}>لا توجد جلسات محددة</h4>
+              <p style={{ fontSize: '0.85rem' }}>انقر على أي يوم مسجل عليه جلسات لاستعراض ملفاتها.</p>
+              <button 
+                className="btn btn-secondary" 
+                style={{ marginTop: '1rem', fontSize: '0.85rem', width: '100%' }}
+                onClick={onOpenQuickAction}
+              >
+                + إضافة جلسة في هذا اليوم
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              {selectedEvents.map((evt, idx) => (
+                <div key={idx} className="cal-agenda-card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                    <div>
+                      <strong style={{ fontSize: '0.98rem', color: 'var(--primary-700)' }}>
+                        {evt.title}
+                      </strong>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-main)', marginTop: '0.2rem' }}>
+                        {evt.subtitle}
                       </div>
-                      <span className="badge" style={{ background: 'var(--status-adjourned-bg)', color: 'var(--status-adjourned)', fontSize: '0.72rem' }}>
-                        {CASE_STATUSES[evt.caseData.status]?.label || 'منظورة'}
-                      </span>
                     </div>
-
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '0.8rem' }}>
-                      <span><strong>المحكمة:</strong> {evt.court}</span>
-                      {evt.courtRoom && <span><strong>قاعة:</strong> {evt.courtRoom}</span>}
-                    </div>
-
-                    {/* Google Calendar Direct Sync Button */}
-                    <div style={{ paddingTop: '0.4rem', borderTop: '1px solid var(--border-subtle)' }}>
-                      <a 
-                        href={createGoogleCalendarUrl(evt)} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="btn btn-secondary"
-                        style={{ width: '100%', fontSize: '0.82rem', padding: '0.4rem', minHeight: 'auto', gap: '0.4rem' }}
-                      >
-                        {/* Google Calendar Icon */}
-                        <svg width="15" height="15" viewBox="0 0 24 24">
-                          <path fill="#4285F4" d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10z"/>
-                        </svg>
-                        <span>إضافة تذكير فوري في Google Calendar</span>
-                        <ExternalLink size={12} />
-                      </a>
-                    </div>
+                    <span className="badge" style={{ background: 'var(--status-adjourned-bg)', color: 'var(--status-adjourned)', fontSize: '0.72rem' }}>
+                      {CASE_STATUSES[evt.caseData.status]?.label || 'منظورة'}
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
 
-          {/* Google Calendar Auto Sync Info Card */}
-          <div className="card" style={{ background: 'linear-gradient(135deg, var(--bg-card), var(--primary-50))' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.5rem' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10z"/>
-              </svg>
-              <h4 style={{ fontSize: '0.95rem', fontWeight: '700' }}>مزامنة التقويم التلقائية</h4>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.5rem' }}>
+                    <div>📍 <strong>المحكمة:</strong> {evt.court} {evt.courtRoom && `(قاعة: ${evt.courtRoom})`}</div>
+                    <div>⏰ <strong>الموعد:</strong> الساعة {evt.time} صباحاً</div>
+                  </div>
+
+                  {/* Google Calendar Automatic Sync Button */}
+                  <div style={{ marginTop: '0.8rem', paddingTop: '0.6rem', borderTop: '1px solid var(--border-subtle)' }}>
+                    <button 
+                      className="btn btn-secondary"
+                      style={{ width: '100%', fontSize: '0.82rem', padding: '0.45rem', gap: '0.5rem', minHeight: '36px' }}
+                      onClick={() => handleDirectSync(evt)}
+                      disabled={syncingId === evt.id}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10z"/>
+                      </svg>
+                      <span>{syncingId === evt.id ? 'جاري المزامنة مع Google...' : 'مزامنة مع Google Calendar (تنبيه 24h)'}</span>
+                      <ExternalLink size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '0.8rem' }}>
-              انقر على زر <strong>"تصدير لتقويم Google (.ics)"</strong> بالأعلى لتنزيل جدول الجلسات واستيراده في تطبيق التقويم على هاتفك لتصلك إشعارات وتنبيهات الجلسات قبل موعدها بـ 24 ساعة.
-            </p>
-          </div>
+          )}
 
+          {/* Automatic Sync Feature Highlight */}
+          <div style={{ marginTop: '1.2rem', padding: '1rem', background: 'var(--primary-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary-100)', fontSize: '0.82rem', color: 'var(--primary-900)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: '700', marginBottom: '0.3rem' }}>
+              <Sparkles size={16} color="var(--primary-700)" />
+              <span>المزامنة التلقائية والإشعارات:</span>
+            </div>
+            تتم مزامنة مواعيد الجلسات مباشرة في حساب Google وتطبيق التقويم على هاتفك مع تنبيه صوتي تلقائي قبل الجلسة بيوم وقبلها بساعة واحدة.
+          </div>
         </div>
 
       </div>
