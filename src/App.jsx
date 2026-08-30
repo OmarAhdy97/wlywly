@@ -8,6 +8,7 @@ import QuickActionModal from './components/layout/QuickActionModal';
 import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
 import AgendaPage from './pages/AgendaPage';
+import CalendarPage from './pages/CalendarPage';
 import CasesPage from './pages/CasesPage';
 import ClientsPage from './pages/ClientsPage';
 import ArchivePage from './pages/ArchivePage';
@@ -93,6 +94,13 @@ function MainApp() {
             {activeTab === 'agenda' && (
               <AgendaPage 
                 onOpenQuickAction={() => setIsQuickActionOpen(true)} 
+              />
+            )}
+
+            {activeTab === 'calendar' && (
+              <CalendarPage 
+                onOpenQuickAction={() => setIsQuickActionOpen(true)} 
+                setActiveTab={setActiveTab}
               />
             )}
 

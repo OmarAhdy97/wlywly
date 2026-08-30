@@ -2,6 +2,7 @@ import React from 'react';
 import { 
   LayoutDashboard, 
   CalendarDays, 
+  Calendar as CalendarIcon,
   Briefcase, 
   Users, 
   Archive, 
@@ -20,7 +21,8 @@ export default function Sidebar({ activeTab, setActiveTab, isDark, toggleTheme, 
 
   const navItems = [
     { id: 'dashboard', label: 'لوحة التحكم', icon: LayoutDashboard },
-    { id: 'agenda', label: 'أجندة الجلسات اليومية', icon: CalendarDays },
+    { id: 'agenda', label: 'رول الجلسات اليومية', icon: CalendarDays },
+    { id: 'calendar', label: 'التقويم القضائي و Google', icon: CalendarIcon },
     { id: 'cases', label: 'إدارة القضايا', icon: Briefcase },
     { id: 'clients', label: 'سجل الموكلين', icon: Users },
     { id: 'archive', label: 'الأرشيف والقضايا المنتهية', icon: Archive },
