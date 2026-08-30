@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
+import { syncSessionToGoogleCalendar } from '../lib/googleCalendar';
 
 const DataContext = createContext(null);
 
@@ -103,18 +104,26 @@ export function DataProvider({ children }) {
     refreshAll();
 
     if (user) {
-      // Periodically refresh scoped data
       const interval = setInterval(refreshAll, 10000);
       return () => clearInterval(interval);
     }
   }, [user, refreshAll]);
 
-  // Case Actions (Scoped by user_id)
+  // Case Actions with Automatic Google Calendar Background Sync
   const addCase = async (newCase) => {
     if (!user) throw new Error('يجب تسجيل الدخول أولاً');
     const caseData = { ...newCase, user_id: user.id };
     const { data, error } = await supabase.from('cases').insert([caseData]).select();
     if (error) throw error;
+
+    // Automatic Google Calendar sync if session date is provided
+    if (newCase.next_session_date && data && data[0]) {
+      syncSessionToGoogleCalendar(
+        { session_date: newCase.next_session_date, session_time: newCase.next_session_time || '09:00', notes: newCase.notes },
+        data[0]
+      ).catch(e => console.log('Auto-sync notice:', e));
+    }
+
     await refreshAll();
     return data;
   };
@@ -128,6 +137,15 @@ export function DataProvider({ children }) {
       .eq('user_id', user.id)
       .select();
     if (error) throw error;
+
+    // Automatic Google Calendar sync if new session date set
+    if (updates.next_session_date && data && data[0]) {
+      syncSessionToGoogleCalendar(
+        { session_date: updates.next_session_date, session_time: updates.next_session_time || '09:00', notes: updates.notes },
+        data[0]
+      ).catch(e => console.log('Auto-sync notice:', e));
+    }
+
     await refreshAll();
     return data;
   };
@@ -143,7 +161,7 @@ export function DataProvider({ children }) {
     await refreshAll();
   };
 
-  // Client Actions (Scoped by user_id)
+  // Client Actions
   const addClient = async (newClient) => {
     if (!user) throw new Error('يجب تسجيل الدخول أولاً');
     const clientData = { ...newClient, user_id: user.id };
@@ -177,7 +195,7 @@ export function DataProvider({ children }) {
     await refreshAll();
   };
 
-  // Session Actions (Scoped by user_id)
+  // Session Actions with Automatic Google Calendar Background Sync
   const addSession = async (sessionData, caseUpdates) => {
     if (!user) throw new Error('يجب تسجيل الدخول أولاً');
     const sessionWithUser = { ...sessionData, user_id: user.id };
@@ -185,17 +203,22 @@ export function DataProvider({ children }) {
     if (error) throw error;
 
     if (caseUpdates && sessionData.case_id) {
-      await supabase
+      const { data: updatedCaseData } = await supabase
         .from('cases')
         .update(caseUpdates)
         .eq('id', sessionData.case_id)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .select();
+
+      if (updatedCaseData && updatedCaseData[0]) {
+        syncSessionToGoogleCalendar(sessionData, updatedCaseData[0]).catch(e => console.log('Auto-sync notice:', e));
+      }
     }
     await refreshAll();
     return data;
   };
 
-  // Team Actions (Scoped by user_id)
+  // Team Actions
   const addTeamMember = async (member) => {
     if (!user) throw new Error('يجب تسجيل الدخول أولاً');
     const memberWithUser = { ...member, user_id: user.id };

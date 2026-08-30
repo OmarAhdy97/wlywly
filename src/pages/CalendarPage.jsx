@@ -12,19 +12,16 @@ import {
   CheckCircle2, 
   Bell, 
   Sparkles,
-  RefreshCw,
-  Eye,
   Gavel
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { CASE_TYPES, CASE_STATUSES } from '../lib/supabase';
-import { syncSessionToGoogleCalendar } from '../lib/googleCalendar';
+import { syncSessionToGoogleCalendar, buildRichLegalEvent } from '../lib/googleCalendar';
 
 export default function CalendarPage({ onOpenQuickAction }) {
   const { cases } = useData();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date().toISOString().split('T')[0]);
-  const [selectedSessionModal, setSelectedSessionModal] = useState(null);
   const [syncingId, setSyncingId] = useState(null);
   const [syncNotice, setSyncNotice] = useState('');
 
@@ -75,7 +72,7 @@ export default function CalendarPage({ onOpenQuickAction }) {
 
   const selectedEvents = eventsByDate[selectedDay] || [];
 
-  // 1-Click Sync Handler
+  // Direct Sync Handler with full rich legal payload
   const handleDirectSync = async (sessionEvent) => {
     setSyncingId(sessionEvent.id);
     const result = await syncSessionToGoogleCalendar(
@@ -88,7 +85,7 @@ export default function CalendarPage({ onOpenQuickAction }) {
       if (result.isFallback && result.fallbackUrl) {
         window.open(result.fallbackUrl, '_blank');
       } else {
-        setSyncNotice(`تمت مزامنة جلسة دعوى ${sessionEvent.caseData.case_number} تلقائياً مع Google Calendar!`);
+        setSyncNotice(`تمت المزامنة التلقائية لجلسة دعوى ${sessionEvent.caseData.case_number} مع Google Calendar!`);
         setTimeout(() => setSyncNotice(''), 4000);
       }
     } else {
@@ -96,7 +93,7 @@ export default function CalendarPage({ onOpenQuickAction }) {
     }
   };
 
-  // Export All Upcoming Sessions as iCal (.ics) file
+  // Export All Upcoming Sessions as iCal (.ics) file with rich details
   const downloadIcsFile = () => {
     const upcoming = activeCases.filter(c => c.next_session_date);
     if (upcoming.length === 0) {
@@ -116,6 +113,10 @@ export default function CalendarPage({ onOpenQuickAction }) {
     upcoming.forEach(c => {
       const dateStr = c.next_session_date.split('T')[0].replace(/-/g, '');
       const timeStr = (c.next_session_time || '09:00').replace(':', '') + '00';
+      const { summary, description, location } = buildRichLegalEvent({}, c);
+
+      // Clean description for iCalendar format
+      const icsDesc = description.replace(/\n/g, '\\n');
 
       icsContent.push(
         'BEGIN:VEVENT',
@@ -123,9 +124,9 @@ export default function CalendarPage({ onOpenQuickAction }) {
         `DTSTAMP:${dateStr}T000000Z`,
         `DTSTART:${dateStr}T${timeStr}`,
         `DTEND:${dateStr}T140000`,
-        `SUMMARY:جلسة دعوى ${c.case_number}/${c.case_year} - ${c.court_name}`,
-        `DESCRIPTION:المدعي: ${c.plaintiff_name} | المدعى عليه: ${c.defendant_name} | الموضوع: ${c.case_title || ''}`,
-        `LOCATION:${c.court_name}`,
+        `SUMMARY:${summary}`,
+        `DESCRIPTION:${icsDesc}`,
+        `LOCATION:${location}`,
         'BEGIN:VALARM',
         'TRIGGER:-P1D',
         'ACTION:DISPLAY',
@@ -134,7 +135,7 @@ export default function CalendarPage({ onOpenQuickAction }) {
         'BEGIN:VALARM',
         'TRIGGER:-PT1H',
         'ACTION:DISPLAY',
-        'DESCRIPTION:تذكير: موعد الجلسة بعد ساعة',
+        'DESCRIPTION:تذكير: موعد الجلسة بعد ساعة واحدة',
         'END:VALARM',
         'END:VEVENT'
       );
@@ -150,7 +151,7 @@ export default function CalendarPage({ onOpenQuickAction }) {
     link.click();
     document.body.removeChild(link);
 
-    setSyncNotice('تم تنزيل ملف المزامنة لتقويم الهاتف بنجاح!');
+    setSyncNotice('تم تنزيل وتصدير جميع الجلسات بتفاصيلها الكاملة!');
     setTimeout(() => setSyncNotice(''), 4000);
   };
 
@@ -169,7 +170,6 @@ export default function CalendarPage({ onOpenQuickAction }) {
 
         <div className="cal-header-actions">
           <button className="btn btn-secondary" onClick={downloadIcsFile} title="مزامنة شاملة لكل الجلسات">
-            {/* Google Calendar Logo */}
             <svg width="18" height="18" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10z"/>
             </svg>
@@ -248,7 +248,7 @@ export default function CalendarPage({ onOpenQuickAction }) {
                 >
                   <div className="cal-cell-header">
                     <span className="cal-cell-number">{dayNum}</span>
-                    {isToday && <span className="cal-today-badge">اليوم</span>}
+                    {/* Clean day header without extra badges */}
                   </div>
 
                   {/* Desktop Events List inside the Cell */}
@@ -261,7 +261,6 @@ export default function CalendarPage({ onOpenQuickAction }) {
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedDay(formattedDate);
-                          setSelectedSessionModal(evt);
                         }}
                       >
                         <span className="event-pill-time">{evt.time}</span>
@@ -332,6 +331,7 @@ export default function CalendarPage({ onOpenQuickAction }) {
                   <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.5rem' }}>
                     <div>📍 <strong>المحكمة:</strong> {evt.court} {evt.courtRoom && `(قاعة: ${evt.courtRoom})`}</div>
                     <div>⏰ <strong>الموعد:</strong> الساعة {evt.time} صباحاً</div>
+                    <div>⚖️ <strong>الخصوم:</strong> {evt.caseData.plaintiff_name} ضد {evt.caseData.defendant_name}</div>
                   </div>
 
                   {/* Google Calendar Automatic Sync Button */}
@@ -358,9 +358,9 @@ export default function CalendarPage({ onOpenQuickAction }) {
           <div style={{ marginTop: '1.2rem', padding: '1rem', background: 'var(--primary-50)', borderRadius: 'var(--radius-md)', border: '1px solid var(--primary-100)', fontSize: '0.82rem', color: 'var(--primary-900)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: '700', marginBottom: '0.3rem' }}>
               <Sparkles size={16} color="var(--primary-700)" />
-              <span>المزامنة التلقائية والإشعارات:</span>
+              <span>المزامنة التلقائية الكاملة:</span>
             </div>
-            تتم مزامنة مواعيد الجلسات مباشرة في حساب Google وتطبيق التقويم على هاتفك مع تنبيه صوتي تلقائي قبل الجلسة بيوم وقبلها بساعة واحدة.
+            يتم حفظ جميع بيانات الدعوى (رقم القضية، المحكمة، القاعة، أسماء الخصوم، وموضوع الدعوى) تلقائياً في تقويم Google وتفعيل إشعار مسبق بيوم وبساعة.
           </div>
         </div>
 
