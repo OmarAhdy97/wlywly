@@ -73,11 +73,6 @@ export function AuthProvider({ children }) {
       provider: 'google',
       options: {
         redirectTo: window.location.origin,
-        scopes: 'https://www.googleapis.com/auth/calendar.events',
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
       },
     });
     if (error) throw error;
