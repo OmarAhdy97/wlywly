@@ -118,10 +118,10 @@ export default function SearchDeadlinesPage({ searchTerm, setSearchTerm, setActi
                   {matchingCases.map(c => (
                     <div key={c.id} style={{ padding: '0.9rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                        <strong style={{ fontSize: '1rem', color: 'var(--primary-700)' }}>
+                        <strong style={{ fontSize: '1rem', color: 'var(--brand-accent)' }}>
                           دعوى رقم {c.case_number}/{c.case_year} — {c.case_title || c.plaintiff_name}
                         </strong>
-                        <span className="badge" style={{ background: 'var(--primary-100)', color: 'var(--primary-700)' }}>
+                        <span className="badge" style={{ background: 'var(--primary-100)', color: 'var(--brand-accent)' }}>
                           {CASE_TYPES[c.case_type] || c.case_type}
                         </span>
                       </div>
@@ -152,7 +152,7 @@ export default function SearchDeadlinesPage({ searchTerm, setSearchTerm, setActi
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
                   {matchingClients.map(c => (
                     <div key={c.id} style={{ padding: '0.8rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                      <strong style={{ fontSize: '0.95rem' }}>{c.name}</strong>
+                      <strong style={{ fontSize: '0.95rem', color: 'var(--brand-accent)' }}>{c.name}</strong>
                       <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
                         {c.phone ? `هاتف: ${c.phone}` : 'بدون هاتف'} | {c.power_of_attorney_number ? `توكيل: ${c.power_of_attorney_number}` : ''}
                       </div>
@@ -201,14 +201,14 @@ export default function SearchDeadlinesPage({ searchTerm, setSearchTerm, setActi
             </div>
 
             {/* Calculated Result Box */}
-            <div style={{ padding: '1.5rem', background: 'linear-gradient(135deg, var(--primary-900), var(--primary-700))', color: '#ffffff', borderRadius: 'var(--radius-lg)', marginTop: '1.5rem' }}>
-              <div style={{ fontSize: '0.85rem', color: '#fed65b', marginBottom: '0.3rem' }}>
+            <div className="deadline-result-box">
+              <div className="deadline-badge-title">
                 آخر ميعاد قانوني لإيداع التقرير بالطعن:
               </div>
-              <h2 style={{ fontSize: '1.8rem', color: '#ffffff', fontWeight: '800' }}>
+              <h2 className="deadline-date-title">
                 {deadlineDate ? deadlineDate.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '—'}
               </h2>
-              <p style={{ fontSize: '0.82rem', color: '#c2d5ec', marginTop: '0.6rem' }}>
+              <p className="deadline-law-ref">
                 السند القانوني: {DEADLINE_PRESETS[appealType]?.law}
               </p>
             </div>
@@ -227,8 +227,8 @@ export default function SearchDeadlinesPage({ searchTerm, setSearchTerm, setActi
               {Object.entries(DEADLINE_PRESETS).map(([k, v]) => (
                 <div key={k} style={{ padding: '0.8rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
-                    <strong style={{ color: 'var(--primary-700)' }}>{v.title}</strong>
-                    <span className="badge" style={{ background: 'var(--primary-100)', color: 'var(--primary-700)' }}>
+                    <strong style={{ color: 'var(--brand-accent)' }}>{v.title}</strong>
+                    <span className="badge" style={{ background: 'var(--primary-100)', color: 'var(--brand-accent)' }}>
                       {v.days} يوم
                     </span>
                   </div>
