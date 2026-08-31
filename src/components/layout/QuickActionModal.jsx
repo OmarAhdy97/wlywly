@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Briefcase, Users, CalendarPlus, UserCheck } from 'lucide-react';
 import { useData } from '../../context/DataContext';
-import { CASE_TYPES, COURT_LEVELS, CASE_STATUSES } from '../../lib/supabase';
+import { CASE_TYPES, COURT_LEVELS, CASE_STATUSES, SESSION_DECISIONS } from '../../lib/supabase';
 
 export default function QuickActionModal({ isOpen, onClose, initialMode = 'case' }) {
   const [activeMode, setActiveMode] = useState(initialMode);
@@ -12,8 +12,8 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
   // Form states for Case
   const [caseNumber, setCaseNumber] = useState('');
   const [caseYear, setCaseYear] = useState(new Date().getFullYear());
-  const [caseType, setCaseType] = useState('civil');
-  const [courtLevel, setCourtLevel] = useState('primary');
+  const [caseType, setCaseType] = useState('مدني');
+  const [courtLevel, setCourtLevel] = useState('ابتدائي');
   const [courtName, setCourtName] = useState('محكمة دمياط الابتدائية');
   const [caseTitle, setCaseTitle] = useState('');
   const [plaintiffName, setPlaintiffName] = useState('');
@@ -53,7 +53,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
         case_type: caseType,
         court_level: courtLevel,
         court_name: courtName,
-        case_title: caseTitle || `دعوى ${CASE_TYPES[caseType]} رقم ${caseNumber}`,
+        case_title: caseTitle || (caseType ? `دعوى ${CASE_TYPES[caseType] || caseType} رقم ${caseNumber}` : `دعوى رقم ${caseNumber}`),
         plaintiff_name: plaintiffName,
         defendant_name: defendantName,
         client_id: selectedClientId || null,
@@ -212,31 +212,49 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
                   <label className="form-label">نوع القضية *</label>
-                  <select className="form-select" value={caseType} onChange={(e) => setCaseType(e.target.value)}>
-                    {Object.entries(CASE_TYPES).map(([k, v]) => (
-                      <option key={k} value={k}>{v}</option>
-                    ))}
-                  </select>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="مثال: مدني، جنائي، أسرة، تعويضات..." 
+                    required 
+                    value={caseType} 
+                    onChange={(e) => setCaseType(e.target.value)} 
+                  />
                 </div>
                 <div className="form-group">
                   <label className="form-label">درجة التقاضي *</label>
-                  <select className="form-select" value={courtLevel} onChange={(e) => setCourtLevel(e.target.value)}>
-                    {Object.entries(COURT_LEVELS).map(([k, v]) => (
-                      <option key={k} value={k}>{v}</option>
-                    ))}
-                  </select>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="مثال: ابتدائي، استئناف، نقض، جزئي..." 
+                    required 
+                    value={courtLevel} 
+                    onChange={(e) => setCourtLevel(e.target.value)} 
+                  />
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label">المحكمة والدائرة</label>
-                <input 
-                  type="text" 
-                  className="form-input" 
-                  placeholder="مثال: محكمة دمياط الابتدائية - الدائرة 3 مدني" 
-                  value={courtName} 
-                  onChange={(e) => setCourtName(e.target.value)} 
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                <div className="form-group">
+                  <label className="form-label">المحكمة *</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="مثال: محكمة دمياط الابتدائية" 
+                    value={courtName} 
+                    onChange={(e) => setCourtName(e.target.value)} 
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">الدائرة</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    placeholder="مثال: الدائرة 3 مدني / قاعة 2" 
+                    value={courtRoom} 
+                    onChange={(e) => setCourtRoom(e.target.value)} 
+                  />
+                </div>
               </div>
 
               <div className="form-group">
@@ -424,7 +442,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
                     value={sessionStatus} 
                     onChange={(e) => setSessionStatus(e.target.value)}
                   >
-                    {Object.entries(CASE_STATUSES).map(([k, v]) => (
+                    {Object.entries(SESSION_DECISIONS).map(([k, v]) => (
                       <option key={k} value={k}>{v.label}</option>
                     ))}
                   </select>

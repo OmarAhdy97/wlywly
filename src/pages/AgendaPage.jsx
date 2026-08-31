@@ -11,7 +11,7 @@ import {
   FileSpreadsheet
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
-import { CASE_TYPES, CASE_STATUSES } from '../lib/supabase';
+import { CASE_TYPES, CASE_STATUSES, SESSION_DECISIONS } from '../lib/supabase';
 
 export default function AgendaPage({ onOpenQuickAction }) {
   const { cases, addSession } = useData();
@@ -241,7 +241,7 @@ export default function AgendaPage({ onOpenQuickAction }) {
                     value={decisionStatus} 
                     onChange={(e) => setDecisionStatus(e.target.value)}
                   >
-                    {Object.entries(CASE_STATUSES).map(([k, v]) => (
+                    {Object.entries(SESSION_DECISIONS).map(([k, v]) => (
                       <option key={k} value={k}>{v.label}</option>
                     ))}
                   </select>

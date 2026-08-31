@@ -36,6 +36,12 @@ export const CASE_STATUSES = {
   settled: { label: 'صلح / منتهية', color: 'var(--status-settled)', bg: 'var(--status-settled-bg)' },
 };
 
+export const SESSION_DECISIONS = {
+  adjourned: { label: 'تأجيل', color: 'var(--status-adjourned)', bg: 'var(--status-adjourned-bg)' },
+  finalJudgment: { label: 'حكم نهائي', color: 'var(--status-judgment)', bg: 'var(--status-judgment-bg)' },
+  preliminaryJudgment: { label: 'حكم تمهيدي', color: 'var(--status-prelim)', bg: 'var(--status-prelim-bg)' },
+};
+
 export const USER_ROLES = {
   managingPartner: 'محامي نقض / مدير المكتب',
   seniorLawyer: 'محامي استئناف',
