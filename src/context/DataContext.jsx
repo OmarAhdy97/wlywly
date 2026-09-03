@@ -11,6 +11,8 @@ export function DataProvider({ children }) {
   const [clients, setClients] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [team, setTeam] = useState([]);
+  const [adminTasks, setAdminTasks] = useState([]);
+  const [bailiffTasks, setBailiffTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -86,17 +88,85 @@ export function DataProvider({ children }) {
     }
   }, [user]);
 
+  const fetchAdminTasks = useCallback(async () => {
+    if (!user) {
+      setAdminTasks([]);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('admin_tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (!error && data) {
+        setAdminTasks(data);
+        localStorage.setItem(`admin_tasks_${user.id}`, JSON.stringify(data));
+        return;
+      }
+    } catch (err) {
+      // fallback
+    }
+
+    try {
+      const saved = localStorage.getItem(`admin_tasks_${user.id}`);
+      if (saved) {
+        setAdminTasks(JSON.parse(saved));
+      } else {
+        setAdminTasks([]);
+      }
+    } catch (e) {
+      setAdminTasks([]);
+    }
+  }, [user]);
+
+  const fetchBailiffTasks = useCallback(async () => {
+    if (!user) {
+      setBailiffTasks([]);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('bailiff_tasks')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (!error && data) {
+        setBailiffTasks(data);
+        localStorage.setItem(`bailiff_tasks_${user.id}`, JSON.stringify(data));
+        return;
+      }
+    } catch (err) {
+      // fallback
+    }
+
+    try {
+      const saved = localStorage.getItem(`bailiff_tasks_${user.id}`);
+      if (saved) {
+        setBailiffTasks(JSON.parse(saved));
+      } else {
+        setBailiffTasks([]);
+      }
+    } catch (e) {
+      setBailiffTasks([]);
+    }
+  }, [user]);
+
   const refreshAll = useCallback(async () => {
     if (!user) {
       setCases([]);
       setClients([]);
       setSessions([]);
       setTeam([]);
+      setAdminTasks([]);
+      setBailiffTasks([]);
       setLoading(false);
       return;
     }
     setLoading(true);
-    await Promise.all([fetchCases(), fetchClients(), fetchSessions(), fetchTeam()]);
+    await Promise.all([fetchCases(), fetchClients(), fetchSessions(), fetchTeam(), fetchAdminTasks(), fetchBailiffTasks()]);
     setLoading(false);
   }, [user, fetchCases, fetchClients, fetchSessions, fetchTeam]);
 
@@ -252,6 +322,171 @@ export function DataProvider({ children }) {
     await refreshAll();
   };
 
+  // Administrative Tasks Actions
+  const addAdminTask = async (taskData) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+    const newTask = {
+      id: taskData.id || `task_${Date.now()}`,
+      user_id: user.id,
+      title: taskData.title,
+      client_id: taskData.client_id || null,
+      client_name: taskData.client_name || null,
+      execution_date: taskData.execution_date || new Date().toISOString().split('T')[0],
+      location: taskData.location || null,
+      requirements: taskData.requirements || '',
+      notes: taskData.notes || '',
+      assigned_to: taskData.assigned_to || null,
+      status: taskData.status || 'pending', // 'pending' (قيد التنفيذ) | 'completed' (مكتمل)
+      created_at: new Date().toISOString(),
+      ...taskData,
+    };
+
+    // Try Supabase first
+    try {
+      await supabase.from('admin_tasks').insert([newTask]);
+    } catch (e) {
+      // fallback to local storage
+    }
+
+    setAdminTasks(prev => {
+      const updated = [newTask, ...prev];
+      localStorage.setItem(`admin_tasks_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+
+    return newTask;
+  };
+
+  const updateAdminTask = async (id, updates) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+    try {
+      await supabase
+        .from('admin_tasks')
+        .update(updates)
+        .eq('id', id)
+        .eq('user_id', user.id);
+    } catch (e) {
+      // ignore
+    }
+
+    setAdminTasks(prev => {
+      const updated = prev.map(t => t.id === id ? { ...t, ...updates } : t);
+      localStorage.setItem(`admin_tasks_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const toggleAdminTaskStatus = async (id) => {
+    const current = adminTasks.find(t => t.id === id);
+    if (!current) return;
+    const nextStatus = current.status === 'completed' ? 'pending' : 'completed';
+    await updateAdminTask(id, { status: nextStatus, completed_at: nextStatus === 'completed' ? new Date().toISOString() : null });
+  };
+
+  const deleteAdminTask = async (id) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+    try {
+      await supabase
+        .from('admin_tasks')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+    } catch (e) {
+      // ignore
+    }
+
+    setAdminTasks(prev => {
+      const updated = prev.filter(t => t.id !== id);
+      localStorage.setItem(`admin_tasks_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Bailiff Tasks (قائمة المحضرين) Actions
+  const addBailiffTask = async (taskData) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+    const newTask = {
+      id: taskData.id || `bailiff_${Date.now()}`,
+      user_id: user.id,
+      client_id: taskData.client_id || null,
+      client_name: taskData.client_name || null,
+      notice_nature: taskData.notice_nature || '', // طبيعة الإعلان
+      bailiff_number: taskData.bailiff_number || '', // رقم المحضرين
+      court_name: taskData.court_name || '', // المحكمة
+      bailiff_office: taskData.bailiff_office || '', // قلم المحضرين
+      delivery_date: taskData.delivery_date || new Date().toISOString().split('T')[0], // تاريخ التسليم
+      receipt_date: taskData.receipt_date || null, // تاريخ الاستلام
+      session_date: taskData.session_date || null, // تاريخ الجلسة
+      notes: taskData.notes || '',
+      status: taskData.status || 'pending', // 'pending' (غير مستلم) | 'delivered' (مستلم)
+      created_at: new Date().toISOString(),
+      ...taskData,
+    };
+
+    try {
+      await supabase.from('bailiff_tasks').insert([newTask]);
+    } catch (e) {
+      // fallback
+    }
+
+    setBailiffTasks(prev => {
+      const updated = [newTask, ...prev];
+      localStorage.setItem(`bailiff_tasks_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+
+    return newTask;
+  };
+
+  const updateBailiffTask = async (id, updates) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+    try {
+      await supabase
+        .from('bailiff_tasks')
+        .update(updates)
+        .eq('id', id)
+        .eq('user_id', user.id);
+    } catch (e) {
+      // ignore
+    }
+
+    setBailiffTasks(prev => {
+      const updated = prev.map(t => t.id === id ? { ...t, ...updates } : t);
+      localStorage.setItem(`bailiff_tasks_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const toggleBailiffStatus = async (id) => {
+    const current = bailiffTasks.find(t => t.id === id);
+    if (!current) return;
+    const nextStatus = current.status === 'delivered' ? 'pending' : 'delivered';
+    const updates = {
+      status: nextStatus,
+      receipt_date: nextStatus === 'delivered' ? (current.receipt_date || new Date().toISOString().split('T')[0]) : null
+    };
+    await updateBailiffTask(id, updates);
+  };
+
+  const deleteBailiffTask = async (id) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+    try {
+      await supabase
+        .from('bailiff_tasks')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+    } catch (e) {
+      // ignore
+    }
+
+    setBailiffTasks(prev => {
+      const updated = prev.filter(t => t.id !== id);
+      localStorage.setItem(`bailiff_tasks_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -259,6 +494,8 @@ export function DataProvider({ children }) {
         clients,
         sessions,
         team,
+        adminTasks,
+        bailiffTasks,
         loading,
         error,
         refreshAll,
@@ -272,6 +509,14 @@ export function DataProvider({ children }) {
         addTeamMember,
         updateTeamMember,
         deleteTeamMember,
+        addAdminTask,
+        updateAdminTask,
+        deleteAdminTask,
+        toggleAdminTaskStatus,
+        addBailiffTask,
+        updateBailiffTask,
+        deleteBailiffTask,
+        toggleBailiffStatus,
       }}
     >
       {children}

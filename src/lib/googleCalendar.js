@@ -6,7 +6,7 @@ import { supabase, CASE_TYPES, COURT_LEVELS, CASE_STATUSES } from './supabase';
 export function buildRichLegalEvent(session, caseData) {
   const caseTypeArabic = CASE_TYPES[caseData.case_type] || caseData.case_type || 'دعوى قضائية';
   const courtLevelArabic = COURT_LEVELS[caseData.court_level] || caseData.court_level || 'ابتدائي';
-  const statusArabic = CASE_STATUSES[session.status || caseData.status]?.label || 'منظورة بالجلسة';
+  const statusArabic = CASE_STATUSES[session.status || caseData.status]?.label || 'متداول بالجلسة';
 
   const sessionDate = session.session_date ? session.session_date.split('T')[0] : (caseData.next_session_date ? caseData.next_session_date.split('T')[0] : new Date().toISOString().split('T')[0]);
   const sessionTime = session.session_time || caseData.next_session_time || '09:00';

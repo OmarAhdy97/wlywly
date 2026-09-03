@@ -8,7 +8,6 @@ import {
   ExternalLink,
   Download,
   Briefcase,
-  Plus,
   CheckCircle2,
   Bell,
   Sparkles,
@@ -21,7 +20,7 @@ import {
   buildRichLegalEvent,
 } from "../lib/googleCalendar";
 
-export default function CalendarPage({ onOpenQuickAction }) {
+export default function CalendarPage({ setActiveTab }) {
   const { cases } = useData();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(
@@ -185,29 +184,39 @@ export default function CalendarPage({ onOpenQuickAction }) {
   ];
 
   return (
-    <div className="page-wrapper" style={{ maxWidth: "1600px" }}>
+    <div className="page-wrapper" style={{ maxWidth: "1400px" }}>
       {/* Top Header */}
-      <div className="cal-header-bar">
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '1.25rem',
+        flexWrap: 'wrap',
+        gap: '1rem',
+        borderBottom: '1px solid var(--border-subtle)',
+        paddingBottom: '1rem'
+      }}>
         <div>
-          <h1
-            style={{
-              fontSize: "1.6rem",
-              fontWeight: "800",
-              color: "var(--text-main)",
-            }}
-          >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-gold)' }}></span>
+            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
+              التقويم والمواعيد القضائية
+            </span>
+          </div>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
             التقويم القضائي ومواعيد الجلسات
           </h1>
-          <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-            تقويم تفاعلي كامل مع ميزة المزامنة التلقائية مع Google Calendar
-            وإشعارات الهاتف الذكي.
-          </p>
         </div>
 
-        <div className="cal-header-actions">
-          <button className="btn btn-primary" onClick={onOpenQuickAction}>
-            <Plus size={18} />
-            <span>إضافة موعد / جلسة</span>
+        <div style={{ display: 'flex', gap: '0.65rem' }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            style={{ borderRadius: '10px', padding: '0.55rem 1rem', fontSize: '0.86rem', display: 'flex', alignItems: 'center', gap: '0.45rem' }}
+            onClick={downloadIcsFile}
+          >
+            <Download size={16} />
+            <span>تصدير iCal للموبايل</span>
           </button>
         </div>
       </div>
@@ -412,17 +421,6 @@ export default function CalendarPage({ onOpenQuickAction }) {
               <p style={{ fontSize: "0.85rem" }}>
                 انقر على أي يوم مسجل عليه جلسات لاستعراض ملفاتها.
               </p>
-              <button
-                className="btn btn-secondary"
-                style={{
-                  marginTop: "1rem",
-                  fontSize: "0.85rem",
-                  width: "100%",
-                }}
-                onClick={onOpenQuickAction}
-              >
-                + إضافة جلسة في هذا اليوم
-              </button>
             </div>
           ) : (
             <div
@@ -469,7 +467,7 @@ export default function CalendarPage({ onOpenQuickAction }) {
                         fontSize: "0.72rem",
                       }}
                     >
-                      {CASE_STATUSES[evt.caseData.status]?.label || "منظورة"}
+                      {CASE_STATUSES[evt.caseData.status]?.label || "متداول"}
                     </span>
                   </div>
 

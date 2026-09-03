@@ -342,14 +342,33 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
-                  <label className="form-label">رقم الهاتف</label>
-                  <input 
-                    type="tel" 
-                    className="form-input" 
-                    placeholder="010XXXXXXXX" 
-                    value={clientPhone} 
-                    onChange={(e) => setClientPhone(e.target.value)} 
-                  />
+                  <label className="form-label">رقم الهاتف (مصر)</label>
+                  <div style={{ display: 'flex', direction: 'ltr', alignItems: 'center' }}>
+                    <span style={{ 
+                      padding: '0.6rem 0.75rem', 
+                      background: 'var(--bg-card-subtle)', 
+                      border: '1px solid var(--border-color)', 
+                      borderRight: 'none', 
+                      borderRadius: 'var(--radius-md) 0 0 var(--radius-md)', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: '0.35rem', 
+                      fontWeight: '700', 
+                      fontSize: '0.85rem',
+                      color: 'var(--text-main)'
+                    }}>
+                      <span>🇪🇬</span>
+                      <span>+20</span>
+                    </span>
+                    <input 
+                      type="tel" 
+                      className="form-input" 
+                      placeholder="010XXXXXXXX" 
+                      style={{ borderRadius: '0 var(--radius-md) var(--radius-md) 0', textAlign: 'left', direction: 'ltr' }}
+                      value={clientPhone} 
+                      onChange={(e) => setClientPhone(e.target.value)} 
+                    />
+                  </div>
                 </div>
                 <div className="form-group">
                   <label className="form-label">الرقم القومي (14 رقم)</label>
@@ -426,7 +445,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="form-group">
-                  <label className="form-label">تاريخ الجلسة المنظورة *</label>
+                  <label className="form-label">تاريخ الجلسة المتداولة *</label>
                   <input 
                     type="date" 
                     className="form-input" 

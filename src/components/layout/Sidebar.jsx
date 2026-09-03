@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  LayoutDashboard,
+  BarChart3,
   CalendarDays,
   Calendar as CalendarIcon,
   Briefcase,
@@ -8,6 +8,8 @@ import {
   Archive,
   UserCheck,
   Search,
+  ClipboardList,
+  Send,
   LogOut,
   Moon,
   Sun,
@@ -26,14 +28,16 @@ export default function Sidebar({
   const { user, signOut } = useAuth();
 
   const navItems = [
-    { id: "dashboard", label: "لوحة التحكم", icon: LayoutDashboard },
-    { id: "agenda", label: "رول الجلسات اليومية", icon: CalendarDays },
-    { id: "calendar", label: "التقويم القضائي", icon: CalendarIcon },
-    { id: "cases", label: "إدارة القضايا", icon: Briefcase },
-    { id: "clients", label: "سجل الموكلين", icon: Users },
-    { id: "archive", label: "الأرشيف والقضايا المنتهية", icon: Archive },
-    { id: "team", label: "فريق العمل والمحامين", icon: UserCheck },
-    { id: "search", label: "البحث والمواعيد الإجرائية", icon: Search },
+    { id: "dashboard", label: "المكتب الرقمي", icon: BarChart3 },
+    { id: "agenda", label: "الرول", icon: CalendarDays },
+    { id: "calendar", label: "التقويم", icon: CalendarIcon },
+    { id: "cases", label: "القضايا", icon: Briefcase },
+    { id: "administrative", label: "المهام", icon: ClipboardList },
+    { id: "bailiffs", label: "المحضرين", icon: Send },
+    { id: "clients", label: "الموكلين", icon: Users },
+    { id: "archive", label: "الأرشيف", icon: Archive },
+    { id: "team", label: "فريق العمل", icon: UserCheck },
+    { id: "search", label: "الحاسبة", icon: Search },
   ];
 
   const handleSelect = (id) => {
@@ -66,8 +70,8 @@ export default function Sidebar({
               }}
             />
             <div className="brand-info">
-              <h2>أجندة دمياط</h2>
-              <span>نظام إدارة المحاماة</span>
+              <h2>الأجندة القضائية </h2>
+              <span>إدارة المكتب </span>
             </div>
           </div>
 

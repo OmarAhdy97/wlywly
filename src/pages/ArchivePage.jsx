@@ -35,25 +35,47 @@ export default function ArchivePage() {
   };
 
   return (
-    <div className="page-wrapper">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+    <div className="page-wrapper" style={{ maxWidth: '1400px' }}>
+      {/* Top Header */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '1.25rem',
+        flexWrap: 'wrap',
+        gap: '1rem',
+        borderBottom: '1px solid var(--border-subtle)',
+        paddingBottom: '1rem'
+      }}>
         <div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: '800' }}>أرشيف القضايا المنتهية</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            سجل القضايا المحكومة، المنتهية صلحاً، أو المؤرشفة لحفظ السجلات والمستندات.
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-gold)' }}></span>
+            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
+              السجلات المؤرشفة والقضايا المنتهية
+            </span>
+          </div>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
+            أرشيف القضايا المنتهية
+          </h1>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span className="badge" style={{ background: 'var(--bg-card-subtle)', color: 'var(--text-main)', border: '1px solid var(--border-color)', fontWeight: '700', padding: '0.4rem 0.85rem', fontSize: '0.82rem' }}>
+            {filtered.length} قضية مؤرشفة
+          </span>
         </div>
       </div>
 
       {/* Search */}
-      <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem 1.5rem' }}>
-        <div className="header-search" style={{ width: '100%', maxWidth: '500px' }}>
-          <Search size={18} style={{ color: 'var(--text-subtle)' }} />
+      <div className="card" style={{ marginBottom: '1.25rem', padding: '0.9rem 1.15rem', borderRadius: '14px' }}>
+        <div className="header-search" style={{ width: '100%', minHeight: '40px', borderRadius: '10px' }}>
+          <Search size={17} style={{ color: 'var(--text-subtle)' }} />
           <input 
             type="text" 
             placeholder="بحث في الأرشيف برقم القضية، السنة، أو أسماء الخصوم..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ fontSize: '0.88rem' }}
           />
         </div>
       </div>
@@ -137,30 +159,74 @@ export default function ArchivePage() {
       {/* Case Details Modal */}
       {selectedCase && (
         <div className="modal-backdrop" onClick={() => setSelectedCase(null)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>ملف القضية المؤرشفة رقم {selectedCase.case_number}/{selectedCase.case_year}</h3>
-              <button className="btn btn-secondary btn-icon" onClick={() => setSelectedCase(null)}>
+          <div className="modal-dialog" style={{ maxWidth: '780px', maxHeight: '92vh', display: 'flex', flexDirection: 'column', borderRadius: '16px', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'var(--primary-800)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', flexShrink: 0 }}>
+                  <Archive size={20} />
+                </div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: '900', margin: 0, color: 'var(--text-main)' }}>
+                  ملف القضية المؤرشفة رقم {selectedCase.case_number}/{selectedCase.case_year}
+                </h3>
+              </div>
+              <button className="btn btn-secondary btn-icon" style={{ borderRadius: '8px', width: '36px', height: '36px', padding: 0 }} onClick={() => setSelectedCase(null)}>
                 <X size={18} />
               </button>
             </div>
-            <div className="modal-body">
-              <div style={{ padding: '1rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
-                <h4>{selectedCase.case_title}</h4>
-                <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)' }}>المحكمة: {selectedCase.court_name}</p>
+
+            <div className="modal-body" style={{ overflowY: 'auto', padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+              <div style={{ padding: '1.25rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.8rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <FileText size={20} color="var(--primary-800)" />
+                    <h4 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
+                      {selectedCase.case_title || `دعوى رقم ${selectedCase.case_number}`}
+                    </h4>
+                  </div>
+                  <span className="badge" style={{ background: 'var(--status-dismissed-bg)', color: 'var(--status-dismissed)', fontWeight: '700', padding: '0.35rem 0.85rem' }}>
+                    مؤرشفة
+                  </span>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem', textAlign: 'center', padding: '0.5rem 0' }}>
+                  <div>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>نوع الدعوى</span>
+                    <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>{CASE_TYPES[selectedCase.case_type] || selectedCase.case_type || '—'}</div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>درجة التقاضي</span>
+                    <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>{COURT_LEVELS[selectedCase.court_level] || selectedCase.court_level || '—'}</div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المحكمة</span>
+                    <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>{selectedCase.court_name || '—'}</div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المدعي</span>
+                    <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>{selectedCase.plaintiff_name || '—'}</div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المدعى عليه</span>
+                    <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>{selectedCase.defendant_name || '—'}</div>
+                  </div>
+                </div>
               </div>
 
               {selectedCase.ruling_text && (
-                <div style={{ padding: '1rem', background: 'var(--status-judgment-bg)', borderRadius: 'var(--radius-md)', marginBottom: '1rem' }}>
-                  <strong>منطوق الحكم النهائي:</strong>
-                  <p style={{ marginTop: '0.3rem' }}>{selectedCase.ruling_text}</p>
+                <div style={{ padding: '1.25rem', background: 'var(--status-judgment-bg)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                  <strong style={{ fontSize: '1rem', color: 'var(--status-judgment)' }}>منطوق الحكم النهائي الصادر:</strong>
+                  <p style={{ marginTop: '0.5rem', lineHeight: '1.6', fontSize: '0.95rem' }}>{selectedCase.ruling_text}</p>
                 </div>
               )}
             </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setSelectedCase(null)}>إغلاق</button>
-              <button className="btn btn-primary" onClick={() => handleRestore(selectedCase.id)}>
-                استعادة إلى القضايا المتداولة
+
+            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border-color)' }}>
+              <button className="btn btn-secondary" style={{ borderRadius: '8px', padding: '0.55rem 1.5rem', fontWeight: '700' }} onClick={() => setSelectedCase(null)}>
+                إغلاق
+              </button>
+              <button className="btn btn-primary" style={{ background: 'var(--primary-800)', borderRadius: '8px', padding: '0.55rem 1.35rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }} onClick={() => handleRestore(selectedCase.id)}>
+                <RotateCcw size={16} />
+                <span>استعادة إلى القضايا المتداولة</span>
               </button>
             </div>
           </div>

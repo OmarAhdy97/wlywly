@@ -14,6 +14,8 @@ import ClientsPage from './pages/ClientsPage';
 import ArchivePage from './pages/ArchivePage';
 import TeamPage from './pages/TeamPage';
 import SearchDeadlinesPage from './pages/SearchDeadlinesPage';
+import AdministrativePage from './pages/AdministrativePage';
+import BailiffsPage from './pages/BailiffsPage';
 
 function MainApp() {
   const { user, loading } = useAuth();
@@ -76,6 +78,7 @@ function MainApp() {
         {/* Main Content Area */}
         <div className="main-content">
           <Header 
+            user={user} 
             onOpenQuickAction={() => setIsQuickActionOpen(true)}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
@@ -87,32 +90,33 @@ function MainApp() {
             {activeTab === 'dashboard' && (
               <DashboardPage 
                 setActiveTab={setActiveTab} 
-                onOpenQuickAction={() => setIsQuickActionOpen(true)} 
               />
             )}
 
             {activeTab === 'agenda' && (
-              <AgendaPage 
-                onOpenQuickAction={() => setIsQuickActionOpen(true)} 
-              />
+              <AgendaPage />
             )}
 
             {activeTab === 'calendar' && (
               <CalendarPage 
-                onOpenQuickAction={() => setIsQuickActionOpen(true)} 
                 setActiveTab={setActiveTab}
               />
             )}
 
             {activeTab === 'cases' && (
-              <CasesPage 
-                onOpenQuickAction={() => setIsQuickActionOpen(true)} 
-              />
+              <CasesPage />
+            )}
+
+            {activeTab === 'administrative' && (
+              <AdministrativePage />
+            )}
+
+            {activeTab === 'bailiffs' && (
+              <BailiffsPage />
             )}
 
             {activeTab === 'clients' && (
               <ClientsPage 
-                onOpenQuickAction={() => setIsQuickActionOpen(true)} 
                 setActiveTab={setActiveTab} 
               />
             )}

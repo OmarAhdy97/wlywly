@@ -27,7 +27,7 @@ export const COURT_LEVELS = {
 };
 
 export const CASE_STATUSES = {
-  active: { label: 'منظورة', color: 'var(--status-active)', bg: 'var(--status-active-bg)' },
+  active: { label: 'متداول', color: 'var(--status-active)', bg: 'var(--status-active-bg)' },
   adjourned: { label: 'مؤجلة', color: 'var(--status-adjourned)', bg: 'var(--status-adjourned-bg)' },
   judgmentReserved: { label: 'محجوزة للحكم', color: 'var(--status-reserved)', bg: 'var(--status-reserved-bg)' },
   finalJudgment: { label: 'حكم نهائي', color: 'var(--status-judgment)', bg: 'var(--status-judgment-bg)' },

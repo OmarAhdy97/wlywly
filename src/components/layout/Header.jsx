@@ -18,7 +18,7 @@ export default function Header({ onOpenQuickAction, searchTerm, setSearchTerm, s
 
   return (
     <header className="app-header">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flex: 1, minWidth: 0, marginLeft: '1.2rem' }}>
         {/* Mobile Menu Button */}
         <button 
           className="btn btn-secondary btn-icon mobile-menu-toggle"
@@ -28,12 +28,12 @@ export default function Header({ onOpenQuickAction, searchTerm, setSearchTerm, s
           <Menu size={20} />
         </button>
 
-        {/* Search Bar */}
-        <form className="header-search" onSubmit={handleSearchSubmit}>
+        {/* Full Width Search Bar */}
+        <form className="header-search" onSubmit={handleSearchSubmit} style={{ flex: 1, width: '100%', maxWidth: '100%' }}>
           <Search size={18} style={{ color: 'var(--text-subtle)', flexShrink: 0 }} />
           <input 
             type="text" 
-            placeholder="ابحث برقم القضية، الموكل..." 
+            placeholder="ابحث برقم القضية، الموكل، المحكمة، أو منطوق الحكم..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -41,7 +41,7 @@ export default function Header({ onOpenQuickAction, searchTerm, setSearchTerm, s
       </div>
 
       {/* Header Actions */}
-      <div className="header-actions">
+      <div className="header-actions" style={{ flexShrink: 0 }}>
         <button 
           className="btn btn-secondary btn-icon" 
           onClick={refreshAll} 

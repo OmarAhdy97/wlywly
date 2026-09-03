@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  LayoutDashboard, 
+  BarChart3, 
   CalendarDays, 
   Plus, 
   Briefcase, 
@@ -14,8 +14,8 @@ export default function BottomNav({ activeTab, setActiveTab, onOpenQuickAction }
         className={`bottom-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
         onClick={() => setActiveTab('dashboard')}
       >
-        <LayoutDashboard size={20} />
-        <span>الرئيسية</span>
+        <BarChart3 size={20} />
+        <span>التحليلات</span>
       </div>
 
       <div 

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Briefcase,
-  Plus,
   Search,
   Filter,
   Eye,
@@ -16,12 +15,17 @@ import {
   Check,
   Clock,
   Gavel,
-  AlertCircle
+  AlertCircle,
+  Plus,
+  Printer,
+  Phone,
+  Scale,
+  Building2
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { CASE_TYPES, COURT_LEVELS, CASE_STATUSES, SESSION_DECISIONS, USER_ROLES } from '../lib/supabase';
 
-export default function CasesPage({ onOpenQuickAction }) {
+export default function CasesPage() {
   const { cases, clients, sessions, team, addSession, updateCase, deleteCase } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
@@ -152,39 +156,55 @@ export default function CasesPage({ onOpenQuickAction }) {
   };
 
   return (
-    <div className="page-wrapper">
+    <div className="page-wrapper" style={{ maxWidth: '1400px' }}>
       {/* Page Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '1.25rem',
+        flexWrap: 'wrap',
+        gap: '1rem',
+        borderBottom: '1px solid var(--border-subtle)',
+        paddingBottom: '1rem'
+      }}>
         <div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: '800' }}>إدارة القضايا والدعاوى المتداولة</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            سجل كامل بجميع الدعاوى، الدوائر القضائية، الخصوم، ومواعيد الجلسات.
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-gold)' }}></span>
+            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
+              السجل القضائي وملفات الدعاوى
+            </span>
+          </div>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
+            إدارة القضايا والدعاوى المتداولة
+          </h1>
         </div>
 
-        <button className="btn btn-primary" onClick={onOpenQuickAction}>
-          <Plus size={18} />
-          <span>إضافة دعوى جديدة</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span className="badge" style={{ background: 'var(--primary-100)', color: 'var(--primary-800)', fontWeight: '700', padding: '0.4rem 0.85rem', fontSize: '0.82rem' }}>
+            {filteredCases.length} قضية نشطة
+          </span>
+        </div>
       </div>
 
       {/* Filters & Search Toolbar */}
-      <div className="card" style={{ marginBottom: '1.5rem', padding: '1.2rem 1.5rem' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', alignItems: 'center' }}>
+      <div className="card" style={{ marginBottom: '1.25rem', padding: '0.9rem 1.15rem', borderRadius: '14px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', alignItems: 'center' }}>
 
-          <div className="header-search" style={{ width: '100%' }}>
-            <Search size={18} style={{ color: 'var(--text-subtle)' }} />
+          <div className="header-search" style={{ width: '100%', minHeight: '40px', borderRadius: '10px' }}>
+            <Search size={17} style={{ color: 'var(--text-subtle)' }} />
             <input
               type="text"
               placeholder="بحث برقم القضية، الموكل، أو الخصم..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ fontSize: '0.88rem' }}
             />
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-muted)' }}>النوع:</span>
-            <select className="form-select" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.84rem', fontWeight: '600', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>النوع:</span>
+            <select className="form-select" style={{ fontSize: '0.86rem', minHeight: '40px', borderRadius: '10px', padding: '0.45rem 0.75rem' }} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
               <option value="ALL">جميع الأنواع</option>
               {Object.entries(CASE_TYPES).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
@@ -192,9 +212,9 @@ export default function CasesPage({ onOpenQuickAction }) {
             </select>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-            <span style={{ fontSize: '0.88rem', fontWeight: '600', color: 'var(--text-muted)' }}>الحالة:</span>
-            <select className="form-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.84rem', fontWeight: '600', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>الحالة:</span>
+            <select className="form-select" style={{ fontSize: '0.86rem', minHeight: '40px', borderRadius: '10px', padding: '0.45rem 0.75rem' }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="ALL">جميع الحالات</option>
               {Object.entries(CASE_STATUSES).map(([k, v]) => (
                 <option key={k} value={k}>{v.label}</option>
@@ -323,201 +343,290 @@ export default function CasesPage({ onOpenQuickAction }) {
           .filter(s => s.case_id === current.id)
           .sort((a, b) => new Date(b.session_date || b.created_at) - new Date(a.session_date || a.created_at));
 
+        const assigned = team.find(m => m.id === current.next_steps || m.id === (current.next_steps || '').replace('assigned:', ''));
+
         return (
           <div className="modal-backdrop" onClick={() => setSelectedCase(null)}>
-            <div className="modal-dialog" style={{ maxWidth: '720px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' }} onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
-                  <Briefcase size={20} color="var(--primary-600)" style={{ flexShrink: 0 }} />
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: '800', lineHeight: '1.4', margin: 0, wordBreak: 'break-word' }}>
+            <div className="modal-dialog" style={{ maxWidth: '780px', maxHeight: '92vh', display: 'flex', flexDirection: 'column', borderRadius: '16px', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
+              {/* Modal Header */}
+              <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'var(--primary-800)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', flexShrink: 0 }}>
+                    <Scale size={20} />
+                  </div>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: '900', margin: 0, color: 'var(--text-main)' }}>
                     تفاصيل وسجل الدعوى رقم {current.case_number}/{current.case_year}
                   </h3>
                 </div>
-                <button className="btn btn-secondary btn-icon" style={{ flexShrink: 0 }} onClick={() => setSelectedCase(null)}>
+                <button
+                  className="btn btn-secondary btn-icon"
+                  style={{ borderRadius: '8px', width: '36px', height: '36px', padding: 0 }}
+                  onClick={() => setSelectedCase(null)}
+                >
                   <X size={18} />
                 </button>
               </div>
 
-              <div className="modal-body" style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                {/* Case Info Header Card */}
-                <div style={{ padding: '1rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '0.8rem' }}>
-                    <h4 style={{ color: 'var(--primary-800)', fontSize: '1.05rem', fontWeight: '700', wordBreak: 'break-word', flex: 1, minWidth: '180px' }}>
-                      {current.case_title || `دعوى رقم ${current.case_number}`}
-                    </h4>
-                    <span className="badge" style={{ background: currentStatus.bg, color: currentStatus.color, fontSize: '0.82rem', padding: '0.3rem 0.7rem' }}>
-                      الحالة: {currentStatus.label}
-                    </span>
+              <div className="modal-body" style={{ overflowY: 'auto', padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+                {/* Case Info Top Card */}
+                <div className="case-modal-top-card">
+                  {/* Title & Status Badge */}
+                  <div className="case-modal-header-row">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <FileText size={20} color="var(--primary-800)" style={{ flexShrink: 0 }} />
+                      <h4 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
+                        {current.case_title || `دعوى ${CASE_TYPES[current.case_type] || current.case_type || 'مدني'} رقم ${current.case_number}`}
+                      </h4>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#fdf2f2', color: 'var(--primary-800)', padding: '0.35rem 0.85rem', borderRadius: 'var(--radius-full)', fontSize: '0.88rem', fontWeight: '700', border: '1px solid rgba(109, 15, 27, 0.15)', whiteSpace: 'nowrap' }}>
+                      <Check size={15} strokeWidth={2.5} style={{ flexShrink: 0 }} />
+                      <span>الحالة: {currentStatus.label}</span>
+                    </div>
                   </div>
 
-                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.9rem' }}>
-                    <span className="badge" style={{ background: 'var(--primary-100)', color: 'var(--primary-700)', fontSize: '0.78rem' }}>
-                      نوع الدعوى: {CASE_TYPES[current.case_type] || current.case_type || '—'}
-                    </span>
-                    <span className="badge" style={{ background: 'var(--status-judgment-bg)', color: 'var(--status-judgment)', fontSize: '0.78rem' }}>
-                      درجة التقاضي: {COURT_LEVELS[current.court_level] || current.court_level || '—'}
-                    </span>
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.75rem', fontSize: '0.88rem' }}>
-                    <div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>المحكمة :</span>
-                      <div style={{ fontWeight: '600', wordBreak: 'break-word' }}>{current.court_name || '—'}</div>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>الدائرة :</span>
-                      <div style={{ fontWeight: '600' }}>{current.court_room || 'غير محددة'}</div>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>المدعي:</span>
-                      <div style={{ fontWeight: '600', wordBreak: 'break-word' }}>{current.plaintiff_name || '—'}</div>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>المدعى عليه:</span>
-                      <div style={{ fontWeight: '600', wordBreak: 'break-word' }}>{current.defendant_name || '—'}</div>
-                    </div>
-                    <div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>المحامي المكلف:</span>
-                      <div style={{ fontWeight: '600', color: current.next_steps ? 'var(--primary-700)' : 'var(--text-muted)' }}>
-                        {(() => {
-                          const assigned = team.find(m => m.id === current.next_steps || m.id === (current.next_steps || '').replace('assigned:', ''));
-                          return assigned ? `الأستاذ / ${assigned.name}` : 'غير مسند';
-                        })()}
+                  {/* Row 1: 4 Column Metric Grid */}
+                  <div className="case-modal-metrics-4">
+                    {/* نوع الدعوى */}
+                    <div className="case-metric-item">
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>نوع الدعوى</span>
+                      <div className="case-metric-val">
+                        <Gavel size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
+                        <span>{CASE_TYPES[current.case_type] || current.case_type || 'مدني'}</span>
                       </div>
                     </div>
-                    <div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>تاريخ الجلسة القادمة:</span>
-                      <div style={{ fontWeight: '700', color: current.next_session_date ? 'var(--primary-600)' : 'var(--text-subtle)' }}>
-                        {current.next_session_date ? new Date(current.next_session_date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' }) : 'لا توجد جلسة محددة'}
+
+                    {/* درجة التقاضي */}
+                    <div className="case-metric-item has-border" style={{ borderRight: '1px solid var(--border-subtle)', paddingRight: '0.5rem' }}>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>درجة التقاضي</span>
+                      <div className="case-metric-val">
+                        <Building2 size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
+                        <span>{COURT_LEVELS[current.court_level] || current.court_level || 'ابتدائي'}</span>
+                      </div>
+                    </div>
+
+                    {/* المدعى عليه */}
+                    <div className="case-metric-item has-border" style={{ borderRight: '1px solid var(--border-subtle)', paddingRight: '0.5rem' }}>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المدعى عليه</span>
+                      <div className="case-metric-val">
+                        <User size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
+                        <span>{current.defendant_name || '—'}</span>
+                      </div>
+                    </div>
+
+                    {/* المحامي / المدعي */}
+                    <div className="case-metric-item has-border" style={{ borderRight: '1px solid var(--border-subtle)', paddingRight: '0.5rem' }}>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المحامي</span>
+                      <div className="case-metric-val">
+                        <User size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
+                        <span>{current.plaintiff_name || 'والي'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Horizontal Divider */}
+                  <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '1rem 0' }} />
+
+                  {/* Row 2: 3 Column Metric Grid (المحكمة + المحامي المكلف + تاريخ الجلسة القادمة) */}
+                  <div className="case-modal-metrics-3">
+                    {/* المحكمة */}
+                    <div className="case-metric-item">
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المحكمة</span>
+                      <div className="case-metric-val">
+                        <Building2 size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
+                        <span>{current.court_name || 'محكمة دمياط الابتدائية'}</span>
+                      </div>
+                    </div>
+
+                    {/* المحامي المكلف */}
+                    <div className="case-metric-item has-border" style={{ borderRight: '1px solid var(--border-subtle)', paddingRight: '0.5rem' }}>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المحامي المكلف</span>
+                      <div className="case-metric-val">
+                        <Briefcase size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
+                        <span>{assigned ? `الأستاذ / ${assigned.name}` : 'غير مسند'}</span>
+                      </div>
+                    </div>
+
+                    {/* تاريخ الجلسة القادمة */}
+                    <div className="case-metric-item has-border" style={{ borderRight: '1px solid var(--border-subtle)', paddingRight: '0.5rem' }}>
+                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>تاريخ الجلسة القادمة</span>
+                      <div className="case-metric-val" style={{ color: current.next_session_date ? 'var(--primary-700)' : 'var(--text-main)' }}>
+                        <Calendar size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
+                        <span>{current.next_session_date ? new Date(current.next_session_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }) : 'لا توجد جلسة محددة'}</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Ruling text if any */}
-                {current.ruling_text && (
-                  <div style={{ padding: '1rem', background: 'var(--status-judgment-bg)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
-                      <Gavel size={18} color="var(--status-judgment)" />
-                      <span style={{ fontSize: '0.88rem', fontWeight: '800', color: 'var(--status-judgment)' }}>منطوق الحكم / القرار الصادر:</span>
+                {/* Section Header: سجل الجلسات والتأجيلات */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0.4rem 0', flexWrap: 'wrap', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: '1.5px solid var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Clock size={16} color="var(--text-main)" />
                     </div>
-                    <p style={{ fontSize: '0.92rem', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{current.ruling_text}</p>
-                  </div>
-                )}
-
-                {/* Notes */}
-                {current.notes && (
-                  <div style={{ padding: '0.9rem', background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-muted)' }}>ملاحظات ومستندات مطلوبة:</span>
-                    <p style={{ marginTop: '0.2rem', fontSize: '0.9rem' }}>{current.notes}</p>
-                  </div>
-                )}
-
-                {/* Case Sessions & Postponement History */}
-                <div style={{ marginTop: '0.3rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '0.8rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <Clock size={18} color="var(--primary-600)" style={{ flexShrink: 0 }} />
-                      <span style={{ fontSize: '0.98rem', fontWeight: '700', color: 'var(--primary-800)' }}>
-                        سجل الجلسات والتأجيلات
-                      </span>
-                      <span style={{ fontSize: '0.75rem', background: 'var(--primary-100)', color: 'var(--primary-700)', padding: '0.15rem 0.55rem', borderRadius: '12px', fontWeight: '700' }}>
-                        {caseSessions.length} جلسات
-                      </span>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      style={{ fontSize: '0.82rem', padding: '0.4rem 0.75rem', whiteSpace: 'nowrap' }}
-                      onClick={() => handleOpenDecision(current)}
-                    >
-                      <Plus size={15} />
-                      <span>تسجيل قرار / تأجيل</span>
-                    </button>
+                    <h4 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
+                      سجل الجلسات والتأجيلات
+                    </h4>
+                    <span style={{ background: '#fdf2f2', color: 'var(--primary-800)', padding: '0.2rem 0.65rem', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '700', border: '1px solid rgba(109, 15, 27, 0.1)', whiteSpace: 'nowrap' }}>
+                      {caseSessions.length} جلسات
+                    </span>
                   </div>
 
-                  {caseSessions.length === 0 ? (
-                    <div style={{ padding: '1.5rem', textAlign: 'center', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', border: '1px dashed var(--border-color)', color: 'var(--text-muted)' }}>
-                      <Calendar size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.4 }} />
-                      <p style={{ fontSize: '0.9rem', fontWeight: '600' }}>لا يوجد سجل جلسات مسجل لهذه القضية حتى الآن</p>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-subtle)', marginTop: '0.2rem' }}>
-                        عند تسجيل قرار الجلسة (تأجيل أو حكم)، سيتم حفظه تلقائيًا في هذا السجل الزمني.
-                      </p>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    style={{ background: 'var(--primary-800)', color: '#ffffff', borderRadius: '8px', padding: '0.45rem 1rem', fontSize: '0.88rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
+                    onClick={() => handleOpenDecision(current)}
+                  >
+                    <Plus size={16} />
+                    <span>تسجيل قرار / تأجيل</span>
+                  </button>
+                </div>
+
+                {/* Vertical Timeline */}
+                {caseSessions.length === 0 ? (
+                  <div style={{ padding: '1.75rem', textAlign: 'center', background: 'var(--bg-card-subtle)', borderRadius: '12px', border: '1px dashed var(--border-color)', color: 'var(--text-muted)' }}>
+                    <Calendar size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.4 }} />
+                    <p style={{ fontSize: '0.92rem', fontWeight: '600' }}>لا يوجد سجل جلسات مسجل لهذه القضية حتى الآن</p>
+                    <p style={{ fontSize: '0.82rem', color: 'var(--text-subtle)', marginTop: '0.2rem' }}>
+                      عند تسجيل قرار الجلسة (تأجيل أو حكم)، سيتم حفظه تلقائيًا في هذا السجل الزمني.
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative', paddingRight: '26px' }}>
+                    {/* Continuous vertical dashed line */}
+                    <div style={{ position: 'absolute', right: '9px', top: '16px', bottom: '16px', width: '2px', background: '#e2e8f0', borderRight: '2px dashed #cbd5e1' }} />
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
                       {caseSessions.map((sess, idx) => {
-                        const sessStatus = CASE_STATUSES[sess.status] || SESSION_DECISIONS[sess.status] || { label: sess.status, bg: 'var(--primary-100)', color: 'var(--primary-700)' };
+                        const isJudgment = sess.status === 'finalJudgment' || sess.status === 'preliminaryJudgment' || (sess.status && sess.status.includes('judgment'));
+
+                        let statusBadgeText = 'مؤجلة';
+                        let statusBadgeBg = '#fff7ed';
+                        let statusBadgeColor = '#c2410c';
+                        let statusBadgeBorder = '#ffedd5';
+
+                        if (sess.status === 'finalJudgment') {
+                          statusBadgeText = 'حكم نهائي';
+                          statusBadgeBg = '#f0fdf4';
+                          statusBadgeColor = '#15803d';
+                          statusBadgeBorder = '#dcfce7';
+                        } else if (sess.status === 'preliminaryJudgment') {
+                          statusBadgeText = 'حكم تمهيدي';
+                          statusBadgeBg = '#eff6ff';
+                          statusBadgeColor = '#1d4ed8';
+                          statusBadgeBorder = '#dbeafe';
+                        }
+
+                        const sessDateStr = sess.session_date
+                          ? new Date(sess.session_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })
+                          : '—';
+
+                        const recordTimeStr = sess.created_at
+                          ? new Date(sess.created_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }) + ' - ' + new Date(sess.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+                          : sessDateStr;
+
+                        const lawyerName = assigned ? assigned.name : 'محمود';
+
                         return (
-                          <div
-                            key={sess.id || idx}
-                            style={{
-                              padding: '1rem',
-                              borderRadius: 'var(--radius-md)',
-                              background: 'var(--bg-card)',
-                              border: '1px solid var(--border-color)',
-                              borderRight: `4px solid ${sessStatus.color || 'var(--primary-600)'}`,
-                              boxShadow: 'var(--shadow-sm)'
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Calendar size={16} color="var(--primary-600)" />
-                                <strong style={{ fontSize: '0.95rem' }}>
-                                  جلسة: {sess.session_date ? new Date(sess.session_date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}
-                                </strong>
-                              </div>
-                              <span className="badge" style={{ background: sessStatus.bg, color: sessStatus.color, fontWeight: '700' }}>
-                                {sessStatus.label}
-                              </span>
+                          <div key={sess.id || idx} style={{ position: 'relative' }}>
+                            {/* Timeline Node Dot */}
+                            <div style={{
+                              position: 'absolute',
+                              right: '-26px',
+                              top: '20px',
+                              width: '20px',
+                              height: '20px',
+                              borderRadius: '50%',
+                              background: isJudgment ? '#22c55e' : '#ea580c',
+                              color: '#ffffff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              border: '2px solid #ffffff',
+                              boxShadow: `0 0 0 2px ${isJudgment ? '#22c55e' : '#ea580c'}`,
+                              zIndex: 2
+                            }}>
+                              {isJudgment && <Check size={12} strokeWidth={3} />}
                             </div>
 
-                            {sess.adjournment_reason && (
-                              <div style={{ marginTop: '0.4rem', fontSize: '0.88rem', display: 'flex', gap: '0.4rem', alignItems: 'flex-start' }}>
-                                <span style={{ fontWeight: '700', color: 'var(--text-muted)', minWidth: '90px' }}>سبب التأجيل:</span>
-                                <span style={{ color: 'var(--text-main)' }}>{sess.adjournment_reason}</span>
-                              </div>
-                            )}
+                            {/* Session Card */}
+                            <div className="case-modal-session-card">
+                              {/* Right: Date & Reasons */}
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: 0, flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <Calendar size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
+                                  <strong style={{ fontSize: '1.02rem', color: 'var(--text-main)', fontWeight: '800' }}>
+                                    جلسة: {sessDateStr}
+                                  </strong>
+                                </div>
 
-                            {sess.ruling_text && (
-                              <div style={{ marginTop: '0.4rem', fontSize: '0.88rem', display: 'flex', gap: '0.4rem', alignItems: 'flex-start', background: 'var(--status-judgment-bg)', padding: '0.5rem', borderRadius: '6px' }}>
-                                <span style={{ fontWeight: '700', color: 'var(--status-judgment)', minWidth: '90px' }}>منطوق الحكم:</span>
-                                <span style={{ color: 'var(--text-main)' }}>{sess.ruling_text}</span>
-                              </div>
-                            )}
+                                {sess.adjournment_reason && (
+                                  <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', marginTop: '0.15rem', wordBreak: 'break-word' }}>
+                                    سبب التأجيل: <span style={{ color: 'var(--text-muted)' }}>{sess.adjournment_reason}</span>
+                                  </div>
+                                )}
 
-                            {sess.notes && sess.notes !== sess.adjournment_reason && (
-                              <div style={{ marginTop: '0.4rem', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                                <strong>ملاحظات:</strong> {sess.notes}
+                                {sess.ruling_text && (
+                                  <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', marginTop: '0.15rem', wordBreak: 'break-word' }}>
+                                    منطوق الحكم: <span style={{ color: 'var(--text-muted)' }}>{sess.ruling_text}</span>
+                                  </div>
+                                )}
                               </div>
-                            )}
 
-                            {sess.created_at && (
-                              <div style={{ marginTop: '0.5rem', fontSize: '0.72rem', color: 'var(--text-subtle)', textAlign: 'left' }}>
-                                تم التسجيل: {new Date(sess.created_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              {/* Left: Badge & Registered by */}
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.45rem', flexShrink: 0 }}>
+                                <span style={{
+                                  background: statusBadgeBg,
+                                  color: statusBadgeColor,
+                                  border: `1px solid ${statusBadgeBorder}`,
+                                  fontWeight: '700',
+                                  fontSize: '0.82rem',
+                                  padding: '0.25rem 0.85rem',
+                                  borderRadius: '8px',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {statusBadgeText}
+                                </span>
+
+                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', direction: 'rtl', textAlign: 'left', whiteSpace: 'nowrap' }}>
+                                  تم التسجيل: {recordTimeStr}
+                                </div>
+
+                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                                  <User size={14} style={{ flexShrink: 0 }} />
+                                  <span>بواسطة: {lawyerName}</span>
+                                </div>
                               </div>
-                            )}
+                            </div>
                           </div>
                         );
                       })}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
-              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6rem' }}>
+              {/* Modal Footer */}
+              {/* <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border-color)' }}>
+                <button 
+                  className="btn btn-secondary" 
+                  style={{ borderRadius: '8px', padding: '0.55rem 1.5rem', fontWeight: '700' }} 
+                  onClick={() => setSelectedCase(null)}
+                >
+                  إغلاق
+                </button>
+
                 <button
                   type="button"
                   className="btn btn-primary"
-                  style={{ whiteSpace: 'nowrap' }}
+                  style={{ background: 'var(--primary-800)', color: '#ffffff', borderRadius: '8px', padding: '0.55rem 1.35rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                   onClick={() => handleOpenDecision(current)}
                 >
                   <Clock size={16} />
                   <span>تسجيل قرار / تأجيل جديد</span>
                 </button>
-                <button className="btn btn-secondary" onClick={() => setSelectedCase(null)}>إغلاق</button>
-              </div>
+              </div> */}
             </div>
           </div>
         );
@@ -724,7 +833,7 @@ export default function CasesPage({ onOpenQuickAction }) {
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
                   <div className="form-group">
-                    <label className="form-label">تاريخ الجلسة المنظورة *</label>
+                    <label className="form-label">تاريخ الجلسة المتداولة *</label>
                     <input
                       type="date"
                       className="form-input"

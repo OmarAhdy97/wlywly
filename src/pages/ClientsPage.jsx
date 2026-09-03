@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { 
   Users, 
-  Plus, 
   Search, 
   Phone, 
   CreditCard, 
@@ -15,7 +14,7 @@ import {
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 
-export default function ClientsPage({ onOpenQuickAction, setActiveTab }) {
+export default function ClientsPage({ setActiveTab }) {
   const { clients, cases, updateClient, deleteClient } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClient, setSelectedClient] = useState(null);
@@ -56,31 +55,47 @@ export default function ClientsPage({ onOpenQuickAction, setActiveTab }) {
   };
 
   return (
-    <div className="page-wrapper">
+    <div className="page-wrapper" style={{ maxWidth: '1400px' }}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '1.25rem',
+        flexWrap: 'wrap',
+        gap: '1rem',
+        borderBottom: '1px solid var(--border-subtle)',
+        paddingBottom: '1rem'
+      }}>
         <div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: '800' }}>سجل الموكلين والتوكيلات</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            بيانات الموكلين، أرقام التوكيلات الرسمية، الأتعاب والمستحقات المالية، والقضايا المرتبطة.
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
+            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-gold)' }}></span>
+            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
+              قاعدة بيانات الموكلين والتوكيلات
+            </span>
+          </div>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
+            سجل الموكلين والتوكيلات
+          </h1>
         </div>
 
-        <button className="btn btn-primary" onClick={onOpenQuickAction}>
-          <Plus size={18} />
-          <span>إضافة موكل جديد</span>
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <span className="badge" style={{ background: 'var(--primary-100)', color: 'var(--primary-800)', fontWeight: '700', padding: '0.4rem 0.85rem', fontSize: '0.82rem' }}>
+            {filteredClients.length} موكل مسجل
+          </span>
+        </div>
       </div>
 
       {/* Search Bar */}
-      <div className="card" style={{ marginBottom: '1.5rem', padding: '1rem 1.5rem' }}>
-        <div className="header-search" style={{ width: '100%', maxWidth: '500px' }}>
-          <Search size={18} style={{ color: 'var(--text-subtle)' }} />
+      <div className="card" style={{ marginBottom: '1.25rem', padding: '0.9rem 1.15rem', borderRadius: '14px' }}>
+        <div className="header-search" style={{ width: '100%', minHeight: '40px', borderRadius: '10px' }}>
+          <Search size={17} style={{ color: 'var(--text-subtle)' }} />
           <input 
             type="text" 
             placeholder="ابحث باسم الموكل، رقم الهاتف، الرقم القومي، أو التوكيل..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            style={{ fontSize: '0.88rem' }}
           />
         </div>
       </div>
@@ -109,9 +124,9 @@ export default function ClientsPage({ onOpenQuickAction, setActiveTab }) {
                       <div>
                         <h3 style={{ fontSize: '1.05rem', fontWeight: '700' }}>{client.name}</h3>
                         {client.phone && (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                            <Phone size={12} />
-                            {client.phone}
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', direction: 'ltr' }}>
+                            <span>🇪🇬 +20</span>
+                            <span>{client.phone.startsWith('0') ? client.phone.substring(1) : client.phone}</span>
                           </span>
                         )}
                       </div>
@@ -253,13 +268,31 @@ export default function ClientsPage({ onOpenQuickAction, setActiveTab }) {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                   <div className="form-group">
-                    <label className="form-label">رقم الهاتف</label>
-                    <input 
-                      type="text" 
-                      className="form-input" 
-                      value={editingClient.phone || ''} 
-                      onChange={(e) => setEditingClient({ ...editingClient, phone: e.target.value })} 
-                    />
+                    <label className="form-label">رقم الهاتف (مصر)</label>
+                    <div style={{ display: 'flex', direction: 'ltr', alignItems: 'center' }}>
+                      <span style={{ 
+                        padding: '0.6rem 0.75rem', 
+                        background: 'var(--bg-card-subtle)', 
+                        border: '1px solid var(--border-color)', 
+                        borderRight: 'none', 
+                        borderRadius: 'var(--radius-md) 0 0 var(--radius-md)', 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '0.35rem', 
+                        fontWeight: '700', 
+                        fontSize: '0.85rem' 
+                      }}>
+                        <span>🇪🇬</span>
+                        <span>+20</span>
+                      </span>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        style={{ borderRadius: '0 var(--radius-md) var(--radius-md) 0', textAlign: 'left', direction: 'ltr' }}
+                        value={editingClient.phone || ''} 
+                        onChange={(e) => setEditingClient({ ...editingClient, phone: e.target.value })} 
+                      />
+                    </div>
                   </div>
                   <div className="form-group">
                     <label className="form-label">الرقم القومي</label>
