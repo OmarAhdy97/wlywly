@@ -14,6 +14,7 @@ export function DataProvider({ children }) {
   const [team, setTeam] = useState([]);
   const [adminTasks, setAdminTasks] = useState([]);
   const [bailiffTasks, setBailiffTasks] = useState([]);
+  const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -155,6 +156,39 @@ export function DataProvider({ children }) {
     }
   }, [user]);
 
+  const fetchTransactions = useCallback(async () => {
+    if (!user) {
+      setTransactions([]);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('client_transactions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false });
+      
+      if (!error && data) {
+        setTransactions(data);
+        localStorage.setItem(`client_transactions_${user.id}`, JSON.stringify(data));
+        return;
+      }
+    } catch (err) {
+      // fallback
+    }
+
+    try {
+      const saved = localStorage.getItem(`client_transactions_${user.id}`);
+      if (saved) {
+        setTransactions(JSON.parse(saved));
+      } else {
+        setTransactions([]);
+      }
+    } catch (e) {
+      setTransactions([]);
+    }
+  }, [user]);
+
   const refreshAll = useCallback(async () => {
     if (!user) {
       setCases([]);
@@ -163,13 +197,22 @@ export function DataProvider({ children }) {
       setTeam([]);
       setAdminTasks([]);
       setBailiffTasks([]);
+      setTransactions([]);
       setLoading(false);
       return;
     }
     setLoading(true);
-    await Promise.all([fetchCases(), fetchClients(), fetchSessions(), fetchTeam(), fetchAdminTasks(), fetchBailiffTasks()]);
+    await Promise.all([
+      fetchCases(), 
+      fetchClients(), 
+      fetchSessions(), 
+      fetchTeam(), 
+      fetchAdminTasks(), 
+      fetchBailiffTasks(),
+      fetchTransactions()
+    ]);
     setLoading(false);
-  }, [user, fetchCases, fetchClients, fetchSessions, fetchTeam]);
+  }, [user, fetchCases, fetchClients, fetchSessions, fetchTeam, fetchAdminTasks, fetchBailiffTasks, fetchTransactions]);
 
   useEffect(() => {
     refreshAll();
@@ -522,6 +565,80 @@ export function DataProvider({ children }) {
     });
   };
 
+  // Client Financial Transactions (Statement of Account & Ledger)
+  const addTransaction = async (txData) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+    const numAmount = Math.abs(parseFloat(txData.amount)) || 0;
+    if (numAmount <= 0) throw new Error('يرجى إدخال مبلغ صحيح أكبر من الصفر');
+
+    const newTx = {
+      id: txData.id || `tx_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      client_id: txData.client_id,
+      case_id: txData.case_id || null,
+      type: txData.type, // 'expense' (مصروف/أتعاب على الموكل) or 'payment' (سداد/تحصيل من الموكل)
+      amount: numAmount,
+      description: txData.description || (txData.type === 'expense' ? 'مصروف قضائي / أتعاب' : 'دفعة سداد نقدية'),
+      date: txData.date || new Date().toISOString().split('T')[0],
+      user_id: user.id,
+      created_at: new Date().toISOString(),
+    };
+
+    // Try Supabase insert
+    try {
+      await supabase.from('client_transactions').insert([newTx]);
+    } catch (e) {
+      // Table may not exist yet, fallback to localStorage
+    }
+
+    // Save in state & localStorage
+    setTransactions(prev => {
+      const updated = [newTx, ...prev];
+      localStorage.setItem(`client_transactions_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+
+    // Automatically recalculate and adjust client financial_balance
+    const targetClient = clients.find(c => c.id === txData.client_id);
+    if (targetClient) {
+      const currentBalance = parseFloat(targetClient.financial_balance) || 0;
+      // Expense increases debt (more negative), Payment reduces debt (more positive)
+      const balanceDelta = txData.type === 'expense' ? -numAmount : numAmount;
+      const updatedBalance = currentBalance + balanceDelta;
+      await updateClient(txData.client_id, { financial_balance: updatedBalance });
+    }
+
+    return newTx;
+  };
+
+  const deleteTransaction = async (id) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+    const txToDelete = transactions.find(t => t.id === id);
+
+    try {
+      await supabase.from('client_transactions').delete().eq('id', id).eq('user_id', user.id);
+    } catch (e) {
+      // ignore
+    }
+
+    setTransactions(prev => {
+      const updated = prev.filter(t => t.id !== id);
+      localStorage.setItem(`client_transactions_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+
+    // Reverse balance adjustment on client
+    if (txToDelete) {
+      const targetClient = clients.find(c => c.id === txToDelete.client_id);
+      if (targetClient) {
+        const currentBalance = parseFloat(targetClient.financial_balance) || 0;
+        // Reversal: if it was an expense, subtract the debt (- -amount = +amount); if payment, add back debt (-amount)
+        const balanceDelta = txToDelete.type === 'expense' ? txToDelete.amount : -txToDelete.amount;
+        const updatedBalance = currentBalance + balanceDelta;
+        await updateClient(txToDelete.client_id, { financial_balance: updatedBalance });
+      }
+    }
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -531,6 +648,7 @@ export function DataProvider({ children }) {
         team,
         adminTasks,
         bailiffTasks,
+        transactions,
         loading,
         error,
         refreshAll,
@@ -552,6 +670,9 @@ export function DataProvider({ children }) {
         updateBailiffTask,
         deleteBailiffTask,
         toggleBailiffStatus,
+        fetchTransactions,
+        addTransaction,
+        deleteTransaction,
       }}
     >
       {children}

@@ -222,3 +222,87 @@ export async function verifyAndFetchClientChatId(clientId) {
     return null;
   }
 }
+
+/**
+ * Builds an official Arabic statement of account message for Telegram
+ */
+export function buildClientStatementMessage({ client, lawyerUser, transactions, currentBalance, clientCases }) {
+  const clientName = client?.name || 'الموكل العزيز';
+  const lawyerName = lawyerUser?.user_metadata?.full_name || 'مكتب المحاماة';
+  const lawyerPhone = lawyerUser?.user_metadata?.phone || '';
+
+  const totalExpenses = (transactions || [])
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+
+  const totalPayments = (transactions || [])
+    .filter(t => t.type === 'payment')
+    .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+
+  const netNum = currentBalance !== undefined ? parseFloat(currentBalance) : (totalPayments - totalExpenses);
+  const isDebtor = netNum < 0;
+  const balanceText = isDebtor 
+    ? `🔴 <b>مستحق على سيادتكم:</b> ${Math.abs(netNum).toLocaleString('en-US')} ج.م` 
+    : netNum > 0 
+      ? `🟢 <b>رصيد دائن لسيادتكم:</b> ${netNum.toLocaleString('en-US')} ج.م` 
+      : '⚪ <b>الحساب خالص بالكامل:</b> (0 ج.م)';
+
+  // Recent 6 transactions
+  let txDetails = '';
+  if (transactions && transactions.length > 0) {
+    const recentTx = [...transactions].slice(-6).reverse();
+    txDetails = recentTx.map(t => {
+      const isExp = t.type === 'expense';
+      const sign = isExp ? '➖' : '➕';
+      const label = isExp ? 'مصروف/أتعاب' : 'دفعة سداد';
+      return `• ${sign} <b>${t.amount} ج.م</b> — ${escapeHtml(t.description)} (<i>${label} - ${t.date || ''}</i>)`;
+    }).join('\n');
+  } else {
+    txDetails = '• لا توجد حركات تفصيلية مسجلة بعد.';
+  }
+
+  const todayArabic = new Date().toLocaleDateString('ar-EG', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  return `
+📜 <b>كشف حساب مالي ومطالبة أتعاب</b>
+
+مرحباً بك أستاذ/ة <b>${escapeHtml(clientName)}</b>،
+كشف حساب صادر من: <b>مكتب أ / ${escapeHtml(lawyerName)}</b> ${lawyerPhone ? `(📞 ${escapeHtml(lawyerPhone)})` : ''}
+
+━━━━━━━━━━━━━━━━━━━
+👤 <b>الموكل:</b> ${escapeHtml(clientName)}
+📑 <b>رقم التوكيل:</b> ${escapeHtml(client?.power_of_attorney_number || 'غير مسجل')}
+━━━━━━━━━━━━━━━━━━━
+
+📊 <b>بيان المعاملات المالية الأخيرة:</b>
+${txDetails}
+
+━━━━━━━━━━━━━━━━━━━
+💰 <b>الملخص المالي العام:</b>
+• إجمالي المصروفات والأتعاب: <b>${totalExpenses.toLocaleString('en-US')} ج.م</b>
+• إجمالي المبالغ المسددة: <b>${totalPayments.toLocaleString('en-US')} ج.م</b>
+━━━━━━━━━━━━━━━━━━━
+${balanceText}
+━━━━━━━━━━━━━━━━━━━
+
+📌 <i>طرق السداد المتاحة: نقداً بمقر المكتب، أو عبر المحافظ الإلكترونية / إنستاباي.</i>
+🗓️ <i>تاريخ الكشف: ${escapeHtml(todayArabic)}</i>
+⚖️ <i>نظام الإدارة المالية — الأجندة القضائية</i>
+  `.trim();
+}
+
+/**
+ * Sends client statement directly via Telegram
+ */
+export async function sendClientStatementTelegram({ client, lawyerUser, transactions, currentBalance, clientCases }) {
+  if (!client || !client.telegram_chat_id) {
+    throw new Error('الموكل غير مربوط بحساب تليجرام');
+  }
+  const messageText = buildClientStatementMessage({ client, lawyerUser, transactions, currentBalance, clientCases });
+  return sendTelegramMessage(client.telegram_chat_id, messageText);
+}

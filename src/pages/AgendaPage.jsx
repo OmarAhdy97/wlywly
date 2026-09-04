@@ -14,7 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { CASE_TYPES, CASE_STATUSES, SESSION_DECISIONS, USER_ROLES } from '../lib/supabase';
 
 export default function AgendaPage() {
-  const { cases, clients, addSession } = useData();
+  const { cases, clients, addSession, addTransaction } = useData();
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [courtFilter, setCourtFilter] = useState('ALL');
@@ -25,6 +25,8 @@ export default function AgendaPage() {
   const [adjournmentReason, setAdjournmentReason] = useState('');
   const [nextDate, setNextDate] = useState('');
   const [rulingText, setRulingText] = useState('');
+  const [sessionExpense, setSessionExpense] = useState('');
+  const [sessionExpenseNote, setSessionExpenseNote] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   // Filter cases matching selected session date
@@ -62,10 +64,25 @@ export default function AgendaPage() {
         notes: adjournmentReason || null,
       }, updates);
 
+      // Auto-log session expense to client's financial account if entered
+      const expAmount = parseFloat(sessionExpense);
+      if (expAmount > 0 && decisionCase.client_id) {
+        await addTransaction({
+          client_id: decisionCase.client_id,
+          case_id: decisionCase.id,
+          type: 'expense',
+          amount: expAmount,
+          description: sessionExpenseNote.trim() || `مصروفات جلسة ${selectedDate}`,
+          date: selectedDate,
+        }).catch(e => console.log('Auto-add session expense notice:', e));
+      }
+
       setDecisionCase(null);
       setAdjournmentReason('');
       setNextDate('');
       setRulingText('');
+      setSessionExpense('');
+      setSessionExpenseNote('');
 
       if (willNotifyTelegram) {
         alert(`✅ تم حفظ القرار وتحديث الأجندة بنجاح، وتم إرسال إشعار فوري للموكل (${linkedClient.name}) عبر التليجرام 📱`);
@@ -362,6 +379,41 @@ export default function AgendaPage() {
                       value={rulingText} 
                       onChange={(e) => setRulingText(e.target.value)} 
                     />
+                  </div>
+                )}
+
+                {/* Optional Session Expenses on Client */}
+                {decisionCase?.client_id && (
+                  <div style={{ 
+                    padding: '0.75rem 0.9rem', 
+                    background: 'var(--bg-card-subtle)', 
+                    borderRadius: '10px', 
+                    border: '1px solid var(--border-color)',
+                    marginTop: '0.4rem'
+                  }}>
+                    <div style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <span>💰</span>
+                      <span>قيد مصاريف بالجلسة على حساب الموكل (اختياري)</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '0.5rem' }}>
+                      <input 
+                        type="number" 
+                        step="any"
+                        className="form-input" 
+                        placeholder="المبلغ (ج.م)" 
+                        style={{ fontSize: '0.82rem', direction: 'ltr', textAlign: 'left' }}
+                        value={sessionExpense} 
+                        onChange={(e) => setSessionExpense(e.target.value)} 
+                      />
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        placeholder="بيان المصروف (أمانة خبير، رسم إيداع، انتقالات...)" 
+                        style={{ fontSize: '0.82rem' }}
+                        value={sessionExpenseNote} 
+                        onChange={(e) => setSessionExpenseNote(e.target.value)} 
+                      />
+                    </div>
                   </div>
                 )}
 
