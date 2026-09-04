@@ -14,7 +14,7 @@ import { useAuth } from '../context/AuthContext';
 import { CASE_TYPES, CASE_STATUSES, SESSION_DECISIONS, USER_ROLES } from '../lib/supabase';
 
 export default function AgendaPage() {
-  const { cases, addSession } = useData();
+  const { cases, clients, addSession } = useData();
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [courtFilter, setCourtFilter] = useState('ALL');
@@ -50,6 +50,9 @@ export default function AgendaPage() {
         notes: adjournmentReason || null,
       };
 
+      const linkedClient = decisionCase.client_id ? clients?.find(c => c.id === decisionCase.client_id) : null;
+      const willNotifyTelegram = !!(linkedClient && linkedClient.telegram_chat_id);
+
       await addSession({
         case_id: decisionCase.id,
         session_date: selectedDate,
@@ -63,6 +66,10 @@ export default function AgendaPage() {
       setAdjournmentReason('');
       setNextDate('');
       setRulingText('');
+
+      if (willNotifyTelegram) {
+        alert(`✅ تم حفظ القرار وتحديث الأجندة بنجاح، وتم إرسال إشعار فوري للموكل (${linkedClient.name}) عبر التليجرام 📱`);
+      }
     } catch (err) {
       alert('خطأ أثناء تسجيل القرار: ' + err.message);
     } finally {
@@ -357,6 +364,52 @@ export default function AgendaPage() {
                     />
                   </div>
                 )}
+
+                {/* Telegram Client Notification Status Notice */}
+                {(() => {
+                  const client = decisionCase?.client_id ? clients?.find(c => c.id === decisionCase.client_id) : null;
+                  if (!client) return null;
+                  if (client.telegram_chat_id) {
+                    return (
+                      <div style={{
+                        padding: '0.65rem 0.85rem',
+                        background: 'rgba(34, 197, 94, 0.08)',
+                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                        borderRadius: '10px',
+                        fontSize: '0.82rem',
+                        color: '#15803d',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        marginTop: '0.75rem'
+                      }}>
+                        <span style={{ fontSize: '1.05rem' }}>📱</span>
+                        <span>
+                          الموكل <b>{client.name}</b> مربوط بالتليجرام — سيتم إرسال إشعار فوري له بنص القرار وتاريخ الجلسة عند الحفظ.
+                        </span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div style={{
+                      padding: '0.65rem 0.85rem',
+                      background: 'var(--bg-card-subtle)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '10px',
+                      fontSize: '0.8rem',
+                      color: 'var(--text-muted)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      marginTop: '0.75rem'
+                    }}>
+                      <span style={{ fontSize: '0.95rem' }}>ℹ️</span>
+                      <span>
+                        الموكل <b>{client.name}</b> غير مربوط بالتليجرام (يمكنك ربطه من صفحة الموكلين لإرسال إشعارات فورية).
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setDecisionCase(null)}>إلغاء</button>

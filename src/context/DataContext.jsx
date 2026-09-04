@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { syncSessionToGoogleCalendar } from '../lib/googleCalendar';
+import { notifyClientOfCaseUpdate } from '../lib/telegram';
 
 const DataContext = createContext(null);
 
@@ -216,6 +217,25 @@ export function DataProvider({ children }) {
       ).catch(e => console.log('Auto-sync notice:', e));
     }
 
+    // Automatic Telegram notification if status or session date updated
+    if (data && data[0] && data[0].client_id && (updates.status || updates.next_session_date || updates.ruling_text)) {
+      const clientItem = clients.find(c => c.id === data[0].client_id);
+      if (clientItem?.telegram_chat_id) {
+        notifyClientOfCaseUpdate({
+          client: clientItem,
+          caseItem: data[0],
+          updateType: updates.status,
+          lawyerUser: user,
+          sessionData: {
+            status: updates.status,
+            next_session_date: updates.next_session_date,
+            notes: updates.notes,
+            ruling_text: updates.ruling_text,
+          }
+        }).catch(e => console.log('Telegram auto-notify on case update:', e));
+      }
+    }
+
     await refreshAll();
     return data;
   };
@@ -265,7 +285,7 @@ export function DataProvider({ children }) {
     await refreshAll();
   };
 
-  // Session Actions with Automatic Google Calendar Background Sync
+  // Session Actions with Automatic Google Calendar & Telegram Sync
   const addSession = async (sessionData, caseUpdates) => {
     if (!user) throw new Error('يجب تسجيل الدخول أولاً');
     const sessionWithUser = { ...sessionData, user_id: user.id };
@@ -282,6 +302,21 @@ export function DataProvider({ children }) {
 
       if (updatedCaseData && updatedCaseData[0]) {
         syncSessionToGoogleCalendar(sessionData, updatedCaseData[0]).catch(e => console.log('Auto-sync notice:', e));
+
+        // Automatic Telegram notification to client
+        const clientId = updatedCaseData[0].client_id;
+        if (clientId) {
+          const clientItem = clients.find(c => c.id === clientId);
+          if (clientItem?.telegram_chat_id) {
+            notifyClientOfCaseUpdate({
+              client: clientItem,
+              caseItem: updatedCaseData[0],
+              updateType: sessionData.status || caseUpdates.status,
+              lawyerUser: user,
+              sessionData: sessionData,
+            }).catch(e => console.log('Telegram session auto-notify error:', e));
+          }
+        }
       }
     }
     await refreshAll();
