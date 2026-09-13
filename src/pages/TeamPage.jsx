@@ -295,7 +295,7 @@ export default function TeamPage() {
           <p style={{ fontSize: '0.9rem' }}>أضف محامين معاونين أو سكرتارية المكتب لتوزيع الحضور والجلسات.</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1.25rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 290px), 1fr))', gap: '1.25rem' }}>
           {team.map((member) => {
             const memberCases = cases.filter(
               c => !c.is_archived && (c.next_steps === member.id || c.next_steps === 'assigned:' + member.id)

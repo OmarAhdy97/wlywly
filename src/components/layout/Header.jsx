@@ -18,18 +18,19 @@ export default function Header({ onOpenQuickAction, searchTerm, setSearchTerm, s
 
   return (
     <header className="app-header">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flex: 1, minWidth: 0, marginLeft: '1.2rem' }}>
+      <div className="header-search-container">
         {/* Mobile Menu Button */}
         <button 
           className="btn btn-secondary btn-icon mobile-menu-toggle"
           onClick={onToggleSidebar}
           title="القائمة"
+          aria-label="القائمة الجانبية"
         >
           <Menu size={20} />
         </button>
 
         {/* Full Width Search Bar */}
-        <form className="header-search" onSubmit={handleSearchSubmit} style={{ flex: 1, width: '100%', maxWidth: '100%' }}>
+        <form className="header-search" onSubmit={handleSearchSubmit}>
           <Search size={18} style={{ color: 'var(--text-subtle)', flexShrink: 0 }} />
           <input 
             type="text" 

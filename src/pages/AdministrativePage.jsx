@@ -406,7 +406,7 @@ export default function AdministrativePage() {
           </button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 290px), 1fr))', gap: '1rem' }}>
           {filteredTasks.map(task => {
             const isDone = task.status === 'completed';
             const assignedMember = team.find(m => m.id === task.assigned_to);

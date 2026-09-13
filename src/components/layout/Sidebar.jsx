@@ -10,6 +10,7 @@ import {
   Search,
   ClipboardList,
   Send,
+  Building2,
   LogOut,
   Moon,
   Sun,
@@ -38,6 +39,7 @@ export default function Sidebar({
     { id: "archive", label: "الأرشيف", icon: Archive },
     { id: "team", label: "فريق العمل", icon: UserCheck },
     { id: "search", label: "الحاسبة", icon: Search },
+    { id: "profile", label: "هوية المكتب", icon: Building2 },
   ];
 
   const handleSelect = (id) => {
@@ -103,7 +105,12 @@ export default function Sidebar({
 
         {/* Sidebar Footer */}
         <div className="sidebar-footer">
-          <div className="user-mini">
+          <div
+            className="user-mini"
+            onClick={() => handleSelect('profile')}
+            title="تعديل هوية وملف المكتب"
+            style={{ cursor: 'pointer' }}
+          >
             <div className="avatar">
               {user?.email ? user.email.charAt(0).toUpperCase() : "م"}
             </div>
@@ -117,7 +124,7 @@ export default function Sidebar({
               <span className="sidebar-user-name">
                 {user?.email?.split("@")[0] || "المحامي"}
               </span>
-              <span className="sidebar-user-status">متصل الآن</span>
+              <span className="sidebar-user-status">متصل الآن • الملف</span>
             </div>
           </div>
 

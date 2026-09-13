@@ -94,7 +94,7 @@ export default function ArchivePage() {
               <thead>
                 <tr>
                   <th>رقم الدعوى والسنة</th>
-                  <th>موضوع الدعوى</th>
+                  <th style={{ minWidth: '170px', maxWidth: '250px' }}>موضوع الدعوى</th>
                   <th>المحكمة</th>
                   <th>المدعي والخصم</th>
                   <th>تاريخ الأرشفة</th>
@@ -108,8 +108,10 @@ export default function ArchivePage() {
                       <strong style={{ fontSize: '1rem', color: 'var(--primary-700)' }}>{c.case_number}</strong> / {c.case_year}
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{CASE_TYPES[c.case_type] || c.case_type}</div>
                     </td>
-                    <td>
-                      <div style={{ fontWeight: '600' }}>{c.case_title || '—'}</div>
+                    <td style={{ minWidth: '170px', maxWidth: '250px', whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                      <div className="case-title-cell" title={c.case_title || ''}>
+                        {c.case_title || '—'}
+                      </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{COURT_LEVELS[c.court_level] || c.court_level}</div>
                     </td>
                     <td>{c.court_name}</td>
@@ -178,8 +180,8 @@ export default function ArchivePage() {
               <div style={{ padding: '1.25rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.8rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <FileText size={20} color="var(--primary-800)" />
-                    <h4 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
+                    <FileText size={20} color="var(--primary-800)" style={{ flexShrink: 0 }} />
+                    <h4 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, color: 'var(--text-main)', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                       {selectedCase.case_title || `دعوى رقم ${selectedCase.case_number}`}
                     </h4>
                   </div>
@@ -188,7 +190,7 @@ export default function ArchivePage() {
                   </span>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '1rem', textAlign: 'center', padding: '0.5rem 0' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 120px), 1fr))', gap: '1rem', textAlign: 'center', padding: '0.5rem 0' }}>
                   <div>
                     <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>نوع الدعوى</span>
                     <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>{CASE_TYPES[selectedCase.case_type] || selectedCase.case_type || '—'}</div>
@@ -220,7 +222,7 @@ export default function ArchivePage() {
               )}
             </div>
 
-            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border-color)' }}>
+            <div className="modal-footer" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.5rem', borderTop: '1px solid var(--border-color)' }}>
               <button className="btn btn-secondary" style={{ borderRadius: '8px', padding: '0.55rem 1.5rem', fontWeight: '700' }} onClick={() => setSelectedCase(null)}>
                 إغلاق
               </button>

@@ -13,10 +13,11 @@ import {
   ShieldCheck,
   HelpCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  Building2
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { USER_ROLES } from '../lib/supabase';
+import { supabase, USER_ROLES } from '../lib/supabase';
 
 export default function AuthPage() {
   // Modes: 'login' | 'signup' | 'forgot' | 'reset'
@@ -24,6 +25,7 @@ export default function AuthPage() {
 
   // Form Fields
   const [fullName, setFullName] = useState('');
+  const [officeName, setOfficeName] = useState('');
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState('authorizedLawyer');
   const [email, setEmail] = useState('');
@@ -68,15 +70,43 @@ export default function AuthPage() {
           throw new Error('كلمتا المرور غير متطابقتين، يرجى التأكد وإعادة المحاولة.');
         }
 
-        await signUp(email, password, {
+        const roleTitle = USER_ROLES[role] || 'محامون ومستشارون قانونيون';
+        const derivedOfficeName = officeName.trim() || (fullName.trim().includes('مكتب') ? fullName.trim() : `مكتب الأستاذ / ${fullName.trim()} للمحاماة والاستشارات القانونية`);
+
+        const signUpResult = await signUp(email, password, {
           data: {
             full_name: fullName.trim(),
+            office_name: derivedOfficeName,
             phone: phone.trim(),
-            role: role
+            role: role,
+            lawyer_title: roleTitle
           }
         });
 
-        setSuccessMsg('تم إنشاء الحساب القضائي بنجاح! يمكنك الآن تسجيل الدخول.');
+        // If user session is returned immediately, save to office_profile table in database right away
+        const createdUser = signUpResult?.user || signUpResult?.data?.user;
+        const createdSession = signUpResult?.session || signUpResult?.data?.session;
+
+        if (createdUser && createdSession) {
+          try {
+            await supabase.from('office_profile').upsert([{
+              user_id: createdUser.id,
+              office_name: derivedOfficeName,
+              lawyer_name: fullName.trim(),
+              lawyer_title: roleTitle,
+              slogan: 'الالتزام .. خبرة .. نتائج',
+              phone: phone.trim(),
+              email: email.trim(),
+              address: '',
+              logo_url: null,
+              updated_at: new Date().toISOString()
+            }], { onConflict: 'user_id' });
+          } catch (e) {
+            console.log('Signup initial profile creation notice:', e);
+          }
+        }
+
+        setSuccessMsg('تم إنشاء الحساب القضائي وحفظ الملف التعريفي بنجاح! يمكنك الآن تسجيل الدخول.');
         setMode('login');
         setPassword('');
         setConfirmPassword('');
@@ -126,7 +156,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div style={{
+    <div className="auth-page-container" style={{
       minHeight: '100vh',
       display: 'flex',
       alignItems: 'center',
@@ -159,7 +189,7 @@ export default function AuthPage() {
         pointerEvents: 'none'
       }}></div>
 
-      <div style={{
+      <div className="auth-card" style={{
         width: '100%',
         maxWidth: mode === 'signup' ? '500px' : '440px',
         background: 'rgba(255, 255, 255, 0.98)',
@@ -289,10 +319,10 @@ export default function AuthPage() {
           {/* SIGNUP SPECIFIC FIELDS */}
           {mode === 'signup' && (
             <>
-              {/* Full Name / Law Firm Name */}
+              {/* Full Name */}
               <div className="form-group" style={{ margin: 0 }}>
                 <label className="form-label" style={{ color: '#24070b', fontWeight: '700', fontSize: '0.84rem' }}>
-                  اسم الأستاذ المحامي / المكتب *
+                  اسم الأستاذ المحامي المسؤول *
                 </label>
                 <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                   <input
@@ -314,8 +344,32 @@ export default function AuthPage() {
                 </div>
               </div>
 
+              {/* Office Name (Optional) */}
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label" style={{ color: '#24070b', fontWeight: '700', fontSize: '0.84rem' }}>
+                  اسم مكتب المحاماة <span style={{ color: '#987a80', fontWeight: 'normal', fontSize: '0.78rem' }}>(اختياري — للهوية والمطبوعات)</span>
+                </label>
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={officeName}
+                    onChange={(e) => setOfficeName(e.target.value)}
+                    placeholder="مثال: مكتب الأستاذ / أحمد محمود للمحاماة والاستشارات"
+                    className="form-input"
+                    style={{
+                      width: '100%',
+                      paddingRight: '2.6rem',
+                      paddingLeft: '0.9rem',
+                      fontSize: '0.88rem',
+                      borderRadius: '10px'
+                    }}
+                  />
+                  <Building2 size={17} color="#987a80" style={{ position: 'absolute', right: '12px', pointerEvents: 'none' }} />
+                </div>
+              </div>
+
               {/* Phone & Role Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+              <div className="form-grid-2" style={{ gap: '0.75rem' }}>
                 {/* Phone */}
                 <div className="form-group" style={{ margin: 0 }}>
                   <label className="form-label" style={{ color: '#24070b', fontWeight: '700', fontSize: '0.84rem' }}>

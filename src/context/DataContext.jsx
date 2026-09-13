@@ -1,10 +1,21 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, USER_ROLES } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { syncSessionToGoogleCalendar } from '../lib/googleCalendar';
 import { notifyClientOfCaseUpdate } from '../lib/telegram';
 
 const DataContext = createContext(null);
+
+export const DEFAULT_OFFICE_PROFILE = {
+  office_name: 'مكتب المحاماة والاستشارات القانونية',
+  lawyer_name: '',
+  lawyer_title: 'محامون ومستشارون قانونيون',
+  slogan: 'الالتزام .. خبرة .. نتائج',
+  phone: '',
+  email: '',
+  address: '',
+  logo_url: null,
+};
 
 export function DataProvider({ children }) {
   const { user } = useAuth();
@@ -15,6 +26,15 @@ export function DataProvider({ children }) {
   const [adminTasks, setAdminTasks] = useState([]);
   const [bailiffTasks, setBailiffTasks] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [officeProfile, setOfficeProfile] = useState(() => {
+    if (user) {
+      try {
+        const saved = localStorage.getItem(`office_profile_${user.id}`);
+        if (saved) return { ...DEFAULT_OFFICE_PROFILE, ...JSON.parse(saved) };
+      } catch (e) { }
+    }
+    return DEFAULT_OFFICE_PROFILE;
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -101,7 +121,7 @@ export function DataProvider({ children }) {
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-      
+
       if (!error && data) {
         setAdminTasks(data);
         localStorage.setItem(`admin_tasks_${user.id}`, JSON.stringify(data));
@@ -134,7 +154,7 @@ export function DataProvider({ children }) {
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-      
+
       if (!error && data) {
         setBailiffTasks(data);
         localStorage.setItem(`bailiff_tasks_${user.id}`, JSON.stringify(data));
@@ -167,7 +187,7 @@ export function DataProvider({ children }) {
         .select('*')
         .eq('user_id', user.id)
         .order('date', { ascending: false });
-      
+
       if (!error && data) {
         setTransactions(data);
         localStorage.setItem(`client_transactions_${user.id}`, JSON.stringify(data));
@@ -189,6 +209,69 @@ export function DataProvider({ children }) {
     }
   }, [user]);
 
+  const fetchOfficeProfile = useCallback(async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('office_profile')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (!error && data) {
+        const merged = { ...DEFAULT_OFFICE_PROFILE, ...data };
+        setOfficeProfile(merged);
+        localStorage.setItem(`office_profile_${user.id}`, JSON.stringify(merged));
+        return;
+      }
+    } catch (err) { }
+
+    try {
+      const saved = localStorage.getItem(`office_profile_${user.id}`);
+      let profileToSave = null;
+
+      if (saved) {
+        profileToSave = { ...DEFAULT_OFFICE_PROFILE, ...JSON.parse(saved), user_id: user.id };
+      } else {
+        const lawyerName = user?.user_metadata?.full_name || user?.user_metadata?.name || '';
+        const roleKey = user?.user_metadata?.role;
+        const lawyerTitle = user?.user_metadata?.lawyer_title || USER_ROLES[roleKey] || DEFAULT_OFFICE_PROFILE.lawyer_title;
+        const officeName = user?.user_metadata?.office_name || (lawyerName
+          ? (lawyerName.includes('مكتب') ? lawyerName : `مكتب الأستاذ / ${lawyerName} للمحاماة والاستشارات القانونية`)
+          : DEFAULT_OFFICE_PROFILE.office_name);
+        const phone = user?.user_metadata?.phone || '';
+        const email = user?.email || '';
+        const address = user?.user_metadata?.address || '';
+
+        profileToSave = {
+          ...DEFAULT_OFFICE_PROFILE,
+          user_id: user.id,
+          lawyer_name: lawyerName,
+          lawyer_title: lawyerTitle,
+          office_name: officeName,
+          phone: phone,
+          email: email,
+          address: address,
+          updated_at: new Date().toISOString(),
+        };
+      }
+
+      setOfficeProfile(profileToSave);
+      localStorage.setItem(`office_profile_${user.id}`, JSON.stringify(profileToSave));
+
+      // Persist to Supabase office_profile table in database immediately!
+      try {
+        await supabase
+          .from('office_profile')
+          .upsert([{ ...profileToSave, user_id: user.id }], { onConflict: 'user_id' });
+      } catch (dbErr) {
+        console.log('Notice: auto-syncing office_profile to database:', dbErr);
+      }
+    } catch (e) {
+      console.log('Error initializing office profile:', e);
+    }
+  }, [user]);
+
   const refreshAll = useCallback(async () => {
     if (!user) {
       setCases([]);
@@ -203,16 +286,17 @@ export function DataProvider({ children }) {
     }
     setLoading(true);
     await Promise.all([
-      fetchCases(), 
-      fetchClients(), 
-      fetchSessions(), 
-      fetchTeam(), 
-      fetchAdminTasks(), 
+      fetchCases(),
+      fetchClients(),
+      fetchSessions(),
+      fetchTeam(),
+      fetchAdminTasks(),
       fetchBailiffTasks(),
-      fetchTransactions()
+      fetchTransactions(),
+      fetchOfficeProfile()
     ]);
     setLoading(false);
-  }, [user, fetchCases, fetchClients, fetchSessions, fetchTeam, fetchAdminTasks, fetchBailiffTasks, fetchTransactions]);
+  }, [user, fetchCases, fetchClients, fetchSessions, fetchTeam, fetchAdminTasks, fetchBailiffTasks, fetchTransactions, fetchOfficeProfile]);
 
   useEffect(() => {
     refreshAll();
@@ -639,6 +723,32 @@ export function DataProvider({ children }) {
     }
   };
 
+  const updateOfficeProfile = async (updates) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+    const newProfile = {
+      ...officeProfile,
+      ...updates,
+      user_id: user.id,
+      updated_at: new Date().toISOString()
+    };
+
+    setOfficeProfile(newProfile);
+    localStorage.setItem(`office_profile_${user.id}`, JSON.stringify(newProfile));
+
+    try {
+      const { error } = await supabase
+        .from('office_profile')
+        .upsert([{ ...newProfile, user_id: user.id }], { onConflict: 'user_id' });
+      if (error) {
+        console.log('Notice: office_profile saved to local storage:', error.message);
+      }
+    } catch (err) {
+      console.log('Notice: office_profile offline fallback used');
+    }
+
+    return newProfile;
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -673,6 +783,9 @@ export function DataProvider({ children }) {
         fetchTransactions,
         addTransaction,
         deleteTransaction,
+        officeProfile,
+        updateOfficeProfile,
+        DEFAULT_OFFICE_PROFILE,
       }}
     >
       {children}

@@ -508,7 +508,7 @@ export default function SearchDeadlinesPage({ searchTerm, setSearchTerm, setActi
       {/* 1. JUDICIAL FEES CALCULATOR TAB                                          */}
       {/* ========================================================================= */}
       {activeTabSub === 'fees' && (
-        <div className="fees-calculator-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '1.25rem', alignItems: 'start' }}>
+        <div className="fees-calculator-grid">
           {/* Form Card */}
           <div className="card" style={{ borderRadius: '14px' }}>
             <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>

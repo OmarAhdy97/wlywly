@@ -189,7 +189,7 @@ export default function CasesPage() {
 
       {/* Filters & Search Toolbar */}
       <div className="card" style={{ marginBottom: '1.25rem', padding: '0.9rem 1.15rem', borderRadius: '14px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.85rem', alignItems: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '0.85rem', alignItems: 'center' }}>
 
           <div className="header-search" style={{ width: '100%', minHeight: '40px', borderRadius: '10px' }}>
             <Search size={17} style={{ color: 'var(--text-subtle)' }} />
@@ -239,7 +239,7 @@ export default function CasesPage() {
               <thead>
                 <tr>
                   <th>رقم الدعوى والسنة</th>
-                  <th>موضوع الدعوى</th>
+                  <th style={{ minWidth: '170px', maxWidth: '250px' }}>موضوع الدعوى</th>
                   <th>المحكمة / الدائرة</th>
                   <th>المدعي والمدعى عليه</th>
                   <th>الجلسة القادمة</th>
@@ -256,8 +256,10 @@ export default function CasesPage() {
                         <strong style={{ fontSize: '1rem', color: 'var(--primary-700)' }}>{c.case_number}</strong> / {c.case_year}
                         <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{CASE_TYPES[c.case_type] || c.case_type}</div>
                       </td>
-                      <td>
-                        <div style={{ fontWeight: '600', maxWidth: '220px' }}>{c.case_title || '—'}</div>
+                      <td style={{ minWidth: '170px', maxWidth: '250px', whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                        <div className="case-title-cell" title={c.case_title || ''}>
+                          {c.case_title || '—'}
+                        </div>
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{COURT_LEVELS[c.court_level] || c.court_level}</div>
                       </td>
                       <td>
@@ -374,7 +376,7 @@ export default function CasesPage() {
                   <div className="case-modal-header-row">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                       <FileText size={20} color="var(--primary-800)" style={{ flexShrink: 0 }} />
-                      <h4 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
+                      <h4 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, color: 'var(--text-main)', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
                         {current.case_title || `دعوى ${CASE_TYPES[current.case_type] || current.case_type || 'مدني'} رقم ${current.case_number}`}
                       </h4>
                     </div>

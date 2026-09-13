@@ -16,6 +16,7 @@ import TeamPage from './pages/TeamPage';
 import SearchDeadlinesPage from './pages/SearchDeadlinesPage';
 import AdministrativePage from './pages/AdministrativePage';
 import BailiffsPage from './pages/BailiffsPage';
+import ProfilePage from './pages/ProfilePage';
 
 function MainApp() {
   const { user, loading } = useAuth();
@@ -53,7 +54,7 @@ function MainApp() {
         fontSize: '1.2rem',
         fontWeight: 'bold',
       }}>
-        جاري تحميل أجندة دمياط القضائية...
+        جاري تحميل الأجندة القضائية...
       </div>
     );
   }
@@ -135,6 +136,10 @@ function MainApp() {
                 setSearchTerm={setSearchTerm}
                 setActiveTab={setActiveTab}
               />
+            )}
+
+            {activeTab === 'profile' && (
+              <ProfilePage />
             )}
           </main>
         </div>

@@ -142,34 +142,37 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="modal-header">
-          <div style={{ display: 'flex', gap: '0.6rem' }}>
+        <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
             <button 
               type="button"
               className={`btn ${activeMode === 'case' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveMode('case')}
+              style={{ fontSize: '0.84rem', padding: '0.45rem 0.8rem' }}
             >
-              <Briefcase size={16} />
+              <Briefcase size={15} />
               <span>إضافة قضية</span>
             </button>
             <button 
               type="button"
               className={`btn ${activeMode === 'client' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveMode('client')}
+              style={{ fontSize: '0.84rem', padding: '0.45rem 0.8rem' }}
             >
-              <Users size={16} />
+              <Users size={15} />
               <span>إضافة موكل</span>
             </button>
             <button 
               type="button"
               className={`btn ${activeMode === 'session' ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveMode('session')}
+              style={{ fontSize: '0.84rem', padding: '0.45rem 0.8rem' }}
             >
-              <CalendarPlus size={16} />
+              <CalendarPlus size={15} />
               <span>تسجيل جلسة</span>
             </button>
           </div>
-          <button className="btn btn-secondary btn-icon" onClick={onClose}>
+          <button className="btn btn-secondary btn-icon" onClick={onClose} style={{ flexShrink: 0 }}>
             <X size={18} />
           </button>
         </div>
@@ -185,7 +188,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
           {/* Mode 1: Case */}
           {activeMode === 'case' && (
             <form onSubmit={handleSaveCase}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">رقم الدعوى *</label>
                   <input 
@@ -209,7 +212,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">نوع القضية *</label>
                   <input 
@@ -268,7 +271,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">المدعي (الطرف الأول) *</label>
                   <input 
@@ -291,7 +294,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">الموكل المرتبط بالدعوى</label>
                   <select 
@@ -340,7 +343,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">رقم الهاتف (مصر)</label>
                   <div style={{ display: 'flex', direction: 'ltr', alignItems: 'center' }}>
@@ -382,7 +385,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">رقم التوكيل</label>
                   <input 
@@ -443,7 +446,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
                 </select>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">تاريخ الجلسة المتداولة *</label>
                   <input 
@@ -469,7 +472,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
               </div>
 
               {sessionStatus === 'adjourned' && (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="form-grid-2">
                   <div className="form-group">
                     <label className="form-label">سبب التأجيل والقرار</label>
                     <input 

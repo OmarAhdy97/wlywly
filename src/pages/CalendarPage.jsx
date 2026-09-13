@@ -120,7 +120,7 @@ export default function CalendarPage({ setActiveTab }) {
       "PRODID:-//Damietta Legal Agenda//Egyptian Courts Calendar//AR",
       "CALSCALE:GREGORIAN",
       "METHOD:PUBLISH",
-      "X-WR-CALNAME:أجندة دمياط القضائية",
+      "X-WR-CALNAME:الأجندة القضائية",
     ];
 
     upcoming.forEach((c) => {

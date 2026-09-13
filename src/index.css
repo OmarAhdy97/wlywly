@@ -135,7 +135,7 @@
 }
 
 /* ==========================================================================
-   STRICT ZERO-OVERFLOW BASE RESET
+   NO UNINTENDED PAGE-LEVEL HORIZONTAL OVERFLOW & BASE RESET
    ========================================================================== */
 
 *,
@@ -151,8 +151,9 @@ html,
 body,
 #root {
   width: 100%;
-  max-width: 100vw;
-  overflow-x: hidden !important;
+  max-width: 100%;
+  overflow-x: clip;
+  /* Cleanly prevents horizontal window scroll while preserving sticky elements */
 }
 
 html {
@@ -170,6 +171,8 @@ body {
   font-weight: 500;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 h1,
@@ -181,7 +184,8 @@ h6 {
   font-family: var(--font-heading);
   font-weight: 800;
   color: var(--text-main);
-  line-height: 1.3;
+  line-height: 1.35;
+  overflow-wrap: break-word;
 }
 
 a {
@@ -200,14 +204,43 @@ textarea {
   background: none;
 }
 
+/* Common Responsive Form Grids */
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+
+.form-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.85rem;
+}
+
+@media (max-width: 640px) {
+
+  .form-grid-2,
+  .form-grid-3,
+  .form-grid-4 {
+    grid-template-columns: 1fr !important;
+    gap: 0.85rem !important;
+  }
+}
+
 /* Layout Containers */
 .app-container {
   display: flex;
   min-height: 100vh;
   width: 100%;
-  max-width: 100vw;
+  max-width: 100%;
   position: relative;
-  overflow-x: hidden !important;
+  overflow-x: clip;
 }
 
 .main-content {
@@ -220,7 +253,6 @@ textarea {
   width: 100%;
   max-width: calc(100vw - var(--sidebar-width));
   min-width: 0 !important;
-  overflow-x: hidden !important;
   transition: margin-right var(--transition-normal);
 }
 
@@ -229,18 +261,37 @@ textarea {
   width: 100%;
   max-width: 100%;
   min-width: 0 !important;
-  overflow-x: hidden !important;
 }
 
 .page-wrapper {
   flex: 1;
   padding: 1.5rem 1.75rem;
-  max-width: 1550px;
+  max-width: 1400px;
   width: 100%;
   min-width: 0 !important;
   margin: 0 auto;
   box-sizing: border-box !important;
-  overflow-x: hidden !important;
+}
+
+@media (max-width: 1024px) {
+  .page-wrapper {
+    padding: 1.25rem 1rem !important;
+    padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 1.5rem) !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .page-wrapper {
+    padding: 0.85rem 0.65rem !important;
+    padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 1.25rem) !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .page-wrapper {
+    padding: 0.75rem 0.45rem !important;
+    padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 1.15rem) !important;
+  }
 }
 
 /* Header */
@@ -259,6 +310,22 @@ textarea {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box !important;
+}
+
+.header-search-container {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex: 1;
+  min-width: 0;
+  margin-left: 1.2rem;
+}
+
+@media (max-width: 768px) {
+  .header-search-container {
+    margin-left: 0.5rem;
+    gap: 0.5rem;
+  }
 }
 
 .header-search {
@@ -849,9 +916,11 @@ textarea {
   width: 100%;
   max-width: 600px;
   max-height: 90vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   box-shadow: var(--shadow-dropdown);
   box-sizing: border-box !important;
+  overflow: hidden;
 }
 
 .modal-header {
@@ -875,6 +944,8 @@ textarea {
   padding: 1.3rem;
   box-sizing: border-box !important;
   flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .modal-footer {
@@ -888,23 +959,26 @@ textarea {
   flex-shrink: 0;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .modal-backdrop {
     padding: 0.5rem;
+    align-items: flex-end;
+    /* Bottom-sheet feel on mobile phones */
   }
 
   .modal-dialog {
-    max-height: 94vh;
-    border-radius: var(--radius-md);
+    max-height: 93vh !important;
+    width: 100% !important;
+    border-radius: 16px 16px 8px 8px !important;
   }
 
   .modal-header {
-    padding: 0.8rem 1rem;
+    padding: 0.85rem 1rem;
     gap: 0.5rem;
   }
 
   .modal-header h3 {
-    font-size: 0.98rem;
+    font-size: 1rem;
   }
 
   .modal-body {
@@ -913,6 +987,10 @@ textarea {
 
   .modal-footer {
     padding: 0.75rem 0.85rem;
+  }
+
+  .modal-footer .btn {
+    flex: 1 1 120px;
   }
 }
 
@@ -928,7 +1006,26 @@ textarea {
   box-sizing: border-box !important;
   display: block;
   position: relative;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
 }
+
+.table-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.table-container::-webkit-scrollbar-track {
+  background: var(--bg-card-subtle);
+  border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {}
+
 
 .data-table {
   width: 100%;
@@ -947,6 +1044,35 @@ textarea {
   white-space: nowrap;
 }
 
+/* Official Law Firm Printable Tables (Agenda Court Roll & Client Statement) */
+.data-table.print-table th,
+.statement-table th {
+  background: #37040a !important;
+  background-color: #37040a !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  border: 1px solid #4f0810 !important;
+  white-space: normal;
+}
+
+.statement-table {
+  min-width: 0 !important;
+  width: 100% !important;
+  table-layout: fixed !important;
+}
+
+.statement-table th,
+.statement-table td {
+  white-space: normal !important;
+  word-break: break-word !important;
+  box-sizing: border-box !important;
+}
+
+.data-table.print-table th *,
+.statement-table th * {
+  color: #ffffff !important;
+}
+
 .data-table td {
   padding: 0.8rem 0.85rem;
   border-bottom: 1px solid var(--border-subtle);
@@ -957,6 +1083,22 @@ textarea {
 
 .data-table tbody tr:hover {
   background: var(--bg-card-subtle);
+}
+
+/* Responsive, Safe-Wrapping Case Title in Data Tables */
+.case-title-cell {
+  max-width: 250px;
+  font-weight: 600;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+  color: var(--text-main);
 }
 
 @media (max-width: 768px) {
@@ -1181,13 +1323,13 @@ textarea {
   bottom: 0;
   left: 0;
   right: 0;
-  height: var(--bottom-nav-height);
+  height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
   background: var(--bg-card);
   border-top: 1px solid var(--border-color);
   z-index: 50;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
   padding: 0 0.4rem;
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   box-sizing: border-box !important;
 }
 
@@ -1197,12 +1339,14 @@ textarea {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.15rem;
+  gap: 0.2rem;
+  min-height: 44px;
   color: var(--text-muted);
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 600;
   cursor: pointer;
-  padding: 0.2rem 0;
+  padding: 0.25rem 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .bottom-nav-item.active {
@@ -1263,6 +1407,12 @@ textarea {
   .mobile-menu-toggle,
   .mobile-close-btn {
     display: flex !important;
+    width: 44px !important;
+    height: 44px !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    align-items: center;
+    justify-content: center;
   }
 
   .main-content {
@@ -1427,6 +1577,35 @@ textarea {
   .data-table td {
     padding: 0.6rem 0.45rem;
     font-size: 0.78rem;
+  }
+
+  /* Calendar fine-tuning for small screens */
+  .cal-grid-weekdays,
+  .cal-grid-cells {
+    gap: 2px !important;
+  }
+
+  .cal-grid-weekday-title {
+    font-size: 0.7rem !important;
+    padding: 2px 0 !important;
+  }
+
+  .cal-desktop-card {
+    padding: 0.75rem 0.5rem !important;
+  }
+
+  .cal-controls-row h2 {
+    font-size: 1.05rem !important;
+  }
+
+  /* Auth page container and card for small screens */
+  .auth-page-container {
+    padding: 1rem 0.6rem !important;
+  }
+
+  .auth-card {
+    padding: 1.5rem 1.15rem !important;
+    border-radius: 16px !important;
   }
 }
 
@@ -1882,6 +2061,13 @@ textarea {
   width: 100%;
 }
 
+.law-firm-print-header {
+  width: 100%;
+  flex-shrink: 0;
+  overflow: visible;
+  box-sizing: border-box;
+}
+
 .printable-court-header {
   margin-bottom: 1.2rem;
   padding: 1.2rem 1.4rem;
@@ -1926,33 +2112,53 @@ textarea {
   }
 }
 
-/* High-Quality Professional Court Printing */
+/* ========================================================================= */
+/* Screen Preview Container for Legal Documents (A4 Sheet Styling on Screen) */
+/* ========================================================================= */
+.printable-document-frame,
+.statement-document-sheet {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(18, 59, 99, 0.08);
+  padding: 1.5rem 1.75rem;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* ========================================================================= */
+/* High-Quality Professional Law Firm Printing (A4 Portrait & PDF Optimized) */
+/* ========================================================================= */
 @media print {
   @page {
     size: A4 portrait;
-    margin: 12mm 14mm 12mm 14mm;
+    margin: 16mm 14mm 16mm 14mm;
   }
 
+  /* Reset shadows and unnecessary screen styles */
   *,
   *::before,
   *::after {
-    background: transparent !important;
-    color: #000000 !important;
     box-shadow: none !important;
     text-shadow: none !important;
     box-sizing: border-box !important;
   }
 
+  /* Force exact color reproduction for law firm branding */
   html,
   body {
     background: #ffffff !important;
-    color: #000000 !important;
+    color: #0f172a !important;
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
     height: auto !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    font-family: 'Alexandria', 'Cairo', 'Tahoma', 'Arial', sans-serif !important;
+    direction: rtl !important;
   }
 
   #root,
@@ -1961,7 +2167,7 @@ textarea {
   .main-content-scroll,
   .page-wrapper {
     background: #ffffff !important;
-    color: #000000 !important;
+    color: #0f172a !important;
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
@@ -1973,16 +2179,19 @@ textarea {
     box-sizing: border-box !important;
   }
 
+  /* Hide Application UI Controls, Navigation, and Non-Printable Elements */
   .no-print,
   .app-sidebar,
   .app-header,
   .mobile-bottom-nav,
   .sidebar-backdrop,
-  .modal-backdrop,
-  .mobile-menu-toggle {
+  .mobile-menu-toggle,
+  .modal-header,
+  .modal-footer {
     display: none !important;
   }
 
+  /* Allow designated print-only elements to be visible */
   .only-print {
     display: block !important;
   }
@@ -1992,85 +2201,232 @@ textarea {
     display: table-cell !important;
   }
 
-  /* Court Paper Official Border Frame */
-  .printable-document-frame {
-    border: 0px solid #000000 !important;
-    padding: 12px 14px !important;
-    border-radius: 4px !important;
+  /* ===== Unified Law Firm Letterhead Print Styles ===== */
+  .law-firm-print-header {
+    padding-bottom: 0.55rem !important;
+    margin-bottom: 0.65rem !important;
+    border-bottom: 2px solid #37040a !important;
+    background: transparent !important;
+    overflow: visible !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    width: 100% !important;
+  }
+
+  .law-firm-print-header * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .law-firm-print-header h2 {
+    color: #37040a !important;
+    font-size: 1.15rem !important;
+    font-weight: 900 !important;
+  }
+
+  .law-firm-print-header .contact-address,
+  .law-firm-print-header .contact-phone {
+    color: #37040a !important;
+    font-weight: 700 !important;
+  }
+
+  .law-firm-print-header .contact-email {
+    color: #6d0f1b !important;
+    font-weight: 600 !important;
+  }
+
+  .court-roll-doc-header {
+    background: transparent !important;
+    border: none !important;
+    border-bottom: 2.5px solid #37040a !important;
+    border-radius: 0 !important;
+    padding: 0.65rem 0.85rem !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  /* ===== Document Containers: Full Printable A4 Width without Borders ===== */
+  .printable-document-frame,
+  .statement-document-sheet,
+  .printable-card,
+  .table-container {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
     min-width: 0 !important;
-    box-sizing: border-box !important;
     background: #ffffff !important;
-    margin: 0 auto !important;
-    overflow: hidden !important;
+    overflow: visible !important;
   }
 
-  .printable-court-header {
-    border: none !important;
-    border-bottom: 1.5px solid #000000 !important;
-    border-radius: 0 !important;
-    padding: 0 0 10px 0 !important;
-    margin-bottom: 12px !important;
-    background: transparent !important;
+  /* ===== Table Pagination & Header Repeating ===== */
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  tr {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* ===== DOCUMENT 1: Client Statement of Account Printing ===== */
+  .statement-modal-backdrop,
+  .modal-backdrop:has(.statement-modal) {
+    display: block !important;
+    position: static !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  .statement-modal-backdrop .modal-dialog,
+  .modal-backdrop:has(.statement-modal) .modal-dialog,
+  .statement-modal {
+    max-width: 100% !important;
+    width: 100% !important;
     box-shadow: none !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 
-  .print-header-grid {
+  .statement-modal .modal-body {
+    overflow: visible !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+
+  .statement-summary-cards {
     display: grid !important;
-    grid-template-columns: 1.15fr 1.35fr 1fr !important;
-    gap: 10px !important;
-    align-items: start !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .statement-summary-cards>div {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    padding: 8px 10px !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+  }
+
+  .statement-table-wrapper,
+  .statement-modal .table-responsive {
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 6px !important;
+    scrollbar-width: none !important;
     width: 100% !important;
+  }
+
+  .statement-table-wrapper::-webkit-scrollbar,
+  .statement-modal .table-responsive::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .statement-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    font-size: 8pt !important;
+    line-height: 1.3 !important;
     box-sizing: border-box !important;
   }
 
-  .print-header-col.center {
-    border-right: 1.5px solid #555 !important;
-    border-left: 1.5px solid #555 !important;
-    padding: 0 8px !important;
+  .statement-table th,
+  .statement-table td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 5px 3px !important;
+    vertical-align: middle !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .statement-table th {
+    background-color: #37040a !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    font-size: 7.5pt !important;
+    text-align: center !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .statement-table tbody tr:nth-child(even) {
+    background-color: #f8fafc !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Specific column widths for Statement Table (6 columns, total exactly 100%) */
+  .statement-table .statement-col-date {
+    width: 14% !important;
     text-align: center !important;
   }
 
-  .print-header-col.center h2 {
-    font-size: 1.12rem !important;
-    font-weight: 900 !important;
-    line-height: 1.25 !important;
-    margin: 0 0 3px 0 !important;
+  .statement-table .statement-col-desc {
+    width: 25% !important;
+    text-align: right !important;
   }
 
-  .print-header-col.left {
-    text-align: left !important;
-    direction: rtl !important;
-    padding-left: 2px !important;
+  .statement-table .statement-col-case {
+    width: 15% !important;
+    text-align: center !important;
   }
 
-  .print-header-col.right {
-    padding-right: 2px !important;
+  .statement-table .statement-col-debit {
+    width: 15% !important;
+    text-align: center !important;
   }
 
-  .printable-card {
-    border: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
+  .statement-table .statement-col-credit {
+    width: 15% !important;
+    text-align: center !important;
   }
 
-  .table-container {
-    border: none !important;
-    overflow: visible !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    box-sizing: border-box !important;
+  .statement-table .statement-col-bal {
+    width: 16% !important;
+    text-align: center !important;
+  }
+
+  /* ===== DOCUMENT 2: Court Roll (AgendaPage) Printing ===== */
+  .daily-roll-summary {
+    display: flex !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    margin-top: 8px !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .daily-roll-summary>div {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    padding: 3px 8px !important;
+    font-size: 7.5pt !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 4px !important;
   }
 
   .data-table.print-table {
@@ -2079,46 +2435,40 @@ textarea {
     min-width: 0 !important;
     table-layout: fixed !important;
     border-collapse: collapse !important;
-    font-size: 8pt !important;
+    font-size: 7.5pt !important;
     line-height: 1.25 !important;
-    font-family: 'Alexandria', 'Cairo', sans-serif !important;
     box-sizing: border-box !important;
   }
 
   .data-table.print-table th,
   .data-table.print-table td {
-    border: 1px solid #000000 !important;
-    padding: 6px 4px !important;
-    text-align: right !important;
+    border: 1px solid #94a3b8 !important;
+    padding: 5px 3px !important;
     vertical-align: middle !important;
-    color: #000000 !important;
     word-break: break-word !important;
     overflow-wrap: break-word !important;
     white-space: normal !important;
     box-sizing: border-box !important;
-    max-width: none !important;
     min-width: 0 !important;
   }
 
-  .data-table.print-table td div,
-  .data-table.print-table td span {
-    max-width: 100% !important;
-    min-width: 0 !important;
-    overflow-wrap: break-word !important;
+  .data-table.print-table th {
+    background-color: #37040a !important;
+    color: #ffffff !important;
+    font-weight: 800 !important;
+    font-size: 7.5pt !important;
+    text-align: center !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
-  /* 
-   * Print column widths — DOM has 9 columns:
-   * 1: م (index)
-   * 2: رقم الدعوى والسنة
-   * 3: المحكمة والقاعة
-   * 4: المدعي
-   * 5: المدعى عليه
-   * 6: موضوع الدعوى
-   * 7: الموقف السابق
-   * 8: تسجيل القرار (no-print, HIDDEN)
-   * 9: قرار الجلسة (only-print, VISIBLE)
-   */
+  .data-table.print-table tbody tr:nth-child(even) {
+    background-color: #f8fafc !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Court Roll Column Widths (9 DOM columns, 8th hidden, 9th visible in print) */
   .data-table.print-table th:nth-child(8),
   .data-table.print-table td:nth-child(8) {
     display: none !important;
@@ -2132,110 +2482,116 @@ textarea {
 
   .data-table.print-table th:nth-child(2),
   .data-table.print-table td:nth-child(2) {
-    width: 14% !important;
+    width: 13% !important;
+    text-align: center !important;
   }
 
   .data-table.print-table th:nth-child(3),
   .data-table.print-table td:nth-child(3) {
-    width: 15% !important;
+    width: 14% !important;
+    text-align: right !important;
   }
 
   .data-table.print-table th:nth-child(4),
   .data-table.print-table td:nth-child(4) {
-    width: 12% !important;
+    width: 14% !important;
+    text-align: right !important;
   }
 
   .data-table.print-table th:nth-child(5),
   .data-table.print-table td:nth-child(5) {
-    width: 12% !important;
+    width: 14% !important;
+    text-align: right !important;
   }
 
   .data-table.print-table th:nth-child(6),
   .data-table.print-table td:nth-child(6) {
     width: 15% !important;
+    text-align: right !important;
   }
 
   .data-table.print-table th:nth-child(7),
   .data-table.print-table td:nth-child(7) {
-    width: 12% !important;
+    width: 10% !important;
+    text-align: center !important;
   }
 
   .data-table.print-table th:nth-child(9),
   .data-table.print-table td:nth-child(9) {
     width: 16% !important;
-  }
-
-  .data-table.print-table th {
-    background-color: #ededed !important;
-    font-weight: 800 !important;
-    font-size: 8pt !important;
     text-align: center !important;
-    padding: 6px 4px !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  .data-table.print-table tr {
-    page-break-inside: avoid !important;
-    page-break-after: auto !important;
-  }
-
-  .data-table.print-table .badge {
-    border: none !important;
-    background: transparent !important;
-    color: #000000 !important;
-    font-weight: 700 !important;
-    padding: 0 !important;
-    font-size: 8pt !important;
-    display: inline-block !important;
   }
 
   .print-handwritten-space {
-    min-height: 38px !important;
+    min-height: 40px !important;
     width: 100% !important;
     display: block !important;
   }
 
+  /* ===== Footers & Signatures in Print ===== */
   .printable-court-footer {
     margin-top: 12px !important;
-    padding-top: 8px !important;
-    border-top: 1.5px solid #000000 !important;
+    padding-top: 6px !important;
+    border-top: none !important;
     font-size: 8pt !important;
-    font-family: 'Alexandria', 'Cairo', sans-serif !important;
     page-break-inside: avoid !important;
+    break-inside: avoid !important;
     width: 100% !important;
     box-sizing: border-box !important;
   }
 
-  .print-footer-grid {
+  .printable-court-footer * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .court-signatures-row {
     display: flex !important;
     justify-content: space-between !important;
-    align-items: center !important;
-    gap: 12px !important;
+    align-items: flex-start !important;
+    margin-top: 10px !important;
+    margin-bottom: 8px !important;
+    padding: 0 1.5rem !important;
     width: 100% !important;
-    padding: 0 4px !important;
   }
 
-  /* Client Statement & Bill Printing */
-  .modal-backdrop:has(.statement-modal) {
-    display: block !important;
-    position: static !important;
-    background: #ffffff !important;
-    padding: 0 !important;
+  .court-signature-col {
+    text-align: center !important;
+    min-width: 180px !important;
   }
 
-  .modal-backdrop:has(.statement-modal) .modal-dialog {
-    max-width: 100% !important;
-    width: 100% !important;
-    box-shadow: none !important;
-    border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: #ffffff !important;
+  .court-signature-title {
+    font-size: 8.5pt !important;
+    font-weight: 800 !important;
+    color: #37040a !important;
   }
 
-  .print-only {
-    display: block !important;
+  .court-signature-space {
+    height: 30px !important;
+  }
+
+  .court-signature-dots {
+    font-size: 8pt !important;
+    color: #94a3b8 !important;
+    letter-spacing: 2px !important;
+  }
+
+  .court-signature-name {
+    font-size: 8.5pt !important;
+    font-weight: 800 !important;
+    color: #0f172a !important;
+    margin-top: 2px !important;
+  }
+
+  .court-signature-role {
+    font-size: 7.5pt !important;
+    color: #64748b !important;
+  }
+
+  .court-footer-divider {
+    margin-top: 6px !important;
+    padding-top: 4px !important;
+    font-size: 7.5pt !important;
   }
 }
 
@@ -2251,6 +2607,7 @@ textarea {
   .statement-form-grid {
     grid-template-columns: 1fr 1fr;
   }
+
   .statement-form-grid .full-span-tablet {
     grid-column: span 2;
   }
@@ -2260,7 +2617,406 @@ textarea {
   .statement-form-grid {
     grid-template-columns: 1fr;
   }
+
   .statement-form-grid .full-span-tablet {
     grid-column: span 1;
+  }
+}
+
+/* AgendaPage Top Header & Filter Bar Styles */
+.agenda-top-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid #f1e4e6;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.agenda-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.agenda-print-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 1.15rem;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #ebd8db;
+  color: #37040a;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.agenda-print-btn:hover {
+  background: #fdf5f6;
+  border-color: #debcc1;
+}
+
+.agenda-filter-card {
+  background: #ffffff;
+  border: 1px solid #ebd8db;
+  border-radius: 12px;
+  padding: 0.65rem 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 4px rgba(55, 4, 10, 0.02);
+}
+
+.agenda-date-group {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.agenda-date-label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #37040a;
+  font-weight: 700;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.agenda-date-input {
+  border: 1px solid #ebd8db;
+  border-radius: 8px;
+  padding: 0.42rem 0.85rem;
+  background: #ffffff;
+  color: #37040a;
+  font-size: 0.88rem;
+  font-weight: 600;
+  outline: none;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.agenda-date-input:focus {
+  border-color: #37040a;
+}
+
+.agenda-today-btn {
+  border: 1px solid #ebd8db;
+  border-radius: 8px;
+  padding: 0.42rem 1rem;
+  background: #ffffff;
+  color: #37040a;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.agenda-today-btn:hover {
+  background: #fdf5f6;
+  border-color: #debcc1;
+}
+
+.agenda-court-group {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.agenda-court-select {
+  border: 1px solid #ebd8db;
+  border-radius: 8px;
+  padding: 0.42rem 1rem;
+  background: #ffffff;
+  color: #37040a;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  font-family: inherit;
+  min-width: 180px;
+  transition: border-color 0.15s ease;
+}
+
+.agenda-court-select:focus {
+  border-color: #37040a;
+}
+
+/* Dark theme overrides */
+[data-theme='dark'] .agenda-top-header {
+  border-bottom-color: var(--border-color);
+}
+
+[data-theme='dark'] .agenda-filter-card {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+[data-theme='dark'] .agenda-print-btn,
+[data-theme='dark'] .agenda-date-input,
+[data-theme='dark'] .agenda-today-btn,
+[data-theme='dark'] .agenda-court-select {
+  background: var(--bg-card-subtle);
+  border-color: var(--border-color);
+  color: var(--text-main);
+}
+
+[data-theme='dark'] .agenda-date-label {
+  color: var(--text-main);
+}
+
+/* AgendaPage Hybrid Responsive Court Roll (Desktop/Tablet Table + Mobile Cards) */
+.agenda-mobile-cards-view {
+  display: none;
+}
+
+/* ========================================================================= */
+/* Printable Court Official Footer (Desktop Base Styles)                      */
+/* ========================================================================= */
+.printable-court-footer {
+  margin-top: 1.5rem;
+  direction: rtl;
+  page-break-inside: avoid;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.court-signatures-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-top: 1.25rem;
+  margin-bottom: 1rem;
+  padding: 0 2rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.court-signature-col {
+  text-align: center;
+  min-width: 200px;
+  box-sizing: border-box;
+}
+
+.court-signature-title {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #37040a;
+}
+
+.court-signature-space {
+  height: 35px;
+}
+
+.court-signature-dots {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  letter-spacing: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 100%;
+  display: block;
+}
+
+.court-signature-name {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-top: 0.3rem;
+  line-height: 1.35;
+}
+
+.court-signature-role {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+}
+
+.court-footer-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 700;
+  page-break-inside: avoid;
+}
+
+.court-footer-divider-line {
+  height: 1.5px;
+  background: #cbd5e1;
+  flex: 1;
+}
+
+.court-footer-divider-text {
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .agenda-top-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .agenda-header-actions {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+  }
+
+  .agenda-header-actions .agenda-print-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .agenda-filter-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.85rem;
+    padding: 0.85rem;
+  }
+
+  .agenda-date-group {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .agenda-date-input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .agenda-court-group {
+    width: 100%;
+  }
+
+  .agenda-court-select {
+    width: 100%;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .agenda-mobile-cards-view {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    margin-top: 0.5rem;
+  }
+
+  .agenda-mobile-cards-view.agenda-force-hide {
+    display: none !important;
+  }
+
+  .agenda-desktop-table-view.agenda-hide-on-mobile-screen {
+    display: none !important;
+  }
+
+  .agenda-mobile-toggle-wrapper {
+    display: block !important;
+  }
+
+  /* Mobile View for Printable Document Frame & Official Footer */
+  .printable-document-frame {
+    padding: 0.9rem 0.65rem !important;
+    border-radius: 10px !important;
+  }
+
+  .court-roll-metadata-row {
+    gap: 0.65rem 1.25rem !important;
+    font-size: 0.8rem !important;
+  }
+
+  .printable-court-footer {
+    margin-top: 1.25rem !important;
+    padding: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  .printable-court-footer .court-signatures-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-start !important;
+    padding: 0 0.25rem !important;
+    margin-top: 0.85rem !important;
+    margin-bottom: 0.75rem !important;
+    gap: 0.5rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .printable-court-footer .court-signature-col {
+    min-width: 0 !important;
+    flex: 1 1 0 !important;
+    max-width: 50% !important;
+    padding: 0 0.15rem !important;
+    text-align: center !important;
+    box-sizing: border-box !important;
+  }
+
+  .printable-court-footer .court-signature-title {
+    font-size: 0.78rem !important;
+    line-height: 1.3 !important;
+    white-space: nowrap !important;
+  }
+
+  .printable-court-footer .court-signature-space {
+    height: 20px !important;
+  }
+
+  .printable-court-footer .court-signature-dots {
+    font-size: 0.72rem !important;
+    letter-spacing: 1px !important;
+    margin: 0 auto !important;
+    max-width: 120px !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
+    text-overflow: clip !important;
+  }
+
+  .printable-court-footer .court-signature-name {
+    font-size: 0.76rem !important;
+    margin-top: 0.25rem !important;
+    line-height: 1.35 !important;
+    word-break: break-word !important;
+  }
+
+  .printable-court-footer .court-signature-role {
+    font-size: 0.68rem !important;
+    line-height: 1.3 !important;
+    margin-top: 0.1rem !important;
+  }
+
+  .printable-court-footer .court-footer-divider {
+    gap: 0.45rem !important;
+    font-size: 0.74rem !important;
+    margin-top: 0.65rem !important;
+    padding-top: 0.4rem !important;
+  }
+
+  .printable-court-footer .court-footer-divider-text {
+    white-space: nowrap !important;
   }
 }

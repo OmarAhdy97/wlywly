@@ -357,6 +357,7 @@ export default function DashboardPage({ setActiveTab }) {
         {/* Minimal Horizon Filter */}
         <div style={{
           display: 'flex',
+          flexWrap: 'wrap',
           background: 'var(--bg-card)',
           padding: '0.25rem',
           borderRadius: '12px',
@@ -420,7 +421,7 @@ export default function DashboardPage({ setActiveTab }) {
       {/* 4 Clean Minimal KPI Metric Cards */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))',
         gap: '0.85rem',
         marginBottom: '1.25rem'
       }}>
@@ -510,7 +511,7 @@ export default function DashboardPage({ setActiveTab }) {
       {/* ===================================================================== */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
         gap: '1rem',
         marginBottom: '1.25rem'
       }}>
@@ -583,7 +584,7 @@ export default function DashboardPage({ setActiveTab }) {
       {/* ===================================================================== */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))',
         gap: '1rem'
       }}>
         {/* Top Courts Distribution */}
