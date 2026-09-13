@@ -30,7 +30,8 @@ import {
   Coins,
   Scale,
   Info,
-  User
+  User,
+  Mail
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
@@ -476,7 +477,7 @@ export default function ClientsPage({ setActiveTab }) {
           <p style={{ fontSize: '0.9rem' }}>يمكنك إضافة موكل جديد باستخدام زر الإضافة أعلاه.</p>
         </div>
       ) : (
-        <div className="no-print clients-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', gap: '1.25rem' }}>
+        <div className="no-print clients-cards-grid">
           {filteredClients.map((client) => {
             const clientCases = cases.filter(c => c.client_id === client.id);
             const isTelegramLinked = !!client.telegram_chat_id;
@@ -665,13 +666,21 @@ export default function ClientsPage({ setActiveTab }) {
         <div className="modal-backdrop" onClick={() => setSelectedClient(null)}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div className="avatar" style={{ background: 'linear-gradient(135deg, var(--primary-700), var(--primary-500))', width: '38px', height: '38px', fontSize: '1rem' }}>
+                  {selectedClient.name ? selectedClient.name.charAt(0) : 'م'}
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800' }}>بيانات الموكل: {selectedClient.name}</h3>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>الملف التعريفي والبيانات القضائية</span>
+                </div>
+              </div>
               <button className="btn btn-secondary btn-icon" onClick={() => setSelectedClient(null)}>
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+              <div className="client-details-grid">
                 <div>
                   <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>الهاتف:</span>
                   <div dir="ltr" style={{ fontWeight: '600', textAlign: 'right' }}>
@@ -717,7 +726,7 @@ export default function ClientsPage({ setActiveTab }) {
                 border: `1px solid ${selectedClient.telegram_chat_id ? 'rgba(34, 197, 94, 0.3)' : 'var(--border-color)'}`,
                 marginBottom: '1.5rem'
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="client-details-telegram-box">
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <MessageSquare size={18} style={{ color: selectedClient.telegram_chat_id ? '#16a34a' : '#0284c7' }} />
                     <div>
@@ -775,11 +784,9 @@ export default function ClientsPage({ setActiveTab }) {
       {/* ========================================================================= */}
       {statementClient && (
         <div className="modal-backdrop statement-modal-backdrop" onClick={() => setStatementClient(null)}>
-          <div className="modal-dialog statement-modal" style={{ width: '96%', maxWidth: '1120px', maxHeight: '92vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-dialog statement-modal statement-modal-dialog" onClick={(e) => e.stopPropagation()}>
 
-
-
-            <div className="modal-body statement-modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1.5rem', background: '#ffffff', color: '#0f172a' }}>
+            <div className="modal-body statement-modal-body statement-modal-body-content">
 
               {/* Feedback Alert */}
               {billFeedback && (
@@ -794,9 +801,6 @@ export default function ClientsPage({ setActiveTab }) {
                   {billFeedback.text}
                 </div>
               )}
-
-              {/* 1. Official Law Firm Letterhead (Always visible on screen and in print) */}
-              <LawFirmPrintHeader />
 
               {(() => {
                 const rawTx = (transactions || []).filter(t => t.client_id === statementClient.id);
@@ -828,18 +832,13 @@ export default function ClientsPage({ setActiveTab }) {
 
                 return (
                   <div className="statement-document-sheet">
+                    {/* 1. Official Law Firm Letterhead (Always visible on screen and in print) */}
+                    <LawFirmPrintHeader />
+
                     {/* 2. Document Title & Period & Reference Number */}
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                      marginBottom: '1.1rem',
-                      flexWrap: 'wrap',
-                      gap: '0.75rem',
-                      direction: 'rtl'
-                    }}>
+                    <div className="statement-doc-header">
                       <div>
-                        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: '900', color: '#37040a', lineHeight: 1.25 }}>
+                        <h1 style={{ margin: 0, fontSize: 'clamp(1.2rem, 3.5vw, 1.5rem)', fontWeight: '900', color: '#37040a', lineHeight: 1.25 }}>
                           كشف حساب ومطالبة أتعاب
                         </h1>
                         <div style={{ fontSize: '0.85rem', color: '#6d0f1b', fontWeight: '700', marginTop: '0.25rem' }}>
@@ -848,7 +847,6 @@ export default function ClientsPage({ setActiveTab }) {
                       </div>
 
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'flex-end' }}>
                           <span style={{ fontSize: '0.82rem', fontWeight: '800', color: '#37040a' }}>تاريخ الإصدار:</span>
                           <span style={{ background: '#f8fafc', border: '1px solid #cbd5e1', padding: '0.2rem 0.75rem', borderRadius: '6px', fontWeight: '800', fontSize: '0.82rem', color: '#0f172a' }}>
@@ -867,7 +865,7 @@ export default function ClientsPage({ setActiveTab }) {
                       marginBottom: '1.15rem',
                       direction: 'rtl'
                     }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                      <div className="statement-client-info-row">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                           <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#37040a', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             <User size={18} />
@@ -883,14 +881,14 @@ export default function ClientsPage({ setActiveTab }) {
                           </div>
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', fontSize: '0.82rem', color: '#334155' }}>
+                        <div className="statement-client-contact-badges">
                           {statementClient.phone && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                              <Phone size={13} style={{ color: '#64748b' }} />
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', border: '1px solid #cbd5e1', borderRadius: '6px', padding: '0.25rem 0.65rem', background: '#f8fafc' }}>
                               <span style={{ color: '#64748b', fontWeight: '600' }}>الهاتف:</span>
                               <span dir="ltr" style={{ fontWeight: '700', color: '#1e293b' }}>
                                 {statementClient.phone.startsWith('+') ? statementClient.phone : `+20 ${statementClient.phone}`}
                               </span>
+                              <Phone size={13} style={{ color: '#64748b' }} />
                             </div>
                           )}
                           {statementClient.email && (
@@ -904,8 +902,8 @@ export default function ClientsPage({ setActiveTab }) {
                       </div>
                     </div>
 
-                    {/* 4. Financial Summary (3 Balanced Professional Cards - Unified & Clean) */}
-                    <div className="statement-summary-cards" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.85rem', marginBottom: '1.15rem', direction: 'rtl' }}>
+                    {/* 4. Financial Summary (3 Balanced Professional Cards - Responsive) */}
+                    <div className="statement-summary-cards">
                       {/* Card 1: Total Expenses & Fees */}
                       <div style={{
                         background: '#ffffff',
@@ -1124,7 +1122,7 @@ export default function ClientsPage({ setActiveTab }) {
                         </span>
                       </div>
 
-                      <div className="table-responsive statement-table-wrapper" style={{ maxHeight: '360px', overflowY: 'auto', overflowX: 'hidden', border: '1px solid #cbd5e1', borderRadius: '8px' }}>
+                      <div className="statement-table-desktop-wrapper table-responsive statement-table-wrapper" style={{ maxHeight: '360px', overflowY: 'auto', overflowX: 'auto', border: '1px solid #cbd5e1', borderRadius: '8px' }}>
                         <table className="data-table statement-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 0 }}>
                           <thead>
                             <tr style={{ background: '#37040a', color: '#ffffff' }}>
@@ -1195,6 +1193,102 @@ export default function ClientsPage({ setActiveTab }) {
                           </tbody>
                         </table>
                       </div>
+
+                      {/* Mobile Transaction Cards View (Shown on Mobile screens <= 768px, hidden on desktop & in print) */}
+                      <div className="statement-mobile-tx-cards no-print">
+                        {displayTx.length === 0 ? (
+                          <div style={{ textAlign: 'center', padding: '1.5rem', color: '#64748b', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.85rem' }}>
+                            لا توجد حركات تفصيلية مسجلة بعد لهذا الموكل.
+                          </div>
+                        ) : (
+                          displayTx.map((tx) => {
+                            const isExpense = tx.type === 'expense';
+                            const linkedCase = tx.case_id ? cases.find(c => c.id === tx.case_id) : null;
+                            return (
+                              <div
+                                key={tx.id}
+                                style={{
+                                  background: '#ffffff',
+                                  border: '1px solid #cbd5e1',
+                                  borderRadius: '10px',
+                                  padding: '0.75rem 0.85rem',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '0.4rem',
+                                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    <span style={{
+                                      background: isExpense ? '#fef2f2' : '#f0fdf4',
+                                      color: isExpense ? '#dc2626' : '#16a34a',
+                                      border: `1px solid ${isExpense ? '#fecaca' : '#bbf7d0'}`,
+                                      padding: '0.15rem 0.5rem',
+                                      borderRadius: '6px',
+                                      fontSize: '0.74rem',
+                                      fontWeight: '800'
+                                    }}>
+                                      {isExpense ? 'مصروف على الموكل' : 'سداد من الموكل'}
+                                    </span>
+                                    <span dir="ltr" style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: '600' }}>
+                                      {tx.date}
+                                    </span>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    className="btn btn-secondary btn-icon"
+                                    style={{ width: '28px', height: '28px', padding: 0, color: '#ef4444', border: '1px solid #fee2e2', background: '#fff' }}
+                                    title="حذف الحركة وتعديل الرصيد"
+                                    onClick={() => {
+                                      if (window.confirm('هل أنت متأكد من حذف هذه الحركة؟ سيتم تعديل رصيد الموكل تلقائياً.')) {
+                                        deleteTransaction(tx.id);
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+
+                                <div style={{ fontSize: '0.88rem', fontWeight: '800', color: '#0f172a' }}>
+                                  {tx.description}
+                                </div>
+
+                                {linkedCase && (
+                                  <div style={{ fontSize: '0.76rem', color: '#475569', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                    <Briefcase size={12} color="#64748b" />
+                                    <span>مرتبط بدعوى: {linkedCase.case_number}/{linkedCase.case_year}</span>
+                                  </div>
+                                )}
+
+                                <div style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  paddingTop: '0.4rem',
+                                  marginTop: '0.2rem',
+                                  borderTop: '1px dashed #e2e8f0',
+                                  fontSize: '0.82rem'
+                                }}>
+                                  <div>
+                                    <span style={{ color: '#64748b', fontSize: '0.75rem' }}>المبلغ: </span>
+                                    <strong style={{ color: isExpense ? '#b91c1c' : '#15803d', fontSize: '0.92rem' }}>
+                                      <span dir="ltr">{parseFloat(tx.amount).toLocaleString('en-US')}</span> ج.م
+                                    </strong>
+                                  </div>
+                                  <div>
+                                    <span style={{ color: '#64748b', fontSize: '0.75rem' }}>الرصيد المستحق: </span>
+                                    <strong style={{ color: '#37040a', fontSize: '0.92rem' }}>
+                                      <span dir="ltr">{Math.abs(tx.balanceAfter).toLocaleString('en-US')}</span> ج.م
+                                    </strong>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
 
                     {/* 7. Important Notes Section (ملاحظات هامة) */}
@@ -1219,16 +1313,7 @@ export default function ClientsPage({ setActiveTab }) {
                     </div>
 
                     {/* 8. Signatures Section */}
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                      marginTop: '1.5rem',
-                      marginBottom: '1rem',
-                      padding: '0 2rem',
-                      direction: 'rtl',
-                      pageBreakInside: 'avoid',
-                    }}>
+                    <div className="statement-signatures-section">
                       <div style={{ textAlign: 'center', minWidth: '200px' }}>
                         <div style={{ fontSize: '0.9rem', fontWeight: '800', color: '#37040a' }}>المحامي المسؤول</div>
                         <div style={{ height: '35px' }}></div>
@@ -1276,52 +1361,57 @@ export default function ClientsPage({ setActiveTab }) {
                 );
               })()}
 
-            </div>
+              {/* Modal Actions Footer (Scroll down to bottom of modal to view - NOT fixed) */}
+              <div className="no-print statement-scroll-footer">
+                <div className="statement-scroll-footer-actions">
+                  {/* Print Bill Button */}
+                  <button
+                    type="button"
+                    className="btn btn-secondary statement-footer-btn"
+                    style={{ height: '42px', minHeight: '42px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                    onClick={() => printWithTitle(getUniqueStatementTitle(statementClient))}
+                  >
+                    <Printer size={16} />
+                    <span>طباعة كشف الحساب / الفاتورة</span>
+                  </button>
 
-            {/* Modal Footer Actions (No Print) */}
-            <div className="modal-footer no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                {/* Print Bill Button */}
+                  {/* Send via Telegram with Confirmation Prompt */}
+                  <button
+                    type="button"
+                    className="btn btn-primary statement-footer-btn"
+                    style={{
+                      height: '42px',
+                      minHeight: '42px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: statementClient.telegram_chat_id ? '#0284c7' : 'var(--border-color)',
+                      borderColor: statementClient.telegram_chat_id ? '#0284c7' : 'var(--border-color)',
+                      color: '#fff'
+                    }}
+                    onClick={() => {
+                      if (!statementClient.telegram_chat_id) {
+                        alert('الموكل غير مربوط بالتليجرام بعد. يرجى الضغط على زر "ربط تليجرام" للموكل أولاً.');
+                        return;
+                      }
+                      setConfirmTelegramBill(true);
+                    }}
+                  >
+                    <Send size={15} />
+                    <span>إرسال الفاتورة عبر تليجرام</span>
+                  </button>
+                </div>
+
                 <button
                   type="button"
-                  className="btn btn-secondary"
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem', fontWeight: '600' }}
-                  onClick={() => printWithTitle(getUniqueStatementTitle(statementClient))}
+                  className="btn btn-secondary statement-close-btn"
+                  style={{ height: '42px', minHeight: '42px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                  onClick={() => setStatementClient(null)}
                 >
-                  <Printer size={15} />
-                  <span>طباعة كشف الحساب / الفاتورة</span>
-                </button>
-
-                {/* Send via Telegram with Confirmation Prompt */}
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.45rem',
-                    fontSize: '0.85rem',
-                    fontWeight: '700',
-                    background: statementClient.telegram_chat_id ? '#0284c7' : 'var(--border-color)',
-                    borderColor: statementClient.telegram_chat_id ? '#0284c7' : 'var(--border-color)',
-                    color: '#fff'
-                  }}
-                  onClick={() => {
-                    if (!statementClient.telegram_chat_id) {
-                      alert('الموكل غير مربوط بالتليجرام بعد. يرجى الضغط على زر "ربط تليجرام" للموكل أولاً.');
-                      return;
-                    }
-                    setConfirmTelegramBill(true);
-                  }}
-                >
-                  <Send size={15} />
-                  <span>إرسال الفاتورة عبر تليجرام</span>
+                  إغلاق
                 </button>
               </div>
 
-              <button type="button" className="btn btn-secondary" onClick={() => setStatementClient(null)}>
-                إغلاق
-              </button>
             </div>
           </div>
         </div>
@@ -1523,7 +1613,7 @@ export default function ClientsPage({ setActiveTab }) {
                         أرسل الرابط التالي للموكل عبر واتساب أو رسالة، ليفتحه على هاتفه:
                       </p>
 
-                      <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                      <div className="telegram-link-row">
                         <input
                           type="text"
                           readOnly
@@ -1594,7 +1684,7 @@ export default function ClientsPage({ setActiveTab }) {
                       <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem' }}>
                         أو: إدخال معرّف التليجرام (Chat ID) يدوياً إذا كان معروفاً:
                       </span>
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                      <div className="telegram-manual-row">
                         <input
                           type="text"
                           placeholder="مثال: 123456789"
@@ -1656,7 +1746,7 @@ export default function ClientsPage({ setActiveTab }) {
                     />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="client-form-grid-2col">
                     <div className="form-group">
                       <label className="form-label">رقم الهاتف (مصر)</label>
                       <div style={{ display: 'flex', direction: 'ltr', alignItems: 'center' }}>
@@ -1695,7 +1785,7 @@ export default function ClientsPage({ setActiveTab }) {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="client-form-grid-2col">
                     <div className="form-group">
                       <label className="form-label">رقم التوكيل</label>
                       <input
@@ -1716,7 +1806,7 @@ export default function ClientsPage({ setActiveTab }) {
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="client-form-grid-2col">
                     <div className="form-group">
                       <label className="form-label">الرصيد المالي (الأتعاب)</label>
                       <input

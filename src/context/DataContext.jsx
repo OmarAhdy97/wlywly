@@ -220,7 +220,12 @@ export function DataProvider({ children }) {
 
       if (!error && data) {
         const merged = { ...DEFAULT_OFFICE_PROFILE, ...data };
-        setOfficeProfile(merged);
+        setOfficeProfile(prev => {
+          const keys = Object.keys(merged);
+          const isIdentical = prev && keys.every(k => prev[k] === merged[k]);
+          if (isIdentical) return prev;
+          return merged;
+        });
         localStorage.setItem(`office_profile_${user.id}`, JSON.stringify(merged));
         return;
       }
@@ -256,14 +261,32 @@ export function DataProvider({ children }) {
         };
       }
 
-      setOfficeProfile(profileToSave);
+      setOfficeProfile(prev => {
+        const keys = Object.keys(profileToSave);
+        const isIdentical = prev && keys.every(k => prev[k] === profileToSave[k]);
+        if (isIdentical) return prev;
+        return profileToSave;
+      });
       localStorage.setItem(`office_profile_${user.id}`, JSON.stringify(profileToSave));
 
-      // Persist to Supabase office_profile table in database immediately!
+      // Persist to Supabase office_profile table in database safely
       try {
-        await supabase
+        const { data: existing } = await supabase
           .from('office_profile')
-          .upsert([{ ...profileToSave, user_id: user.id }], { onConflict: 'user_id' });
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (!existing) {
+          const { error: insErr } = await supabase
+            .from('office_profile')
+            .insert([profileToSave]);
+          if (insErr) {
+            await supabase
+              .from('office_profile')
+              .upsert([profileToSave], { onConflict: 'user_id' });
+          }
+        }
       } catch (dbErr) {
         console.log('Notice: auto-syncing office_profile to database:', dbErr);
       }
@@ -725,28 +748,81 @@ export function DataProvider({ children }) {
 
   const updateOfficeProfile = async (updates) => {
     if (!user) throw new Error('يجب تسجيل الدخول أولاً');
-    const newProfile = {
-      ...officeProfile,
-      ...updates,
+
+    // 1. Clean payload matching office_profile columns exactly
+    const cleanProfile = {
       user_id: user.id,
+      office_name: updates.office_name !== undefined ? updates.office_name : (officeProfile.office_name || ''),
+      lawyer_name: updates.lawyer_name !== undefined ? updates.lawyer_name : (officeProfile.lawyer_name || ''),
+      lawyer_title: updates.lawyer_title !== undefined ? updates.lawyer_title : (officeProfile.lawyer_title || ''),
+      slogan: updates.slogan !== undefined ? updates.slogan : (officeProfile.slogan || ''),
+      phone: updates.phone !== undefined ? updates.phone : (officeProfile.phone || ''),
+      email: updates.email !== undefined ? updates.email : (officeProfile.email || user.email || ''),
+      address: updates.address !== undefined ? updates.address : (officeProfile.address || ''),
+      logo_url: updates.logo_url !== undefined ? updates.logo_url : (officeProfile.logo_url || null),
       updated_at: new Date().toISOString()
     };
 
-    setOfficeProfile(newProfile);
-    localStorage.setItem(`office_profile_${user.id}`, JSON.stringify(newProfile));
+    const fullProfile = { ...officeProfile, ...cleanProfile };
+    setOfficeProfile(fullProfile);
+    localStorage.setItem(`office_profile_${user.id}`, JSON.stringify(fullProfile));
 
+    // 2. Update Supabase Auth user_metadata so all app components reading from user.user_metadata stay in sync
     try {
-      const { error } = await supabase
-        .from('office_profile')
-        .upsert([{ ...newProfile, user_id: user.id }], { onConflict: 'user_id' });
-      if (error) {
-        console.log('Notice: office_profile saved to local storage:', error.message);
-      }
-    } catch (err) {
-      console.log('Notice: office_profile offline fallback used');
+      await supabase.auth.updateUser({
+        data: {
+          full_name: cleanProfile.lawyer_name,
+          name: cleanProfile.lawyer_name,
+          office_name: cleanProfile.office_name,
+          lawyer_title: cleanProfile.lawyer_title,
+          phone: cleanProfile.phone,
+          address: cleanProfile.address,
+          slogan: cleanProfile.slogan,
+        }
+      });
+    } catch (authErr) {
+      console.warn('Notice: Updating auth user_metadata failed:', authErr);
     }
 
-    return newProfile;
+    // 3. Persist to Supabase office_profile table (check if row exists -> update, else insert/upsert)
+    let dbError = null;
+    try {
+      const { data: existingRow, error: checkError } = await supabase
+        .from('office_profile')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (existingRow && existingRow.id) {
+        const { error: updateError } = await supabase
+          .from('office_profile')
+          .update(cleanProfile)
+          .eq('id', existingRow.id)
+          .eq('user_id', user.id);
+        if (updateError) dbError = updateError;
+      } else {
+        const { error: insertError } = await supabase
+          .from('office_profile')
+          .insert([cleanProfile]);
+
+        if (insertError) {
+          // Fallback to upsert if insert had conflict
+          const { error: upsertError } = await supabase
+            .from('office_profile')
+            .upsert([cleanProfile], { onConflict: 'user_id' });
+          if (upsertError) dbError = upsertError;
+        }
+      }
+    } catch (err) {
+      dbError = err;
+    }
+
+    if (dbError) {
+      console.error('Error persisting office_profile to database:', dbError);
+      throw new Error(dbError.message || 'فشل حفظ البيانات في قاعدة البيانات');
+    }
+
+    return fullProfile;
   };
 
   return (

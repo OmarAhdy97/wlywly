@@ -8,7 +8,8 @@ import {
   CheckCircle2,
   Eye,
   Scale,
-  FileCheck
+  FileCheck,
+  AlertCircle
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import LawFirmPrintHeader, { LawFirmDefaultLogo } from '../components/common/LawFirmPrintHeader';
@@ -73,6 +74,7 @@ export default function ProfilePage() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState(null);
   const [logoSizeKb, setLogoSizeKb] = useState(() => {
     if (officeProfile.logo_url) {
       return Math.round((officeProfile.logo_url.length * (3 / 4)) / 1024);
@@ -80,9 +82,11 @@ export default function ProfilePage() {
     return null;
   });
 
-  // Keep formData in sync whenever officeProfile is loaded from database or initialized
+  const isDirtyRef = useRef(false);
+
+  // Keep formData in sync with officeProfile ONLY if the user has not made unsaved edits
   useEffect(() => {
-    if (officeProfile) {
+    if (officeProfile && !isDirtyRef.current) {
       setFormData({
         office_name: officeProfile.office_name || '',
         lawyer_name: officeProfile.lawyer_name || '',
@@ -100,8 +104,10 @@ export default function ProfilePage() {
   }, [officeProfile]);
 
   const handleInputChange = (field, value) => {
+    isDirtyRef.current = true;
     setFormData(prev => ({ ...prev, [field]: value }));
     setSaveSuccess(false);
+    setSaveError(null);
   };
 
   const handleLogoUpload = async (e) => {
@@ -118,6 +124,7 @@ export default function ProfilePage() {
       const compressedBase64 = await compressImage(file, 160, 160, 0.82);
       const sizeKb = Math.round((compressedBase64.length * (3 / 4)) / 1024);
       setLogoSizeKb(sizeKb);
+      isDirtyRef.current = true;
       handleInputChange('logo_url', compressedBase64);
     } catch (err) {
       alert('حدث خطأ أثناء معالجة الصورة: ' + err.message);
@@ -125,6 +132,7 @@ export default function ProfilePage() {
   };
 
   const handleRemoveLogo = () => {
+    isDirtyRef.current = true;
     handleInputChange('logo_url', null);
     setLogoSizeKb(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -134,13 +142,16 @@ export default function ProfilePage() {
     e.preventDefault();
     setIsSaving(true);
     setSaveSuccess(false);
+    setSaveError(null);
 
     try {
       await updateOfficeProfile(formData);
+      isDirtyRef.current = false;
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 4000);
+      setTimeout(() => setSaveSuccess(false), 5000);
     } catch (err) {
-      alert('خطأ أثناء حفظ هوية المكتب: ' + err.message);
+      console.error('Error saving office profile:', err);
+      setSaveError(err.message || 'حدث خطأ أثناء حفظ البيانات في قاعدة البيانات');
     } finally {
       setIsSaving(false);
     }
@@ -192,6 +203,26 @@ export default function ProfilePage() {
         }}>
           <CheckCircle2 size={20} />
           <span>تم حفظ هوية المكتب والملف التعريفي بنجاح! سيتم تطبيقها فوراً على كافة المطبوعات.</span>
+        </div>
+      )}
+
+      {/* Error Notification */}
+      {saveError && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.6rem',
+          background: '#fef2f2',
+          border: '1px solid #fca5a5',
+          color: '#b91c1c',
+          padding: '0.85rem 1.1rem',
+          borderRadius: '10px',
+          marginBottom: '1.25rem',
+          fontSize: '0.9rem',
+          fontWeight: '700',
+        }}>
+          <AlertCircle size={20} />
+          <span>خطأ أثناء الحفظ في قاعدة البيانات: {saveError}</span>
         </div>
       )}
 

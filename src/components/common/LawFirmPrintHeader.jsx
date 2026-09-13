@@ -103,7 +103,7 @@ export default function LawFirmPrintHeader({ customProfile = null, className = '
         </svg>
       </div>
 
-      <div style={{
+      <div className="law-firm-header-content" style={{
         position: 'relative',
         zIndex: 1,
         display: 'flex',
