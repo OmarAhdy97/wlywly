@@ -1,0 +1,8 @@
+{
+  "appId": "com.agenda.qadaeyya",
+  "appName": "الأجندة القضائية",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
