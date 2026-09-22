@@ -82,3 +82,73 @@ export function addDaysToDate(baseDateStr, daysToAdd) {
   const dayStr = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${dayStr}`;
 }
+
+/**
+ * Returns today's date formatted as YYYY-MM-DD in local time
+ */
+export function getTodayLocalStr() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * Returns tomorrow's date formatted as YYYY-MM-DD in local time
+ */
+export function getTomorrowLocalStr() {
+  return addDaysToDate(getTodayLocalStr(), 1);
+}
+
+/**
+ * Checks if a given date string is in the past (strictly before today)
+ */
+export function isPastDate(dateStr) {
+  if (!dateStr) return false;
+  const cleanDate = dateStr.split('T')[0];
+  return cleanDate < getTodayLocalStr();
+}
+
+/**
+ * Calculates number of full days a date is overdue relative to today
+ */
+export function getDaysOverdue(dateStr) {
+  if (!dateStr) return 0;
+  const [y1, m1, d1] = dateStr.split('T')[0].split('-').map(Number);
+  const [y2, m2, d2] = getTodayLocalStr().split('-').map(Number);
+  const datePast = new Date(y1, m1 - 1, d1);
+  const dateToday = new Date(y2, m2 - 1, d2);
+  const diffTime = dateToday - datePast;
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  return Math.max(0, diffDays);
+}
+
+/**
+ * Formats an ISO date/time string into a human-friendly Arabic relative time string
+ */
+export function formatRelativeTime(isoStr) {
+  if (!isoStr) return '—';
+  try {
+    const d = new Date(isoStr);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'الآن';
+    if (diffMins < 60) return `منذ ${diffMins} دقيقة`;
+    if (diffHours === 1) return 'منذ ساعة';
+    if (diffHours === 2) return 'منذ ساعتين';
+    if (diffHours < 24) return `منذ ${diffHours} ساعات`;
+    if (diffDays === 1) return 'أمس';
+    if (diffDays === 2) return 'أول أمس';
+    if (diffDays < 7) return `منذ ${diffDays} أيام`;
+
+    return d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' });
+  } catch (e) {
+    return 'مؤخراً';
+  }
+}
+
