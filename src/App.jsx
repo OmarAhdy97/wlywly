@@ -17,6 +17,7 @@ import SearchDeadlinesPage from './pages/SearchDeadlinesPage';
 import AdministrativePage from './pages/AdministrativePage';
 import BailiffsPage from './pages/BailiffsPage';
 import ProfilePage from './pages/ProfilePage';
+import LegalFormulasPage from './pages/LegalFormulasPage';
 
 function MainApp() {
   const { user, loading } = useAuth();
@@ -106,6 +107,10 @@ function MainApp() {
 
             {activeTab === 'cases' && (
               <CasesPage />
+            )}
+
+            {activeTab === 'formulas' && (
+              <LegalFormulasPage />
             )}
 
             {activeTab === 'administrative' && (
