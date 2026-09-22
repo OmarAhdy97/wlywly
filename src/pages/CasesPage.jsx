@@ -24,9 +24,10 @@ import {
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { CASE_TYPES, COURT_LEVELS, CASE_STATUSES, SESSION_DECISIONS, USER_ROLES } from '../lib/supabase';
+import SessionDecisionModal from '../components/common/SessionDecisionModal';
 
 export default function CasesPage() {
-  const { cases, clients, sessions, team, addSession, updateCase, deleteCase } = useData();
+  const { cases, clients, sessions, team, adminTasks, adminTaskUpdates, appeals, updateCase, deleteCase } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -37,13 +38,6 @@ export default function CasesPage() {
 
   // Decision Modal State
   const [decisionCase, setDecisionCase] = useState(null);
-  const [decisionStatus, setDecisionStatus] = useState('adjourned');
-  const [decisionSessionDate, setDecisionSessionDate] = useState(new Date().toISOString().split('T')[0]);
-  const [adjournmentReason, setAdjournmentReason] = useState('');
-  const [nextSessionDate, setNextSessionDate] = useState('');
-  const [rulingText, setRulingText] = useState('');
-  const [assignedLawyerId, setAssignedLawyerId] = useState('');
-  const [isSavingDecision, setIsSavingDecision] = useState(false);
 
   // Active (non-archived) cases
   const activeCases = cases.filter(c => !c.is_archived);
@@ -83,51 +77,6 @@ export default function CasesPage() {
 
   const handleOpenDecision = (c) => {
     setDecisionCase(c);
-    setDecisionStatus('adjourned');
-    setDecisionSessionDate(c.next_session_date ? c.next_session_date.split('T')[0] : new Date().toISOString().split('T')[0]);
-    setAdjournmentReason('');
-    setNextSessionDate('');
-    setRulingText('');
-    setAssignedLawyerId(c.next_steps || '');
-  };
-
-  const handleRecordDecision = async (e) => {
-    e.preventDefault();
-    if (!decisionCase) return;
-    setIsSavingDecision(true);
-    try {
-      const updates = {
-        status: decisionStatus,
-        next_session_date: decisionStatus === 'adjourned' ? (nextSessionDate || null) : null,
-        ruling_text: rulingText || null,
-        notes: adjournmentReason || decisionCase.notes || null,
-        next_steps: assignedLawyerId || null,
-      };
-
-      await addSession({
-        case_id: decisionCase.id,
-        session_date: decisionSessionDate,
-        session_time: '09:00',
-        status: decisionStatus,
-        adjournment_reason: adjournmentReason || null,
-        ruling_text: rulingText || null,
-        notes: adjournmentReason || null,
-      }, updates);
-
-      if (selectedCase && selectedCase.id === decisionCase.id) {
-        setSelectedCase({ ...selectedCase, ...updates });
-      }
-
-      setDecisionCase(null);
-      setAdjournmentReason('');
-      setNextSessionDate('');
-      setRulingText('');
-      setAssignedLawyerId('');
-    } catch (err) {
-      alert('خطأ أثناء تسجيل القرار: ' + err.message);
-    } finally {
-      setIsSavingDecision(false);
-    }
   };
 
   const handleSaveEdit = async (e) => {
@@ -341,9 +290,75 @@ export default function CasesPage() {
       {selectedCase && (() => {
         const current = cases.find(c => c.id === selectedCase.id) || selectedCase;
         const currentStatus = CASE_STATUSES[current.status] || CASE_STATUSES.active;
-        const caseSessions = (sessions || [])
-          .filter(s => s.case_id === current.id)
-          .sort((a, b) => new Date(b.session_date || b.created_at) - new Date(a.session_date || a.created_at));
+
+        // Build comprehensive chronological timeline (Sessions, Appeals, Admin Tasks)
+        const caseSessions = (sessions || []).filter(s => s.case_id === current.id);
+        const caseAppeals = (appeals || []).filter(a => a.case_id === current.id);
+        const caseTasks = (adminTasks || []).filter(t => t.case_id === current.id);
+        const caseTaskUpdates = (adminTaskUpdates || []).filter(u => {
+          if (u.case_id === current.id) return true;
+          return caseTasks.some(t => t.id === u.admin_task_id);
+        });
+
+        // Extract significant milestones (postponements, completions, reassignments)
+        const taskMilestones = caseTaskUpdates
+          .filter(u => ['postponed', 'completed', 'reassigned', 'cancelled'].includes(u.action_type))
+          .map(u => {
+            const relTask = caseTasks.find(t => t.id === u.admin_task_id);
+            const taskTitle = relTask ? relTask.title : 'عمل إداري';
+            let titleText = `متابعة إدارية: ${taskTitle}`;
+            if (u.action_type === 'postponed') titleText = `تأجيل متابعة إدارية: ${taskTitle}`;
+            else if (u.action_type === 'completed') titleText = `إتمام عمل إداري: ${taskTitle}`;
+            else if (u.action_type === 'reassigned') titleText = `إعادة إسناد عمل إداري: ${taskTitle}`;
+            else if (u.action_type === 'cancelled') titleText = `إلغاء عمل إداري: ${taskTitle}`;
+
+            return {
+              type: 'admin_task_milestone',
+              id: u.id,
+              date: u.created_at,
+              created_at: u.created_at,
+              status: u.action_type,
+              title: titleText,
+              notes: u.update_text,
+              new_due_date: u.new_due_date,
+              previous_due_date: u.previous_due_date,
+            };
+          });
+
+        const timelineItems = [
+          ...caseSessions.map(s => ({
+            type: 'session',
+            id: s.id,
+            date: s.session_date || s.created_at,
+            created_at: s.created_at,
+            status: s.status,
+            adjournment_reason: s.adjournment_reason,
+            ruling_text: s.ruling_text,
+            notes: s.notes,
+          })),
+          ...caseAppeals.map(a => ({
+            type: 'appeal',
+            id: a.id,
+            date: a.judgment_date || a.created_at,
+            created_at: a.created_at,
+            status: 'appeal',
+            judgment_text: a.judgment_text,
+            follow_up_date: a.follow_up_date,
+            notes: a.notes,
+          })),
+          ...caseTasks.map(t => ({
+            type: 'admin_task',
+            id: t.id,
+            date: t.execution_date || t.created_at,
+            created_at: t.created_at,
+            status: t.status,
+            title: t.title,
+            requirements: t.requirements,
+            notes: t.notes,
+            location: t.location,
+          })),
+          ...taskMilestones,
+        ].sort((a, b) => new Date(b.date || b.created_at) - new Date(a.date || a.created_at));
 
         const assigned = team.find(m => m.id === current.next_steps || m.id === (current.next_steps || '').replace('assigned:', ''));
 
@@ -460,17 +475,17 @@ export default function CasesPage() {
                   </div>
                 </div>
 
-                {/* Section Header: سجل الجلسات والتأجيلات */}
+                {/* Section Header: سجل وقائع ودورة حياة الدعوى */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0.4rem 0', flexWrap: 'wrap', gap: '0.75rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                     <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: '1.5px solid var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <Clock size={16} color="var(--text-main)" />
                     </div>
                     <h4 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-                      سجل الجلسات والتأجيلات
+                      سجل الجلسات ودورة حياة الدعوى
                     </h4>
                     <span style={{ background: '#fdf2f2', color: 'var(--primary-800)', padding: '0.2rem 0.65rem', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '700', border: '1px solid rgba(109, 15, 27, 0.1)', whiteSpace: 'nowrap' }}>
-                      {caseSessions.length} جلسات
+                      {timelineItems.length} أحداث
                     </span>
                   </div>
 
@@ -486,12 +501,12 @@ export default function CasesPage() {
                 </div>
 
                 {/* Vertical Timeline */}
-                {caseSessions.length === 0 ? (
+                {timelineItems.length === 0 ? (
                   <div style={{ padding: '1.75rem', textAlign: 'center', background: 'var(--bg-card-subtle)', borderRadius: '12px', border: '1px dashed var(--border-color)', color: 'var(--text-muted)' }}>
                     <Calendar size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.4 }} />
-                    <p style={{ fontSize: '0.92rem', fontWeight: '600' }}>لا يوجد سجل جلسات مسجل لهذه القضية حتى الآن</p>
+                    <p style={{ fontSize: '0.92rem', fontWeight: '600' }}>لا يوجد سجل جلسات أو قرارات مسجلة لهذه القضية حتى الآن</p>
                     <p style={{ fontSize: '0.82rem', color: 'var(--text-subtle)', marginTop: '0.2rem' }}>
-                      عند تسجيل قرار الجلسة (تأجيل أو حكم)، سيتم حفظه تلقائيًا في هذا السجل الزمني.
+                      عند تسجيل قرار الجلسة (تأجيل، حكم نهائي، أو حكم تمهيدي)، سيتم حفظه تلقائيًا في هذا السجل الزمني.
                     </p>
                   </div>
                 ) : (
@@ -500,38 +515,88 @@ export default function CasesPage() {
                     <div style={{ position: 'absolute', right: '9px', top: '16px', bottom: '16px', width: '2px', background: '#e2e8f0', borderRight: '2px dashed #cbd5e1' }} />
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-                      {caseSessions.map((sess, idx) => {
-                        const isJudgment = sess.status === 'finalJudgment' || sess.status === 'preliminaryJudgment' || (sess.status && sess.status.includes('judgment'));
+                      {timelineItems.map((item, idx) => {
+                        const isJudgment = item.status === 'finalJudgment' || item.status === 'preliminaryJudgment';
+                        const isAppeal = item.type === 'appeal';
+                        const isAdminTask = item.type === 'admin_task';
+                        const isAdminTaskMilestone = item.type === 'admin_task_milestone';
 
                         let statusBadgeText = 'مؤجلة';
                         let statusBadgeBg = '#fff7ed';
                         let statusBadgeColor = '#c2410c';
                         let statusBadgeBorder = '#ffedd5';
+                        let nodeColor = '#ea580c';
 
-                        if (sess.status === 'finalJudgment') {
+                        if (item.status === 'finalJudgment') {
                           statusBadgeText = 'حكم نهائي';
                           statusBadgeBg = '#f0fdf4';
                           statusBadgeColor = '#15803d';
                           statusBadgeBorder = '#dcfce7';
-                        } else if (sess.status === 'preliminaryJudgment') {
+                          nodeColor = '#15803d';
+                        } else if (item.status === 'preliminaryJudgment') {
                           statusBadgeText = 'حكم تمهيدي';
                           statusBadgeBg = '#eff6ff';
                           statusBadgeColor = '#1d4ed8';
                           statusBadgeBorder = '#dbeafe';
+                          nodeColor = '#1d4ed8';
+                        } else if (isAppeal) {
+                          statusBadgeText = 'متابعة استئناف';
+                          statusBadgeBg = '#eff6ff';
+                          statusBadgeColor = '#1e40af';
+                          statusBadgeBorder = '#bfdbfe';
+                          nodeColor = '#2563eb';
+                        } else if (isAdminTask) {
+                          statusBadgeText = 'عمل إداري';
+                          statusBadgeBg = '#fffbeb';
+                          statusBadgeColor = '#b45309';
+                          statusBadgeBorder = '#fef3c7';
+                          nodeColor = '#d97706';
+                        } else if (isAdminTaskMilestone) {
+                          if (item.status === 'completed') {
+                            statusBadgeText = 'إتمام عمل إداري';
+                            statusBadgeBg = '#f0fdf4';
+                            statusBadgeColor = '#15803d';
+                            statusBadgeBorder = '#dcfce7';
+                            nodeColor = '#15803d';
+                          } else if (item.status === 'postponed') {
+                            statusBadgeText = 'تأجيل عمل إداري';
+                            statusBadgeBg = '#fff7ed';
+                            statusBadgeColor = '#c2410c';
+                            statusBadgeBorder = '#ffedd5';
+                            nodeColor = '#ea580c';
+                          } else if (item.status === 'cancelled') {
+                            statusBadgeText = 'إلغاء عمل إداري';
+                            statusBadgeBg = '#fef2f2';
+                            statusBadgeColor = '#dc2626';
+                            statusBadgeBorder = '#fecaca';
+                            nodeColor = '#dc2626';
+                          } else {
+                            statusBadgeText = 'متابعة إدارية';
+                            statusBadgeBg = '#eff6ff';
+                            statusBadgeColor = '#0284c7';
+                            statusBadgeBorder = '#bae6fd';
+                            nodeColor = '#0284c7';
+                          }
+                        } else if (item.status === 'scheduled') {
+                          statusBadgeText = 'جلسة قادمة';
+                          statusBadgeBg = '#f1f5f9';
+                          statusBadgeColor = '#475569';
+                          statusBadgeBorder = '#e2e8f0';
+                          nodeColor = '#64748b';
                         }
 
-                        const sessDateStr = sess.session_date
-                          ? new Date(sess.session_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })
+                        const itemDateStr = item.date
+                          ? new Date(item.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })
                           : '—';
 
-                        const recordTimeStr = sess.created_at
-                          ? new Date(sess.created_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }) + ' - ' + new Date(sess.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
-                          : sessDateStr;
+                        const recordTimeStr = item.created_at
+                          ? new Date(item.created_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })
+                          : itemDateStr;
 
-                        const lawyerName = assigned ? assigned.name : 'محمود';
+                        const lawyerName = assigned ? assigned.name : 'مسؤول الدعوى';
 
                         return (
-                          <div key={sess.id || idx} style={{ position: 'relative' }}>
+                          <div key={item.id || idx} style={{ position: 'relative' }}>
                             {/* Timeline Node Dot */}
                             <div style={{
                               position: 'absolute',
@@ -540,38 +605,70 @@ export default function CasesPage() {
                               width: '20px',
                               height: '20px',
                               borderRadius: '50%',
-                              background: isJudgment ? '#22c55e' : '#ea580c',
+                              background: nodeColor,
                               color: '#ffffff',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               border: '2px solid #ffffff',
-                              boxShadow: `0 0 0 2px ${isJudgment ? '#22c55e' : '#ea580c'}`,
+                              boxShadow: `0 0 0 2px ${nodeColor}`,
                               zIndex: 2
                             }}>
-                              {isJudgment && <Check size={12} strokeWidth={3} />}
+                              {(isJudgment || isAppeal || item.status === 'completed') && <Check size={12} strokeWidth={3} />}
                             </div>
 
-                            {/* Session Card */}
+                            {/* Event Card */}
                             <div className="case-modal-session-card">
-                              {/* Right: Date & Reasons */}
+                              {/* Right: Date & Content */}
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: 0, flex: 1 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                   <Calendar size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
                                   <strong style={{ fontSize: '1.02rem', color: 'var(--text-main)', fontWeight: '800' }}>
-                                    جلسة: {sessDateStr}
+                                    {isAdminTask ? `عمل إداري: ${item.title}` : (isAdminTaskMilestone ? item.title : (isAppeal ? `ميعاد استئناف: ${itemDateStr}` : `جلسة: ${itemDateStr}`))}
                                   </strong>
                                 </div>
 
-                                {sess.adjournment_reason && (
+                                {/* Adjournment Reason */}
+                                {item.adjournment_reason && (
                                   <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', marginTop: '0.15rem', wordBreak: 'break-word' }}>
-                                    سبب التأجيل: <span style={{ color: 'var(--text-muted)' }}>{sess.adjournment_reason}</span>
+                                    سبب التأجيل: <span style={{ color: 'var(--text-muted)' }}>{item.adjournment_reason}</span>
                                   </div>
                                 )}
 
-                                {sess.ruling_text && (
+                                {/* Ruling Text */}
+                                {(item.ruling_text || item.judgment_text) && (
                                   <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', marginTop: '0.15rem', wordBreak: 'break-word' }}>
-                                    منطوق الحكم: <span style={{ color: 'var(--text-muted)' }}>{sess.ruling_text}</span>
+                                    منطوق الحكم: <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>{item.ruling_text || item.judgment_text}</span>
+                                  </div>
+                                )}
+
+                                {/* Admin Task Title & Requirements */}
+                                {isAdminTask && (
+                                  <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', marginTop: '0.15rem', wordBreak: 'break-word' }}>
+                                    {item.requirements ? <span>المطلوب: {item.requirements}</span> : null}
+                                    {item.location ? <span style={{ marginRight: '0.5rem', color: 'var(--text-muted)' }}>— المكان: {item.location}</span> : null}
+                                  </div>
+                                )}
+
+                                {/* Admin Task Milestone Postponement Details */}
+                                {isAdminTaskMilestone && item.new_due_date && (
+                                  <div style={{ fontSize: '0.86rem', color: '#c2410c', fontWeight: '700' }}>
+                                    موعد المتابعة الجديد: {new Date(item.new_due_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                    {item.previous_due_date ? <span style={{ color: 'var(--text-muted)', fontWeight: 'normal', marginRight: '0.4rem' }}>(سابقاً: {new Date(item.previous_due_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })})</span> : ''}
+                                  </div>
+                                )}
+
+                                {/* Appeal Follow-up date */}
+                                {isAppeal && item.follow_up_date && (
+                                  <div style={{ fontSize: '0.86rem', color: '#1d4ed8', fontWeight: '700' }}>
+                                    تاريخ متابعة الاستئناف بالأجندة: {new Date(item.follow_up_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                  </div>
+                                )}
+
+                                {/* Extra notes */}
+                                {item.notes && item.notes !== item.adjournment_reason && (
+                                  <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+                                    ملاحظات / التفاصيل: {item.notes}
                                   </div>
                                 )}
                               </div>
@@ -592,7 +689,7 @@ export default function CasesPage() {
                                 </span>
 
                                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', direction: 'rtl', textAlign: 'left', whiteSpace: 'nowrap' }}>
-                                  تم التسجيل: {recordTimeStr}
+                                  التاريخ: {recordTimeStr}
                                 </div>
 
                                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
@@ -809,125 +906,18 @@ export default function CasesPage() {
         </div>
       )}
 
-      {/* Decision Recording Modal for CasesPage */}
-      {decisionCase && (
-        <div className="modal-backdrop" onClick={() => setDecisionCase(null)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
-                <Clock size={18} color="var(--primary-600)" style={{ flexShrink: 0 }} />
-                <h3 style={{ fontSize: '1.05rem', fontWeight: '800', margin: 0, wordBreak: 'break-word' }}>
-                  تسجيل قرار الجلسة لدعوى رقم {decisionCase.case_number}/{decisionCase.case_year}
-                </h3>
-              </div>
-              <button className="btn btn-secondary btn-icon" style={{ flexShrink: 0 }} onClick={() => setDecisionCase(null)}>
-                <X size={18} />
-              </button>
-            </div>
-            <form onSubmit={handleRecordDecision}>
-              <div className="modal-body">
-                <div style={{ padding: '0.8rem 1rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', marginBottom: '1rem' }}>
-                  <div style={{ fontWeight: '700', color: 'var(--primary-800)', wordBreak: 'break-word' }}>
-                    {decisionCase.case_title || `دعوى رقم ${decisionCase.case_number}`}
-                  </div>
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المحكمة: {decisionCase.court_name}</div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
-                  <div className="form-group">
-                    <label className="form-label">تاريخ الجلسة المتداولة *</label>
-                    <input
-                      type="date"
-                      className="form-input"
-                      required
-                      value={decisionSessionDate}
-                      onChange={(e) => setDecisionSessionDate(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">قرار الجلسة / الحالة *</label>
-                    <select
-                      className="form-select"
-                      value={decisionStatus}
-                      onChange={(e) => setDecisionStatus(e.target.value)}
-                    >
-                      {Object.entries(SESSION_DECISIONS).map(([k, v]) => (
-                        <option key={k} value={k}>{v.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {decisionStatus === 'adjourned' && (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
-                    <div className="form-group">
-                      <label className="form-label">سبب التأجيل والقرار</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="مثال: للإعلان بأصل الصحيفة والمستندات"
-                        value={adjournmentReason}
-                        onChange={(e) => setAdjournmentReason(e.target.value)}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">تاريخ الجلسة القادمة *</label>
-                      <input
-                        type="date"
-                        className="form-input"
-                        required
-                        value={nextSessionDate}
-                        onChange={(e) => setNextSessionDate(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Optional Team Assignment */}
-                <div className="form-group" style={{ marginTop: '0.4rem' }}>
-                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <UserCheck size={16} color="var(--primary-600)" />
-                    <span>إسناد / تكليف عضو من الفريق لمتابعة هذه الدعوى (اختياري)</span>
-                  </label>
-                  <select
-                    className="form-select"
-                    value={assignedLawyerId}
-                    onChange={(e) => setAssignedLawyerId(e.target.value)}
-                  >
-                    <option value="">-- بدون إسناد / غير مسندة --</option>
-                    {team.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        الأستاذ / {m.name} — ({USER_ROLES[m.role] || m.role})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {(decisionStatus === 'finalJudgment' || decisionStatus === 'preliminaryJudgment') && (
-                  <div className="form-group">
-                    <label className="form-label">منطوق الحكم</label>
-                    <textarea
-                      className="form-textarea"
-                      placeholder="أدخل منطوق الحكم الصادر في الجلسة بالتفصيل..."
-                      rows={3}
-                      value={rulingText}
-                      onChange={(e) => setRulingText(e.target.value)}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setDecisionCase(null)}>إلغاء</button>
-                <button type="submit" className="btn btn-primary" disabled={isSavingDecision}>
-                  {isSavingDecision ? 'جاري الحفظ...' : 'حفظ القرار وتحديث تاريخ القضية'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Unified Session Decision Modal for CasesPage */}
+      <SessionDecisionModal
+        isOpen={!!decisionCase}
+        caseItem={decisionCase}
+        currentSessionDate={decisionCase?.next_session_date || new Date().toISOString().split('T')[0]}
+        onClose={() => setDecisionCase(null)}
+        onSuccess={(updates) => {
+          if (selectedCase && selectedCase.id === decisionCase?.id) {
+            setSelectedCase(prev => ({ ...prev, ...updates }));
+          }
+        }}
+      />
     </div>
   );
 }

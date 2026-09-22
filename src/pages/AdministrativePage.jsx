@@ -20,23 +20,47 @@ import {
   FileCheck,
   FolderX,
   Mic,
-  ListFilter
+  ListFilter,
+  AlertTriangle,
+  Ban,
+  History,
+  Scale,
+  ChevronDown,
+  ChevronUp,
+  ArrowRight
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { USER_ROLES } from '../lib/supabase';
+import AdministrativeTaskUpdateModal, { ADMIN_TASK_STATUSES } from '../components/common/AdministrativeTaskUpdateModal';
 
 export default function AdministrativePage() {
-  const { adminTasks, clients, team, addAdminTask, updateAdminTask, deleteAdminTask, toggleAdminTaskStatus } = useData();
+  const {
+    adminTasks,
+    adminTaskUpdates,
+    clients,
+    cases,
+    team,
+    officeProfile,
+    addAdminTask,
+    updateAdminTask,
+    deleteAdminTask,
+    toggleAdminTaskStatus
+  } = useData();
 
   // Filter and Search states
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('pending'); // 'pending' | 'completed' | 'all'
+  const [filterStatus, setFilterStatus] = useState('active'); // 'active' | 'postponed' | 'waiting' | 'completed' | 'cancelled' | 'all'
 
-  // Modal State
+  // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
+  const [taskToUpdate, setTaskToUpdate] = useState(null); // For AdministrativeTaskUpdateModal
 
-  // Form Fields
+  // Expandable Timeline State per Card
+  const [expandedHistoryTaskIds, setExpandedHistoryTaskIds] = useState(new Set());
+
+  // Form Fields for Add/Edit Basic Task
+  const [caseId, setCaseId] = useState('');
   const [clientId, setClientId] = useState('');
   const [title, setTitle] = useState('');
   const [executionDate, setExecutionDate] = useState(new Date().toISOString().split('T')[0]);
@@ -46,9 +70,23 @@ export default function AdministrativePage() {
   const [assignedTo, setAssignedTo] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
+  // Toggle History View for a specific task
+  const toggleTaskHistory = (taskId) => {
+    setExpandedHistoryTaskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
+
   // Open modal for new task
   const handleOpenNew = () => {
     setEditingTask(null);
+    setCaseId('');
     setClientId('');
     setTitle('');
     setExecutionDate(new Date().toISOString().split('T')[0]);
@@ -59,9 +97,10 @@ export default function AdministrativePage() {
     setIsModalOpen(true);
   };
 
-  // Open modal for editing
+  // Open modal for editing basic task data
   const handleOpenEdit = (task) => {
     setEditingTask(task);
+    setCaseId(task.case_id || '');
     setClientId(task.client_id || '');
     setTitle(task.title || '');
     setExecutionDate(task.execution_date ? task.execution_date.split('T')[0] : new Date().toISOString().split('T')[0]);
@@ -73,6 +112,7 @@ export default function AdministrativePage() {
   };
 
   const handleResetForm = () => {
+    setCaseId('');
     setClientId('');
     setTitle('');
     setExecutionDate(new Date().toISOString().split('T')[0]);
@@ -95,9 +135,10 @@ export default function AdministrativePage() {
       const clientObj = clients.find(c => c.id === clientId);
       const taskData = {
         title: title.trim(),
+        case_id: caseId || null,
         client_id: clientId || null,
         client_name: clientObj ? clientObj.name : null,
-        execution_date: executionDate,
+        execution_date: executionDate || null,
         location: location.trim() || null,
         requirements: requirements.trim() || null,
         notes: notes.trim() || null,
@@ -113,7 +154,7 @@ export default function AdministrativePage() {
       setIsModalOpen(false);
       handleResetForm();
     } catch (err) {
-      alert('خطأ أثناء حفظ العمل الإداري: ' + err.message);
+      alert('خطأ أثناء حفظ العمل الإداري: ' + (err.message || err));
     } finally {
       setIsSaving(false);
     }
@@ -121,7 +162,7 @@ export default function AdministrativePage() {
 
   // Handle Delete
   const handleDelete = async (id) => {
-    if (window.confirm('هل أنت متأكد من حذف هذا العمل الإداري نهائياً؟')) {
+    if (window.confirm('هل أنت متأكد من حذف هذا العمل الإداري وسجله نهائياً؟')) {
       await deleteAdminTask(id);
     }
   };
@@ -130,8 +171,18 @@ export default function AdministrativePage() {
   const query = searchTerm.toLowerCase().trim();
   const filteredTasks = adminTasks.filter(task => {
     // Status filter
-    if (filterStatus === 'pending' && task.status === 'completed') return false;
-    if (filterStatus === 'completed' && task.status !== 'completed') return false;
+    const status = task.status || 'pending';
+    if (filterStatus === 'active') {
+      if (status === 'completed' || status === 'cancelled') return false;
+    } else if (filterStatus === 'postponed') {
+      if (status !== 'postponed') return false;
+    } else if (filterStatus === 'waiting') {
+      if (status !== 'waiting') return false;
+    } else if (filterStatus === 'completed') {
+      if (status !== 'completed') return false;
+    } else if (filterStatus === 'cancelled') {
+      if (status !== 'cancelled') return false;
+    }
 
     // Search query
     if (!query) return true;
@@ -145,9 +196,27 @@ export default function AdministrativePage() {
   });
 
   // Counts
-  const pendingCount = adminTasks.filter(t => t.status !== 'completed').length;
+  const activeCount = adminTasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled').length;
+  const postponedCount = adminTasks.filter(t => t.status === 'postponed').length;
+  const waitingCount = adminTasks.filter(t => t.status === 'waiting').length;
   const completedCount = adminTasks.filter(t => t.status === 'completed').length;
+  const cancelledCount = adminTasks.filter(t => t.status === 'cancelled').length;
   const totalCount = adminTasks.length;
+
+  // Resolve actor name from ID
+  const resolveActorName = (actorId) => {
+    if (!actorId) return 'المسؤول';
+    const member = team.find(m => m.id === actorId);
+    if (member) return `أ/ ${member.name}`;
+    if (officeProfile?.lawyer_name) return `أ/ ${officeProfile.lawyer_name}`;
+    return 'المكتب';
+  };
+
+  const resolveAssigneeName = (id) => {
+    if (!id) return 'غير محدد';
+    const m = team.find(t => t.id === id);
+    return m ? `أ/ ${m.name}` : 'غير محدد';
+  };
 
   return (
     <div className="page-wrapper" style={{ maxWidth: '1400px' }}>
@@ -166,11 +235,11 @@ export default function AdministrativePage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-gold)' }}></span>
             <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
-              الإدارة والمعاملات الخارجية
+              الإدارة والمعاملات ومسار الأعمال الخارجية
             </span>
           </div>
           <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-            الأعمال الإدارية
+            الأعمال الإدارية ودورة حياة المتابعة
           </h1>
         </div>
 
@@ -220,7 +289,7 @@ export default function AdministrativePage() {
           onClick={handleOpenNew}
         >
           <Plus size={18} strokeWidth={2.5} />
-          <span>إضافة</span>
+          <span>إضافة عمل</span>
         </button>
 
         <div style={{
@@ -238,7 +307,7 @@ export default function AdministrativePage() {
           <Search size={18} style={{ color: 'var(--text-subtle)', flexShrink: 0 }} />
           <input
             type="text"
-            placeholder="ابحث عن عمل، موكل، أو مكان تنفيذ..."
+            placeholder="ابحث عن عمل إداري، موكل، قضية، أو مكان تنفيذ..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
@@ -257,6 +326,7 @@ export default function AdministrativePage() {
 
       {/* Filter Tabs (Pills) */}
       <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1.2rem', flexWrap: 'wrap', alignItems: 'center' }}>
+        {/* 1. Active Tab */}
         <button
           type="button"
           style={{
@@ -268,26 +338,91 @@ export default function AdministrativePage() {
             fontSize: '0.9rem',
             fontWeight: '700',
             cursor: 'pointer',
-            border: filterStatus === 'pending' ? '1.5px solid var(--primary-700)' : '1px solid var(--border-color)',
-            background: filterStatus === 'pending' ? 'var(--primary-800)' : 'var(--bg-card)',
-            color: filterStatus === 'pending' ? '#ffffff' : 'var(--text-main)',
-            boxShadow: filterStatus === 'pending' ? '0 3px 10px rgba(55, 4, 10, 0.25)' : 'none',
+            border: filterStatus === 'active' ? '1.5px solid var(--primary-700)' : '1px solid var(--border-color)',
+            background: filterStatus === 'active' ? 'var(--primary-800)' : 'var(--bg-card)',
+            color: filterStatus === 'active' ? '#ffffff' : 'var(--text-main)',
+            boxShadow: filterStatus === 'active' ? '0 3px 10px rgba(55, 4, 10, 0.25)' : 'none',
             transition: 'all 0.15s ease'
           }}
-          onClick={() => setFilterStatus('pending')}
+          onClick={() => setFilterStatus('active')}
         >
           <Clock size={16} />
-          <span>قيد التنفيذ</span>
+          <span>قيد المتابعة والتنفيذ</span>
           <span style={{
-            background: filterStatus === 'pending' ? 'rgba(255,255,255,0.25)' : 'var(--bg-card-subtle)',
+            background: filterStatus === 'active' ? 'rgba(255,255,255,0.25)' : 'var(--bg-card-subtle)',
             padding: '0.1rem 0.5rem',
             borderRadius: '12px',
             fontSize: '0.78rem'
           }}>
-            {pendingCount}
+            {activeCount}
           </span>
         </button>
 
+        {/* 2. Postponed Tab */}
+        <button
+          type="button"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.5rem 1.1rem',
+            borderRadius: '24px',
+            fontSize: '0.9rem',
+            fontWeight: '700',
+            cursor: 'pointer',
+            border: filterStatus === 'postponed' ? '1.5px solid #ea580c' : '1px solid var(--border-color)',
+            background: filterStatus === 'postponed' ? '#ea580c' : 'var(--bg-card)',
+            color: filterStatus === 'postponed' ? '#ffffff' : 'var(--text-main)',
+            boxShadow: filterStatus === 'postponed' ? '0 3px 10px rgba(234, 88, 12, 0.2)' : 'none',
+            transition: 'all 0.15s ease'
+          }}
+          onClick={() => setFilterStatus('postponed')}
+        >
+          <AlertTriangle size={16} />
+          <span>المؤجلة</span>
+          <span style={{
+            background: filterStatus === 'postponed' ? 'rgba(255,255,255,0.25)' : 'var(--bg-card-subtle)',
+            padding: '0.1rem 0.5rem',
+            borderRadius: '12px',
+            fontSize: '0.78rem'
+          }}>
+            {postponedCount}
+          </span>
+        </button>
+
+        {/* 3. Waiting Tab */}
+        <button
+          type="button"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.5rem 1.1rem',
+            borderRadius: '24px',
+            fontSize: '0.9rem',
+            fontWeight: '700',
+            cursor: 'pointer',
+            border: filterStatus === 'waiting' ? '1.5px solid #7c3aed' : '1px solid var(--border-color)',
+            background: filterStatus === 'waiting' ? '#7c3aed' : 'var(--bg-card)',
+            color: filterStatus === 'waiting' ? '#ffffff' : 'var(--text-main)',
+            boxShadow: filterStatus === 'waiting' ? '0 3px 10px rgba(124, 58, 237, 0.2)' : 'none',
+            transition: 'all 0.15s ease'
+          }}
+          onClick={() => setFilterStatus('waiting')}
+        >
+          <RotateCcw size={16} />
+          <span>بانتظار إجراء</span>
+          <span style={{
+            background: filterStatus === 'waiting' ? 'rgba(255,255,255,0.25)' : 'var(--bg-card-subtle)',
+            padding: '0.1rem 0.5rem',
+            borderRadius: '12px',
+            fontSize: '0.78rem'
+          }}>
+            {waitingCount}
+          </span>
+        </button>
+
+        {/* 4. Completed Tab */}
         <button
           type="button"
           style={{
@@ -308,7 +443,7 @@ export default function AdministrativePage() {
           onClick={() => setFilterStatus('completed')}
         >
           <CheckCircle2 size={16} />
-          <span>مكتمل</span>
+          <span>تم التنفيذ</span>
           <span style={{
             background: filterStatus === 'completed' ? 'rgba(255,255,255,0.25)' : 'var(--bg-card-subtle)',
             padding: '0.1rem 0.5rem',
@@ -319,6 +454,39 @@ export default function AdministrativePage() {
           </span>
         </button>
 
+        {/* 5. Cancelled Tab */}
+        <button
+          type="button"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.5rem 1.1rem',
+            borderRadius: '24px',
+            fontSize: '0.9rem',
+            fontWeight: '700',
+            cursor: 'pointer',
+            border: filterStatus === 'cancelled' ? '1.5px solid #dc2626' : '1px solid var(--border-color)',
+            background: filterStatus === 'cancelled' ? '#dc2626' : 'var(--bg-card)',
+            color: filterStatus === 'cancelled' ? '#ffffff' : 'var(--text-main)',
+            boxShadow: filterStatus === 'cancelled' ? '0 3px 10px rgba(220, 38, 38, 0.2)' : 'none',
+            transition: 'all 0.15s ease'
+          }}
+          onClick={() => setFilterStatus('cancelled')}
+        >
+          <Ban size={16} />
+          <span>ملغاة</span>
+          <span style={{
+            background: filterStatus === 'cancelled' ? 'rgba(255,255,255,0.25)' : 'var(--bg-card-subtle)',
+            padding: '0.1rem 0.5rem',
+            borderRadius: '12px',
+            fontSize: '0.78rem'
+          }}>
+            {cancelledCount}
+          </span>
+        </button>
+
+        {/* 6. All Tab */}
         <button
           type="button"
           style={{
@@ -356,7 +524,7 @@ export default function AdministrativePage() {
         <span style={{ background: 'var(--primary-100)', color: 'var(--primary-800)', padding: '0.15rem 0.6rem', borderRadius: '12px', fontWeight: '800' }}>
           {filteredTasks.length}
         </span>
-        <span>عدد الأعمال الإدارية المعروضة</span>
+        <span>أعمال إدارية معروضة</span>
       </div>
 
       {/* Task List or Empty State */}
@@ -392,7 +560,7 @@ export default function AdministrativePage() {
             لا توجد أعمال إدارية تطابق بحثك
           </h3>
           <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', maxWidth: '380px', margin: '0 auto 1.5rem', lineHeight: '1.5' }}>
-            حاول تغيير الفلتر أو البحث عن شيء آخر، أو أضف عملاً إدارياً جديداً للمكتب.
+            حاول تغيير تبويب الفلتر أو البحث عن شيء آخر، أو أضف عملاً إدارياً جديداً للمكتب.
           </p>
 
           <button
@@ -406,17 +574,31 @@ export default function AdministrativePage() {
           </button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 290px), 1fr))', gap: '1rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))', gap: '1.1rem', alignItems: 'start' }}>
           {filteredTasks.map(task => {
             const isDone = task.status === 'completed';
+            const isCancelled = task.status === 'cancelled';
             const assignedMember = team.find(m => m.id === task.assigned_to);
+            const statusConfig = ADMIN_TASK_STATUSES[task.status] || ADMIN_TASK_STATUSES.pending;
+            const StatusIcon = statusConfig.icon;
+            const relatedCase = task.case_id ? cases.find(c => c.id === task.case_id) : null;
+
+            // Audit history for this task
+            const taskHistory = (adminTaskUpdates || [])
+              .filter(u => u.admin_task_id === task.id)
+              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+            const isHistoryExpanded = expandedHistoryTaskIds.has(task.id);
+
+            // Calculate how many times postponed
+            const postponementCount = taskHistory.filter(u => u.action_type === 'postponed' || u.new_status === 'postponed').length;
 
             return (
               <div
                 key={task.id}
                 style={{
                   background: 'var(--bg-card)',
-                  border: isDone ? '1px solid #dcfce7' : '1px solid var(--border-color)',
+                  border: isDone ? '1px solid #dcfce7' : (isCancelled ? '1px solid #fee2e2' : '1px solid var(--border-color)'),
                   borderRadius: '14px',
                   padding: '1.2rem',
                   boxShadow: 'var(--shadow-sm)',
@@ -424,16 +606,49 @@ export default function AdministrativePage() {
                   flexDirection: 'column',
                   gap: '0.85rem',
                   position: 'relative',
-                  transition: 'transform 0.15s ease, box-shadow 0.15s ease'
+                  transition: 'all 0.2s ease'
                 }}
               >
-                {/* Card Top: Client badge & Status */}
+                {/* Card Top: Client & Case badge + Current Status Badge */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--bg-card-subtle)', padding: '0.25rem 0.65rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)' }}>
-                    <User size={13} color="var(--primary-700)" />
-                    <span>{task.client_name || 'بدون موكل محدد'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    {/* Client Name */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      background: 'var(--bg-card-subtle)',
+                      padding: '0.25rem 0.65rem',
+                      borderRadius: '8px',
+                      fontSize: '0.82rem',
+                      fontWeight: '700',
+                      color: 'var(--text-main)'
+                    }}>
+                      <User size={13} color="var(--primary-700)" />
+                      <span>{task.client_name || 'بدون موكل محدد'}</span>
+                    </div>
+
+                    {/* Related Case Badge if present */}
+                    {relatedCase && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.35rem',
+                        background: '#eff6ff',
+                        color: '#1d4ed8',
+                        padding: '0.25rem 0.6rem',
+                        borderRadius: '8px',
+                        fontSize: '0.78rem',
+                        fontWeight: '800',
+                        border: '1px solid #bfdbfe'
+                      }}>
+                        <Scale size={13} />
+                        <span>دعوى {relatedCase.case_number}/{relatedCase.case_year}</span>
+                      </div>
+                    )}
                   </div>
 
+                  {/* Status Badge */}
                   <span style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -441,46 +656,83 @@ export default function AdministrativePage() {
                     padding: '0.25rem 0.75rem',
                     borderRadius: '20px',
                     fontSize: '0.78rem',
-                    fontWeight: '700',
-                    background: isDone ? '#f0fdf4' : 'var(--primary-50)',
-                    color: isDone ? '#15803d' : 'var(--primary-800)',
-                    border: isDone ? '1px solid #bbf7d0' : '1px solid var(--primary-100)'
+                    fontWeight: '800',
+                    background: statusConfig.bg,
+                    color: statusConfig.color,
+                    border: `1px solid ${statusConfig.border}`
                   }}>
-                    {isDone ? <Check size={12} strokeWidth={3} /> : <Clock size={12} />}
-                    <span>{isDone ? 'مكتمل' : 'قيد التنفيذ'}</span>
+                    <StatusIcon size={13} />
+                    <span>{statusConfig.label}</span>
                   </span>
                 </div>
 
                 {/* Task Title */}
                 <div>
-                  <h3 style={{ fontSize: '1.08rem', fontWeight: '800', color: isDone ? 'var(--text-muted)' : 'var(--text-main)', margin: '0 0 0.35rem', textDecoration: isDone ? 'line-through' : 'none' }}>
+                  <h3 style={{
+                    fontSize: '1.08rem',
+                    fontWeight: '800',
+                    color: isDone || isCancelled ? 'var(--text-muted)' : 'var(--text-main)',
+                    margin: '0 0 0.2rem',
+                    textDecoration: isDone || isCancelled ? 'line-through' : 'none'
+                  }}>
                     {task.title}
                   </h3>
                 </div>
 
-                {/* Key Details: Date & Location */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.85rem', background: 'var(--bg-card-subtle)', padding: '0.75rem 0.9rem', borderRadius: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
-                    <Calendar size={15} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                    <span><strong>تاريخ التنفيذ:</strong> {task.execution_date ? new Date(task.execution_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }) : 'غير محدد'}</span>
+                {/* Key Details: Current Follow-up Date, Assignee, Location */}
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                  fontSize: '0.85rem',
+                  background: 'var(--bg-card-subtle)',
+                  padding: '0.8rem 0.95rem',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border-subtle)'
+                }}>
+                  {/* Current Follow-up Date */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
+                      <Calendar size={15} color="var(--primary-700)" style={{ flexShrink: 0 }} />
+                      <span>
+                        <strong>المتابعة القادمة:</strong>{' '}
+                        {task.execution_date
+                          ? new Date(task.execution_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })
+                          : 'بدون موعد محدد'}
+                      </span>
+                    </div>
+
+                    {postponementCount > 0 && (
+                      <span style={{
+                        fontSize: '0.72rem',
+                        fontWeight: '800',
+                        color: '#c2410c',
+                        background: '#fff7ed',
+                        padding: '0.1rem 0.45rem',
+                        borderRadius: '6px',
+                        border: '1px solid #ffedd5'
+                      }}>
+                        تأجلت {postponementCount} {postponementCount === 1 ? 'مرة' : 'مرات'}
+                      </span>
+                    )}
                   </div>
 
+                  {/* Assignee */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
+                    <UserCheck size={15} color="var(--primary-700)" style={{ flexShrink: 0 }} />
+                    <span><strong>المسند إليه حالياً:</strong> {assignedMember ? `الأستاذ / ${assignedMember.name}` : 'غير مسند'}</span>
+                  </div>
+
+                  {/* Location */}
                   {task.location && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
                       <MapPin size={15} color="var(--primary-700)" style={{ flexShrink: 0 }} />
                       <span><strong>المكان:</strong> {task.location}</span>
                     </div>
                   )}
-
-                  {assignedMember && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
-                      <UserCheck size={15} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                      <span><strong>المكلف:</strong> الأستاذ / {assignedMember.name}</span>
-                    </div>
-                  )}
                 </div>
 
-                {/* Requirements / المطلوب */}
+                {/* Requirements */}
                 {task.requirements && (
                   <div style={{ fontSize: '0.84rem', color: 'var(--text-main)', lineHeight: '1.45' }}>
                     <strong style={{ color: 'var(--primary-800)', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.2rem' }}>
@@ -494,56 +746,317 @@ export default function AdministrativePage() {
 
                 {/* Notes */}
                 {task.notes && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-subtle)', fontStyle: 'italic', borderTop: '1px dashed var(--border-subtle)', paddingTop: '0.4rem' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-subtle)', fontStyle: 'italic', borderTop: '1px dashed var(--border-subtle)', paddingTop: '0.35rem' }}>
                     ملاحظات: {task.notes}
                   </div>
                 )}
 
-                {/* Card Actions Footer */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '0.6rem', borderTop: '1px solid var(--border-subtle)' }}>
-                  <button
-                    type="button"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                      background: isDone ? '#fef2f2' : '#f0fdf4',
-                      color: isDone ? '#dc2626' : '#16a34a',
-                      border: isDone ? '1px solid #fecaca' : '1px solid #bbf7d0',
-                      padding: '0.35rem 0.75rem',
-                      borderRadius: '8px',
-                      fontSize: '0.82rem',
-                      fontWeight: '700',
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => toggleAdminTaskStatus(task.id)}
-                  >
-                    {isDone ? <RotateCcw size={14} /> : <Check size={14} strokeWidth={3} />}
-                    <span>{isDone ? 'إعادة للتنفيذ' : 'إتمام العمل'}</span>
-                  </button>
+                {/* Card Actions Toolbar */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: 'auto',
+                  paddingTop: '0.7rem',
+                  borderTop: '1px solid var(--border-subtle)',
+                  flexWrap: 'wrap',
+                  gap: '0.5rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                    {/* Primary Button: تحديث */}
+                    <button
+                      type="button"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        background: 'var(--primary-800)',
+                        color: '#ffffff',
+                        border: '1px solid var(--accent-gold)',
+                        padding: '0.38rem 0.85rem',
+                        borderRadius: '8px',
+                        fontSize: '0.83rem',
+                        fontWeight: '800',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(55, 4, 10, 0.15)'
+                      }}
+                      onClick={() => setTaskToUpdate(task)}
+                    >
+                      <Clock size={14} />
+                      <span>تحديث</span>
+                    </button>
 
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
+                    {/* Secondary Button: عرض السجل */}
+                    <button
+                      type="button"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        background: isHistoryExpanded ? 'var(--primary-50)' : 'var(--bg-card)',
+                        color: isHistoryExpanded ? 'var(--primary-800)' : 'var(--text-main)',
+                        border: isHistoryExpanded ? '1.5px solid var(--primary-600)' : '1px solid var(--border-color)',
+                        padding: '0.38rem 0.8rem',
+                        borderRadius: '8px',
+                        fontSize: '0.82rem',
+                        fontWeight: '700',
+                        cursor: 'pointer'
+                      }}
+                      onClick={() => toggleTaskHistory(task.id)}
+                    >
+                      <History size={14} color="var(--primary-700)" />
+                      <span>{isHistoryExpanded ? 'إخفاء السجل' : 'عرض السجل'}</span>
+                      <span style={{
+                        background: isHistoryExpanded ? 'var(--primary-200)' : 'var(--bg-card-subtle)',
+                        color: 'var(--primary-800)',
+                        fontSize: '0.72rem',
+                        padding: '0.05rem 0.4rem',
+                        borderRadius: '8px',
+                        fontWeight: '800'
+                      }}>
+                        {taskHistory.length || 1}
+                      </span>
+                      {isHistoryExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                    </button>
+                  </div>
+
+                  {/* Right side icon actions */}
+                  <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                    {/* Quick Toggle Done/Reopen */}
+                    <button
+                      type="button"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: '32px',
+                        height: '32px',
+                        borderRadius: '8px',
+                        border: isDone ? '1px solid #fecaca' : '1px solid #bbf7d0',
+                        background: isDone ? '#fef2f2' : '#f0fdf4',
+                        color: isDone ? '#dc2626' : '#16a34a',
+                        cursor: 'pointer'
+                      }}
+                      title={isDone ? 'إعادة المهمة للتنفيذ' : 'إتمام العمل بنجاح'}
+                      onClick={() => toggleAdminTaskStatus(task.id)}
+                    >
+                      {isDone ? <RotateCcw size={14} /> : <Check size={14} strokeWidth={3} />}
+                    </button>
+
                     <button
                       type="button"
                       className="btn btn-secondary btn-icon"
-                      style={{ width: '32px', height: '32px', padding: 0 }}
-                      title="تعديل العمل الإداري"
+                      style={{ width: '32px', height: '32px', padding: 0, borderRadius: '8px' }}
+                      title="تعديل البيانات الأساسية"
                       onClick={() => handleOpenEdit(task)}
                     >
-                      <Edit3 size={15} />
+                      <Edit3 size={14} />
                     </button>
 
                     <button
                       type="button"
                       className="btn btn-danger btn-icon"
-                      style={{ width: '32px', height: '32px', padding: 0 }}
+                      style={{ width: '32px', height: '32px', padding: 0, borderRadius: '8px' }}
                       title="حذف"
                       onClick={() => handleDelete(task.id)}
                     >
-                      <Trash2 size={15} />
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
+
+                {/* ========================================================================= */}
+                {/* EXPANDABLE AUDIT TIMELINE SECTION (السجل الزمني الكامل للمهمة)             */}
+                {/* ========================================================================= */}
+                {isHistoryExpanded && (
+                  <div style={{
+                    marginTop: '0.4rem',
+                    padding: '0.85rem 1rem',
+                    background: 'var(--bg-card-subtle)',
+                    borderRadius: '12px',
+                    border: '1px solid var(--border-subtle)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.75rem'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', borderBottom: '1px dashed var(--border-subtle)', paddingBottom: '0.45rem' }}>
+                      <History size={15} color="var(--primary-700)" />
+                      <strong style={{ fontSize: '0.88rem', color: 'var(--text-main)' }}>
+                        سجل التحديثات والحركات التاريخية ({taskHistory.length || 1})
+                      </strong>
+                    </div>
+
+                    {/* Timeline List */}
+                    <div style={{ position: 'relative', paddingRight: '16px' }}>
+                      {/* Vertical connector line */}
+                      <div style={{
+                        position: 'absolute',
+                        right: '5px',
+                        top: '8px',
+                        bottom: '8px',
+                        width: '2px',
+                        background: 'var(--border-color)',
+                        borderRight: '1.5px dashed var(--border-subtle)'
+                      }} />
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                        {(taskHistory.length > 0 ? taskHistory : [
+                          {
+                            id: `init_${task.id}`,
+                            action_type: 'created',
+                            new_status: task.status || 'pending',
+                            new_due_date: task.execution_date,
+                            new_assigned_to: task.assigned_to,
+                            update_text: task.requirements || 'تم إنشاء العمل الإداري',
+                            created_at: task.created_at || new Date().toISOString(),
+                            created_by: null
+                          }
+                        ]).map((item, idx) => {
+                          const itemStatus = ADMIN_TASK_STATUSES[item.new_status] || ADMIN_TASK_STATUSES.pending;
+                          const dateObj = new Date(item.created_at);
+                          const dateStr = dateObj.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' });
+                          const timeStr = dateObj.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+
+                          let actionTitle = 'تحديث مسار العمل الإداري';
+                          let actionColor = itemStatus.color;
+
+                          if (item.action_type === 'created') {
+                            actionTitle = 'تم إنشاء العمل الإداري والتكليف المبدئي';
+                            actionColor = 'var(--primary-700)';
+                          } else if (item.action_type === 'postponed' || item.new_status === 'postponed') {
+                            actionTitle = 'تم تأجيل المتابعة';
+                            actionColor = '#c2410c';
+                          } else if (item.action_type === 'completed' || item.new_status === 'completed') {
+                            actionTitle = 'تم إتمام العمل الإداري بنجاح';
+                            actionColor = '#15803d';
+                          } else if (item.action_type === 'reopened') {
+                            actionTitle = 'إعادة فتح المهمة للتنفيذ';
+                            actionColor = '#7c3aed';
+                          } else if (item.action_type === 'cancelled' || item.new_status === 'cancelled') {
+                            actionTitle = 'تم إلغاء العمل الإداري';
+                            actionColor = '#dc2626';
+                          } else if (item.action_type === 'reassigned') {
+                            actionTitle = 'إعادة إسناد المهمة';
+                            actionColor = '#0284c7';
+                          }
+
+                          return (
+                            <div key={item.id || idx} style={{ position: 'relative' }}>
+                              {/* Node Dot */}
+                              <div style={{
+                                position: 'absolute',
+                                right: '-15px',
+                                top: '4px',
+                                width: '10px',
+                                height: '10px',
+                                borderRadius: '50%',
+                                background: actionColor,
+                                border: '2px solid #ffffff',
+                                boxShadow: `0 0 0 1.5px ${actionColor}`,
+                                zIndex: 1
+                              }} />
+
+                              {/* Event Body */}
+                              <div style={{
+                                background: 'var(--bg-card)',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: '8px',
+                                padding: '0.65rem 0.8rem',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.35rem',
+                                fontSize: '0.82rem'
+                              }}>
+                                {/* Header: Date/Time + Actor */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem' }}>
+                                  <div style={{ fontWeight: '800', color: actionColor, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                    <span>{actionTitle}</span>
+                                  </div>
+
+                                  <div style={{ fontSize: '0.74rem', color: 'var(--text-subtle)' }}>
+                                    {dateStr} — {timeStr}
+                                  </div>
+                                </div>
+
+                                {/* Status & Assignee transition */}
+                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.78rem' }}>
+                                  {/* Status transition if provided */}
+                                  {item.previous_status && item.previous_status !== item.new_status ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--text-muted)' }}>
+                                      <span>الحالة:</span>
+                                      <span style={{ textDecoration: 'line-through' }}>{ADMIN_TASK_STATUSES[item.previous_status]?.label || item.previous_status}</span>
+                                      <ArrowRight size={11} />
+                                      <strong style={{ color: itemStatus.color }}>{itemStatus.label}</strong>
+                                    </div>
+                                  ) : (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                      <span>الحالة:</span>
+                                      <strong style={{ color: itemStatus.color }}>{itemStatus.label}</strong>
+                                    </div>
+                                  )}
+
+                                  {/* Assignee transition if changed */}
+                                  {item.previous_assigned_to !== item.new_assigned_to && item.new_assigned_to && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--text-muted)' }}>
+                                      <span>المسؤول:</span>
+                                      {item.previous_assigned_to && (
+                                        <>
+                                          <span style={{ textDecoration: 'line-through' }}>{resolveAssigneeName(item.previous_assigned_to)}</span>
+                                          <ArrowRight size={11} />
+                                        </>
+                                      )}
+                                      <strong style={{ color: 'var(--primary-800)' }}>{resolveAssigneeName(item.new_assigned_to)}</strong>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Due date postponement info */}
+                                {item.previous_due_date !== item.new_due_date && item.new_due_date && (
+                                  <div style={{
+                                    fontSize: '0.78rem',
+                                    color: '#c2410c',
+                                    background: '#fff7ed',
+                                    padding: '0.25rem 0.5rem',
+                                    borderRadius: '6px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.35rem'
+                                  }}>
+                                    <Calendar size={12} />
+                                    <span>
+                                      المتابعة: {item.previous_due_date ? `كانت ${item.previous_due_date.split('T')[0]}` : 'لم تكن محددة'} ← <strong>الجديد: {item.new_due_date.split('T')[0]}</strong>
+                                    </span>
+                                  </div>
+                                )}
+
+                                {/* Notes / Reasons */}
+                                {item.update_text && (
+                                  <div style={{
+                                    fontSize: '0.8rem',
+                                    color: 'var(--text-main)',
+                                    background: 'var(--bg-card-subtle)',
+                                    padding: '0.4rem 0.6rem',
+                                    borderRadius: '6px',
+                                    borderRight: `3px solid ${actionColor}`,
+                                    whiteSpace: 'pre-wrap',
+                                    lineHeight: '1.4'
+                                  }}>
+                                    {item.update_text}
+                                  </div>
+                                )}
+
+                                {/* Actor snapshot */}
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-subtle)', textAlign: 'left', marginTop: '0.1rem' }}>
+                                  بواسطة: {resolveActorName(item.created_by)}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -551,13 +1064,22 @@ export default function AdministrativePage() {
       )}
 
       {/* ========================================================================= */}
-      {/* ADD / EDIT ADMINISTRATIVE TASK MODAL (MATCHING SCREENSHOT 2)              */}
+      {/* 1. UPDATE ADMINISTRATIVE TASK WORKFLOW MODAL                               */}
+      {/* ========================================================================= */}
+      <AdministrativeTaskUpdateModal
+        isOpen={!!taskToUpdate}
+        task={taskToUpdate}
+        onClose={() => setTaskToUpdate(null)}
+      />
+
+      {/* ========================================================================= */}
+      {/* 2. ADD / EDIT BASIC ADMINISTRATIVE TASK MODAL                              */}
       {/* ========================================================================= */}
       {isModalOpen && (
         <div className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
           <div
             className="modal-dialog"
-            style={{ maxWidth: '620px', maxHeight: '92vh', display: 'flex', flexDirection: 'column', borderRadius: '16px', overflow: 'hidden' }}
+            style={{ maxWidth: '640px', maxHeight: '92vh', display: 'flex', flexDirection: 'column', borderRadius: '16px', overflow: 'hidden' }}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -590,26 +1112,49 @@ export default function AdministrativePage() {
             {/* Modal Body / Form */}
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
               <div className="modal-body" style={{ overflowY: 'auto', padding: '1.25rem 1.4rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                {/* SECTION 1: بيانات الموكل */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.95rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.5rem' }}>
-                    <User size={16} color="var(--primary-700)" />
-                    <span>بيانات الموكل (اختياري)</span>
+                {/* SECTION 1: بيانات الموكل والقضية */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.8rem' }}>
+                  {/* الموكل */}
+                  <div>
+                    <label className="form-label" style={{ fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <User size={15} color="var(--primary-700)" />
+                      <span>الموكل (اختياري)</span>
+                    </label>
+                    <select
+                      className="form-select"
+                      value={clientId}
+                      onChange={(e) => setClientId(e.target.value)}
+                      style={{ background: 'var(--bg-card)', borderRadius: '10px', padding: '0.6rem 0.8rem', fontSize: '0.9rem' }}
+                    >
+                      <option value="">-- بدون موكل محدد --</option>
+                      {clients.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} {c.phone ? `(${c.phone})` : ''}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  <select
-                    className="form-select"
-                    value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
-                    style={{ background: 'var(--bg-card)', borderRadius: '10px', padding: '0.65rem 0.9rem', fontSize: '0.92rem' }}
-                  >
-                    <option value="">-- اضغط لاختيار الموكل من السجل... --</option>
-                    {clients.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.phone ? `(${c.phone})` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  {/* القضية المرتبطة */}
+                  <div>
+                    <label className="form-label" style={{ fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                      <Scale size={15} color="var(--primary-700)" />
+                      <span>القضية المرتبطة (اختياري)</span>
+                    </label>
+                    <select
+                      className="form-select"
+                      value={caseId}
+                      onChange={(e) => setCaseId(e.target.value)}
+                      style={{ background: 'var(--bg-card)', borderRadius: '10px', padding: '0.6rem 0.8rem', fontSize: '0.9rem' }}
+                    >
+                      <option value="">-- عمل إداري عام غير مرتبط بدعوى --</option>
+                      {cases.map(c => (
+                        <option key={c.id} value={c.id}>
+                          دعوى {c.case_number}/{c.case_year} — {c.case_title || c.plaintiff_name || 'بدون مسمى'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 {/* SECTION 2: تفاصيل العمل */}
@@ -627,7 +1172,7 @@ export default function AdministrativePage() {
                         type="text"
                         required
                         className="form-input"
-                        placeholder="مثال: استخراج شهادة ميلاد، تقديم طلب شهادة، قيد إعلان..."
+                        placeholder="مثال: متابعة الخبير، استخراج شهادة، قيد صحيفة استئناف..."
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         style={{ paddingLeft: '2.5rem' }}
@@ -636,9 +1181,9 @@ export default function AdministrativePage() {
                     </div>
                   </div>
 
-                  {/* تاريخ التنفيذ */}
+                  {/* تاريخ المتابعة / التنفيذ الأول */}
                   <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: '700' }}>تاريخ التنفيذ *</label>
+                    <label className="form-label" style={{ fontWeight: '700' }}>موعد المتابعة / التنفيذ الأولي *</label>
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                       <input
                         type="date"
@@ -654,12 +1199,12 @@ export default function AdministrativePage() {
 
                   {/* مكان التنفيذ */}
                   <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: '700' }}>مكان التنفيذ (الجهة / المحكمة / القسم)</label>
+                    <label className="form-label" style={{ fontWeight: '700' }}>مكان التنفيذ (الجهة / المحكمة / مكتب الخبراء)</label>
                     <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                       <input
                         type="text"
                         className="form-input"
-                        placeholder="مثال: محكمة الأسرة، قسم الشرطة، الشهر العقاري، السجل المدني..."
+                        placeholder="مثال: مكتب خبراء وزارة العدل، محكمة الأسرة، الشهر العقاري..."
                         value={location}
                         onChange={(e) => setLocation(e.target.value)}
                         style={{ paddingLeft: '2.5rem' }}
@@ -670,7 +1215,7 @@ export default function AdministrativePage() {
 
                   {/* المطلوب */}
                   <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: '700' }}>المطلوب (الأوراق أو الإجراءات المطلوبة) *</label>
+                    <label className="form-label" style={{ fontWeight: '700' }}>المطلوب (الإجراءات أو المستندات المطلوبة) *</label>
                     <textarea
                       required
                       className="form-textarea"
@@ -687,7 +1232,7 @@ export default function AdministrativePage() {
                     <textarea
                       className="form-textarea"
                       rows={2}
-                      placeholder="أي ملاحظات إضافية أو تعليمات للمحامي المنفذ..."
+                      placeholder="أي ملاحظات إضافية أو تعليمات للمحامي المكلف..."
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                     />
@@ -697,7 +1242,7 @@ export default function AdministrativePage() {
                   <div className="form-group">
                     <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                       <UserCheck size={15} color="var(--primary-700)" />
-                      <span>تكليف عضو من الفريق بالمتابعة والتنفيذ</span>
+                      <span>إسناد المهمة لمحامٍ أو عضو بالفريق</span>
                     </label>
                     <select
                       className="form-select"

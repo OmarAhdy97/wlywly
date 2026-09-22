@@ -3,40 +3,67 @@ import { supabase, CASE_TYPES, COURT_LEVELS, CASE_STATUSES } from './supabase';
 /**
  * Builds rich, formatted legal details for Google Calendar events
  */
-export function buildRichLegalEvent(session, caseData) {
-  const caseTypeArabic = CASE_TYPES[caseData.case_type] || caseData.case_type || 'دعوى قضائية';
-  const courtLevelArabic = COURT_LEVELS[caseData.court_level] || caseData.court_level || 'ابتدائي';
-  const statusArabic = CASE_STATUSES[session.status || caseData.status]?.label || 'متداول بالجلسة';
+export function buildRichLegalEvent(session, caseData, eventType = 'court_session') {
+  const caseTypeArabic = CASE_TYPES[caseData?.case_type] || caseData?.case_type || 'دعوى قضائية';
+  const courtLevelArabic = COURT_LEVELS[caseData?.court_level] || caseData?.court_level || 'ابتدائي';
+  const statusArabic = CASE_STATUSES[session?.status || caseData?.status]?.label || 'متداول بالجلسة';
 
-  const sessionDate = session.session_date ? session.session_date.split('T')[0] : (caseData.next_session_date ? caseData.next_session_date.split('T')[0] : new Date().toISOString().split('T')[0]);
-  const sessionTime = session.session_time || caseData.next_session_time || '09:00';
+  const sessionDate = session?.event_date || (session?.session_date ? session.session_date.split('T')[0] : (caseData?.next_session_date ? caseData.next_session_date.split('T')[0] : new Date().toISOString().split('T')[0]));
+  const sessionTime = session?.event_time || session?.session_time || caseData?.next_session_time || '09:00';
 
-  const summary = `🏛️ جلسة: دعوى ${caseData.case_number}/${caseData.case_year} (${caseTypeArabic}) — ${caseData.court_name}`;
+  let summary = `🏛️ جلسة: دعوى ${caseData?.case_number || ''}/${caseData?.case_year || ''} (${caseTypeArabic}) — ${caseData?.court_name || ''}`;
+  let description = '';
 
-  const description = 
+  if (eventType === 'appeal_follow_up' || session?.event_type === 'appeal_follow_up') {
+    summary = `⚖️ متابعة استئناف: دعوى ${caseData?.case_number || ''}/${caseData?.case_year || ''} — ${caseData?.court_name || ''}`;
+    description =
+`⚖️ تذكير موعد متابعة قيد الاستئناف:
+────────────────────────────
+• رقم الدعوى الأصلية: ${caseData?.case_number || ''} لسنة ${caseData?.case_year || ''} قضائية
+• المحكمة: ${caseData?.court_name || ''}
+• الموكل: ${caseData?.plaintiff_name || 'غير محدد'}
+• الخصم: ${caseData?.defendant_name || 'غير محدد'}
+• منطوق الحكم الصادر: ${session?.judgment_text || session?.ruling_text || caseData?.ruling_text || 'صدر حكم نهائي'}
+• الإجراء المطلوب: التأكد من قيد وإيداع صحيفة الاستئناف وسداد الرسوم قبل فوات الميعاد القانوني.
+────────────────────────────
+الأجندة القضائية — نظام إدارة مكاتب المحاماة`;
+  } else if (eventType === 'administrative_task' || session?.event_type === 'administrative_task') {
+    summary = `📋 عمل إداري: ${session?.title || 'متابعة إدارية للدعوى'} (${caseData?.case_number || ''}/${caseData?.case_year || ''})`;
+    description =
+`📋 تفاصيل العمل الإداري:
+────────────────────────────
+• الموضوع: ${session?.title || 'متابعة إدارية'}
+• رقم الدعوى: ${caseData?.case_number || ''} لسنة ${caseData?.case_year || ''}
+• المحكمة / الجهة: ${session?.location || caseData?.court_name || 'جهة الاختصاص'}
+• المطلوب والملاحظات: ${session?.requirements || session?.notes || 'مباشرة الإجراء'}
+────────────────────────────
+الأجندة القضائية — نظام إدارة مكاتب المحاماة`;
+  } else {
+    description = 
 `⚖️ بيانات الجلسة والدعوى القضائية:
 ────────────────────────────
-• رقم الدعوى: ${caseData.case_number} لسنة ${caseData.case_year} قضائية
+• رقم الدعوى: ${caseData?.case_number || ''} لسنة ${caseData?.case_year || ''} قضائية
 • نوع الدعوى: ${caseTypeArabic} (${courtLevelArabic})
-• المحكمة: ${caseData.court_name}
-• القاعة / الدائرة: ${caseData.court_room || session.court_room || 'الدائرة المختصة'}
+• المحكمة: ${caseData?.court_name || ''}
+• القاعة / الدائرة: ${caseData?.court_room || session?.court_room || 'الدائرة المختصة'}
 • الموقف الحالي: ${statusArabic}
 
 👥 أطراف الخصومة:
-• المدعي (الموكل/الطرف الأول): ${caseData.plaintiff_name || 'غير محدد'}
-• المدعى عليه (الخصم/الطرف الثاني): ${caseData.defendant_name || 'غير محدد'}
-• موضوع الدعوى: ${caseData.case_title || 'حضور الجلسة وإبداء الدفاع'}
+• المدعي (الموكل/الطرف الأول): ${caseData?.plaintiff_name || 'غير محدد'}
+• المدعى عليه (الخصم/الطرف الثاني): ${caseData?.defendant_name || 'غير محدد'}
+• موضوع الدعوى: ${caseData?.case_title || 'حضور الجلسة وإبداء الدفاع'}
 
 📋 المطلوب والقرارات بالجلسة:
-• القرار / المطلوب: ${session.notes || session.adjournment_reason || caseData.notes || 'تقديم المذكرات وأصل المستندات والمرافعة'}
-${session.ruling_text || caseData.ruling_text ? '• منطوق القرار/الحكم: ' + (session.ruling_text || caseData.ruling_text) : ''}
+• القرار / المطلوب: ${session?.notes || session?.adjournment_reason || caseData?.notes || 'تقديم المذكرات وأصل المستندات والمرافعة'}
+${session?.ruling_text || caseData?.ruling_text ? '• منطوق القرار/الحكم: ' + (session.ruling_text || caseData.ruling_text) : ''}
 
 ⏰ التنبيهات:
 • تم ضبط إشعار صوتي تلقائي قبل موعد الجلسة بـ 24 ساعة وساعة واحدة.
 ────────────────────────────
 الأجندة القضائية — نظام إدارة مكاتب المحاماة`;
+  }
 
-  const location = `${caseData.court_name}${caseData.court_room ? ' - قاعة ' + caseData.court_room : ''}`;
+  const location = `${caseData?.court_name || ''}${caseData?.court_room ? ' - قاعة ' + caseData.court_room : ''}`;
 
   return {
     summary,
@@ -50,9 +77,9 @@ ${session.ruling_text || caseData.ruling_text ? '• منطوق القرار/ا�
 /**
  * Automatically creates an event directly in the lawyer's Google Calendar
  */
-export async function syncSessionToGoogleCalendar(session, caseData) {
+export async function syncSessionToGoogleCalendar(session, caseData, eventType = 'court_session') {
   try {
-    const { summary, description, location, sessionDate, sessionTime } = buildRichLegalEvent(session, caseData);
+    const { summary, description, location, sessionDate, sessionTime } = buildRichLegalEvent(session, caseData, eventType);
 
     const { data: { session: authSession } } = await supabase.auth.getSession();
     const providerToken = authSession?.provider_token;

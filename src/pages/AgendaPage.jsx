@@ -16,30 +16,29 @@ import { CASE_TYPES, CASE_STATUSES, SESSION_DECISIONS, USER_ROLES } from '../lib
 import LawFirmPrintHeader from '../components/common/LawFirmPrintHeader';
 import { printWithTitle, DEFAULT_APP_TITLE } from '../lib/printUtils';
 
+import SessionDecisionModal from '../components/common/SessionDecisionModal';
+
 export default function AgendaPage() {
-  const { cases, clients, addSession, addTransaction, officeProfile } = useData();
+  const { cases, clients, adminTasks, appeals, agendaEvents, officeProfile } = useData();
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [courtFilter, setCourtFilter] = useState('ALL');
   const [mobileViewMode, setMobileViewMode] = useState('card'); // 'card' | 'table'
   const [expandedCaseId, setExpandedCaseId] = useState(null);
 
-  // Modal for quick decision recording directly from table
+  // Decision Modal State
   const [decisionCase, setDecisionCase] = useState(null);
-  const [decisionStatus, setDecisionStatus] = useState('adjourned');
-  const [adjournmentReason, setAdjournmentReason] = useState('');
-  const [nextDate, setNextDate] = useState('');
-  const [rulingText, setRulingText] = useState('');
-  const [sessionExpense, setSessionExpense] = useState('');
-  const [sessionExpenseNote, setSessionExpenseNote] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
 
-  // Filter cases matching selected session date
+  // Filter cases matching selected session date (Actual court sessions only)
   const filteredCases = cases.filter(c => {
     const matchesDate = c.next_session_date && c.next_session_date.startsWith(selectedDate);
-    const matchesCourt = courtFilter === 'ALL' || c.court_name.includes(courtFilter);
+    const matchesCourt = courtFilter === 'ALL' || (c.court_name && c.court_name.includes(courtFilter));
     return matchesDate && matchesCourt;
   });
+
+  // Additional follow-up events for selected date (Appeals & Administrative Tasks)
+  const dayAppeals = (appeals || []).filter(a => a.follow_up_date === selectedDate);
+  const dayAdminTasks = (adminTasks || []).filter(t => t.execution_date === selectedDate);
 
   const getUniqueRollTitle = () => {
     const now = new Date();
@@ -69,60 +68,6 @@ export default function AgendaPage() {
       window.removeEventListener('afterprint', onAfterPrint);
     };
   }, [selectedDate, courtFilter, officeProfile]);
-
-  const handleRecordDecision = async (e) => {
-    e.preventDefault();
-    if (!decisionCase) return;
-    setIsSaving(true);
-    try {
-      const updates = {
-        status: decisionStatus,
-        next_session_date: nextDate || null,
-        ruling_text: rulingText || null,
-        notes: adjournmentReason || null,
-      };
-
-      const linkedClient = decisionCase.client_id ? clients?.find(c => c.id === decisionCase.client_id) : null;
-      const willNotifyTelegram = !!(linkedClient && linkedClient.telegram_chat_id);
-
-      await addSession({
-        case_id: decisionCase.id,
-        session_date: selectedDate,
-        status: decisionStatus,
-        adjournment_reason: adjournmentReason || null,
-        ruling_text: rulingText || null,
-        notes: adjournmentReason || null,
-      }, updates);
-
-      // Auto-log session expense to client's financial account if entered
-      const expAmount = parseFloat(sessionExpense);
-      if (expAmount > 0 && decisionCase.client_id) {
-        await addTransaction({
-          client_id: decisionCase.client_id,
-          case_id: decisionCase.id,
-          type: 'expense',
-          amount: expAmount,
-          description: sessionExpenseNote.trim() || `مصروفات جلسة ${selectedDate}`,
-          date: selectedDate,
-        }).catch(e => console.log('Auto-add session expense notice:', e));
-      }
-
-      setDecisionCase(null);
-      setAdjournmentReason('');
-      setNextDate('');
-      setRulingText('');
-      setSessionExpense('');
-      setSessionExpenseNote('');
-
-      if (willNotifyTelegram) {
-        alert(`✅ تم حفظ القرار وتحديث الأجندة بنجاح، وتم إرسال إشعار فوري للموكل (${linkedClient.name}) عبر التليجرام 📱`);
-      }
-    } catch (err) {
-      alert('خطأ أثناء حفظ القرار: ' + err.message);
-    } finally {
-      setIsSaving(false);
-    }
-  };
 
   return (
     <div className="page-wrapper">
@@ -390,16 +335,7 @@ export default function AgendaPage() {
                         gap: '0.5rem',
                         marginTop: '0.2rem'
                       }}
-                      onClick={() => {
-                        const validStatus = SESSION_DECISIONS[c.status] ? c.status : 'adjourned';
-                        setDecisionCase(c);
-                        setDecisionStatus(validStatus);
-                        setAdjournmentReason(c.notes || '');
-                        setNextDate(c.next_session_date ? c.next_session_date.split('T')[0] : '');
-                        setRulingText(c.ruling_text || '');
-                        setSessionExpense('');
-                        setSessionExpenseNote('');
-                      }}
+                      onClick={() => setDecisionCase(c)}
                     >
                       <Clock size={16} />
                       <span>تسجيل قرار الجلسة / التأجيل</span>
@@ -460,16 +396,7 @@ export default function AgendaPage() {
                             <button
                               className="btn btn-secondary"
                               style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem', minHeight: '36px' }}
-                              onClick={() => {
-                                const validStatus = SESSION_DECISIONS[c.status] ? c.status : 'adjourned';
-                                setDecisionCase(c);
-                                setDecisionStatus(validStatus);
-                                setAdjournmentReason(c.notes || '');
-                                setNextDate(c.next_session_date ? c.next_session_date.split('T')[0] : '');
-                                setRulingText(c.ruling_text || '');
-                                setSessionExpense('');
-                                setSessionExpenseNote('');
-                              }}
+                              onClick={() => setDecisionCase(c)}
                             >
                               تسجيل القرار
                             </button>
@@ -525,156 +452,76 @@ export default function AgendaPage() {
         </div>
       </div>
 
-      {/* Decision Recording Modal */}
-      {decisionCase && (
-        <div className="modal-backdrop" onClick={() => setDecisionCase(null)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>تسجيل قرار الجلسة لدعوى رقم {decisionCase.case_number}/{decisionCase.caseYear || decisionCase.case_year}</h3>
-            </div>
-            <form onSubmit={handleRecordDecision}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label className="form-label">قرار المحكمة في الجلسة *</label>
-                  <select
-                    className="form-select"
-                    value={decisionStatus}
-                    onChange={(e) => setDecisionStatus(e.target.value)}
-                  >
-                    {Object.entries(SESSION_DECISIONS).map(([k, v]) => (
-                      <option key={k} value={k}>{v.label}</option>
-                    ))}
-                  </select>
+      {/* Companion Section: Follow-ups for Today (Appeals & Admin Tasks) - Hidden in Print */}
+      {(dayAppeals.length > 0 || dayAdminTasks.length > 0) && (
+        <div className="card no-print" style={{ marginTop: '1.25rem', padding: '1rem 1.25rem', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            <span style={{ fontSize: '1.1rem' }}>📌</span>
+            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: '800', color: '#1e293b' }}>
+              متابعات وأعمال أخرى في هذا اليوم ({selectedDate})
+            </h4>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
+            {/* Appeal Follow-ups */}
+            {dayAppeals.map((app) => {
+              const relCase = cases.find(c => c.id === app.case_id);
+              return (
+                <div key={app.id} style={{
+                  padding: '0.75rem 0.9rem',
+                  borderRadius: '10px',
+                  background: 'rgba(37, 99, 235, 0.06)',
+                  border: '1px solid rgba(37, 99, 235, 0.25)',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '0.5rem'
+                }}>
+                  <Scale size={18} color="#1d4ed8" style={{ marginTop: '2px', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontWeight: '800', color: '#1e40af', fontSize: '0.88rem' }}>
+                      متابعة استئناف — دعوى {relCase ? `${relCase.case_number}/${relCase.case_year}` : 'محددة'}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#334155', marginTop: '0.2rem' }}>
+                      {app.judgment_text ? `منطوق الحكم: ${app.judgment_text.slice(0, 60)}...` : 'ميعاد متابعة قيد الاستئناف'}
+                    </div>
+                  </div>
                 </div>
+              );
+            })}
 
-                {decisionStatus === 'adjourned' && (
-                  <>
-                    <div className="form-group">
-                      <label className="form-label">سبب التأجيل والقرار بالجلسة</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="مثال: لتقديم المذكرات وسداد أمانة الخبير"
-                        value={adjournmentReason}
-                        onChange={(e) => setAdjournmentReason(e.target.value)}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">تاريخ الجلسة القادمة *</label>
-                      <input
-                        type="date"
-                        className="form-input"
-                        required
-                        value={nextDate}
-                        onChange={(e) => setNextDate(e.target.value)}
-                      />
-                    </div>
-                  </>
-                )}
-
-                {(decisionStatus === 'finalJudgment' || decisionStatus === 'preliminaryJudgment') && (
-                  <div className="form-group">
-                    <label className="form-label">منطوق الحكم</label>
-                    <textarea
-                      className="form-textarea"
-                      placeholder="أدخل منطوق الحكم الصادر في الجلسة بالتفصيل..."
-                      value={rulingText}
-                      onChange={(e) => setRulingText(e.target.value)}
-                    />
+            {/* Admin Tasks */}
+            {dayAdminTasks.map((tsk) => (
+              <div key={tsk.id} style={{
+                padding: '0.75rem 0.9rem',
+                borderRadius: '10px',
+                background: '#fffbeb',
+                border: '1px solid #fde68a',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.5rem'
+              }}>
+                <Briefcase size={18} color="#b45309" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontWeight: '800', color: '#92400e', fontSize: '0.88rem' }}>
+                    {tsk.title}
                   </div>
-                )}
-
-                {/* Optional Session Expenses on Client */}
-                {decisionCase?.client_id && (
-                  <div style={{
-                    padding: '0.75rem 0.9rem',
-                    background: 'var(--bg-card-subtle)',
-                    borderRadius: '10px',
-                    border: '1px solid var(--border-color)',
-                    marginTop: '0.4rem'
-                  }}>
-                    <div style={{ fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)', marginBottom: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <span>💰</span>
-                      <span>قيد مصاريف بالجلسة على حساب الموكل (اختياري)</span>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '130px 1fr', gap: '0.5rem' }}>
-                      <input
-                        type="number"
-                        step="any"
-                        className="form-input"
-                        placeholder="المبلغ (ج.م)"
-                        style={{ fontSize: '0.82rem', direction: 'ltr', textAlign: 'left' }}
-                        value={sessionExpense}
-                        onChange={(e) => setSessionExpense(e.target.value)}
-                      />
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="بيان المصروف (أمانة خبير، رسم إيداع، انتقالات...)"
-                        style={{ fontSize: '0.82rem' }}
-                        value={sessionExpenseNote}
-                        onChange={(e) => setSessionExpenseNote(e.target.value)}
-                      />
-                    </div>
+                  <div style={{ fontSize: '0.78rem', color: '#451a03', marginTop: '0.2rem' }}>
+                    {tsk.requirements || tsk.notes || tsk.location || 'إجراء إداري مطلوب اليوم'}
                   </div>
-                )}
-
-                {/* Telegram Client Notification Status Notice */}
-                {(() => {
-                  const client = decisionCase?.client_id ? clients?.find(c => c.id === decisionCase.client_id) : null;
-                  if (!client) return null;
-                  if (client.telegram_chat_id) {
-                    return (
-                      <div style={{
-                        padding: '0.65rem 0.85rem',
-                        background: 'rgba(34, 197, 94, 0.08)',
-                        border: '1px solid rgba(34, 197, 94, 0.3)',
-                        borderRadius: '10px',
-                        fontSize: '0.82rem',
-                        color: '#15803d',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        marginTop: '0.75rem'
-                      }}>
-                        <span style={{ fontSize: '1.05rem' }}>📱</span>
-                        <span>
-                          الموكل <b>{client.name}</b> مربوط بالتليجرام — سيتم إرسال إشعار فوري له بنص القرار وتاريخ الجلسة عند الحفظ.
-                        </span>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div style={{
-                      padding: '0.65rem 0.85rem',
-                      background: 'var(--bg-card-subtle)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '10px',
-                      fontSize: '0.8rem',
-                      color: 'var(--text-muted)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      marginTop: '0.75rem'
-                    }}>
-                      <span style={{ fontSize: '0.95rem' }}>ℹ️</span>
-                      <span>
-                        الموكل <b>{client.name}</b> غير مربوط بالتليجرام (يمكنك ربطه من صفحة الموكلين لإرسال إشعارات فورية).
-                      </span>
-                    </div>
-                  );
-                })()}
+                </div>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setDecisionCase(null)}>إلغاء</button>
-                <button type="submit" className="btn btn-primary" disabled={isSaving}>
-                  {isSaving ? 'جاري الحفظ...' : 'حفظ القرار وتحديث الأجندة'}
-                </button>
-              </div>
-            </form>
+            ))}
           </div>
         </div>
       )}
+
+      {/* Decision Recording Modal */}
+      <SessionDecisionModal
+        isOpen={!!decisionCase}
+        caseItem={decisionCase}
+        currentSessionDate={selectedDate}
+        onClose={() => setDecisionCase(null)}
+      />
     </div>
   );
 }

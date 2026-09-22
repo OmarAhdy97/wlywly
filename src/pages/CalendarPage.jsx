@@ -21,7 +21,7 @@ import {
 } from "../lib/googleCalendar";
 
 export default function CalendarPage({ setActiveTab }) {
-  const { cases } = useData();
+  const { cases, appeals, adminTasks } = useData();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(
     new Date().toISOString().split("T")[0],
@@ -62,12 +62,16 @@ export default function CalendarPage({ setActiveTab }) {
 
   // Map events by date (YYYY-MM-DD)
   const eventsByDate = {};
+
+  // 1. Actual Court Sessions
   activeCases.forEach((c) => {
     if (c.next_session_date) {
       const dateKey = c.next_session_date.split("T")[0];
       if (!eventsByDate[dateKey]) eventsByDate[dateKey] = [];
       eventsByDate[dateKey].push({
         id: c.id,
+        type: 'court_session',
+        badgeText: 'جلسة محكمة',
         title: `دعوى ${c.case_number}/${c.case_year}`,
         subtitle: c.case_title || c.plaintiff_name,
         court: c.court_name,
@@ -78,17 +82,61 @@ export default function CalendarPage({ setActiveTab }) {
     }
   });
 
+  // 2. Appeal Follow-up Reminders
+  (appeals || []).forEach((a) => {
+    if (a.follow_up_date) {
+      const dateKey = a.follow_up_date.split("T")[0];
+      const relCase = cases.find(c => c.id === a.case_id);
+      if (!eventsByDate[dateKey]) eventsByDate[dateKey] = [];
+      eventsByDate[dateKey].push({
+        id: a.id,
+        type: 'appeal_follow_up',
+        badgeText: 'متابعة استئناف',
+        title: relCase ? `متابعة استئناف: ${relCase.case_number}/${relCase.case_year}` : 'متابعة قيد استئناف',
+        subtitle: a.judgment_text || 'ميعاد متابعة قيد الاستئناف وسداد الرسوم',
+        court: relCase?.court_name || 'محكمة الاستئناف',
+        courtRoom: null,
+        time: "09:00",
+        caseData: relCase || { case_number: '—', case_year: '—', court_name: 'الاستئناف' },
+      });
+    }
+  });
+
+  // 3. Administrative Tasks
+  (adminTasks || []).forEach((t) => {
+    if (t.execution_date) {
+      const dateKey = t.execution_date.split("T")[0];
+      const relCase = t.case_id ? cases.find(c => c.id === t.case_id) : null;
+      if (!eventsByDate[dateKey]) eventsByDate[dateKey] = [];
+      eventsByDate[dateKey].push({
+        id: t.id,
+        type: 'administrative_task',
+        badgeText: 'عمل إداري',
+        title: t.title,
+        subtitle: t.requirements || t.notes || 'عمل إداري بمكتب المحاماة',
+        court: t.location || relCase?.court_name || 'مكتب الخبراء / المحكمة',
+        courtRoom: null,
+        time: "09:00",
+        caseData: relCase || { case_number: '—', case_year: '—', court_name: t.location || 'إداري' },
+      });
+    }
+  });
+
   const selectedEvents = eventsByDate[selectedDay] || [];
 
-  // Direct Sync Handler with full rich legal payload
+  // Direct Sync Handler with full rich legal payload & event typing
   const handleDirectSync = async (sessionEvent) => {
     setSyncingId(sessionEvent.id);
     const result = await syncSessionToGoogleCalendar(
       {
-        session_date: sessionEvent.caseData.next_session_date,
+        session_date: selectedDay,
         session_time: sessionEvent.time,
+        title: sessionEvent.title,
+        requirements: sessionEvent.subtitle,
+        event_type: sessionEvent.type,
       },
       sessionEvent.caseData,
+      sessionEvent.type
     );
 
     setSyncingId(null);
@@ -97,7 +145,7 @@ export default function CalendarPage({ setActiveTab }) {
         window.open(result.fallbackUrl, "_blank");
       } else {
         setSyncNotice(
-          `تمت المزامنة التلقائية لجلسة دعوى ${sessionEvent.caseData.case_number} مع Google Calendar!`,
+          `تمت مزامنة (${sessionEvent.badgeText}) مع Google Calendar بنجاح!`,
         );
         setTimeout(() => setSyncNotice(""), 4000);
       }
@@ -462,12 +510,13 @@ export default function CalendarPage({ setActiveTab }) {
                     <span
                       className="badge"
                       style={{
-                        background: "var(--status-adjourned-bg)",
-                        color: "var(--status-adjourned)",
+                        background: evt.type === 'appeal_follow_up' ? '#eff6ff' : (evt.type === 'administrative_task' ? '#fffbeb' : 'var(--status-adjourned-bg)'),
+                        color: evt.type === 'appeal_follow_up' ? '#1e40af' : (evt.type === 'administrative_task' ? '#b45309' : 'var(--status-adjourned)'),
                         fontSize: "0.72rem",
+                        fontWeight: '700',
                       }}
                     >
-                      {CASE_STATUSES[evt.caseData.status]?.label || "متداول"}
+                      {evt.badgeText || CASE_STATUSES[evt.caseData?.status]?.label || "متداول"}
                     </span>
                   </div>
 
@@ -482,16 +531,18 @@ export default function CalendarPage({ setActiveTab }) {
                     }}
                   >
                     <div>
-                      📍 <strong>المحكمة:</strong> {evt.court}{" "}
+                      📍 <strong>المكان / المحكمة:</strong> {evt.court}{" "}
                       {evt.courtRoom && `(قاعة: ${evt.courtRoom})`}
                     </div>
                     <div>
                       ⏰ <strong>الموعد:</strong> الساعة {evt.time} صباحاً
                     </div>
-                    <div>
-                      ⚖️ <strong>الخصوم:</strong> {evt.caseData.plaintiff_name}{" "}
-                      ضد {evt.caseData.defendant_name}
-                    </div>
+                    {evt.caseData?.plaintiff_name && (
+                      <div>
+                        ⚖️ <strong>الخصوم:</strong> {evt.caseData.plaintiff_name}{" "}
+                        {evt.caseData.defendant_name ? `ضد ${evt.caseData.defendant_name}` : ''}
+                      </div>
+                    )}
                   </div>
 
                   {/* Google Calendar Automatic Sync Button */}

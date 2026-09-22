@@ -24,8 +24,11 @@ export function DataProvider({ children }) {
   const [sessions, setSessions] = useState([]);
   const [team, setTeam] = useState([]);
   const [adminTasks, setAdminTasks] = useState([]);
+  const [adminTaskUpdates, setAdminTaskUpdates] = useState([]);
   const [bailiffTasks, setBailiffTasks] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [appeals, setAppeals] = useState([]);
+  const [agendaEvents, setAgendaEvents] = useState([]);
   const [officeProfile, setOfficeProfile] = useState(() => {
     if (user) {
       try {
@@ -143,6 +146,39 @@ export function DataProvider({ children }) {
     }
   }, [user]);
 
+  const fetchAdminTaskUpdates = useCallback(async () => {
+    if (!user) {
+      setAdminTaskUpdates([]);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('admin_task_updates')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setAdminTaskUpdates(data);
+        localStorage.setItem(`admin_task_updates_${user.id}`, JSON.stringify(data));
+        return;
+      }
+    } catch (err) {
+      // fallback
+    }
+
+    try {
+      const saved = localStorage.getItem(`admin_task_updates_${user.id}`);
+      if (saved) {
+        setAdminTaskUpdates(JSON.parse(saved));
+      } else {
+        setAdminTaskUpdates([]);
+      }
+    } catch (e) {
+      setAdminTaskUpdates([]);
+    }
+  }, [user]);
+
   const fetchBailiffTasks = useCallback(async () => {
     if (!user) {
       setBailiffTasks([]);
@@ -206,6 +242,64 @@ export function DataProvider({ children }) {
       }
     } catch (e) {
       setTransactions([]);
+    }
+  }, [user]);
+
+  const fetchAppeals = useCallback(async () => {
+    if (!user) {
+      setAppeals([]);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('appeals')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        setAppeals(data);
+        localStorage.setItem(`appeals_${user.id}`, JSON.stringify(data));
+        return;
+      }
+    } catch (err) {
+      // fallback
+    }
+
+    try {
+      const saved = localStorage.getItem(`appeals_${user.id}`);
+      setAppeals(saved ? JSON.parse(saved) : []);
+    } catch (e) {
+      setAppeals([]);
+    }
+  }, [user]);
+
+  const fetchAgendaEvents = useCallback(async () => {
+    if (!user) {
+      setAgendaEvents([]);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('agenda_events')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('event_date', { ascending: true });
+
+      if (!error && data) {
+        setAgendaEvents(data);
+        localStorage.setItem(`agenda_events_${user.id}`, JSON.stringify(data));
+        return;
+      }
+    } catch (err) {
+      // fallback
+    }
+
+    try {
+      const saved = localStorage.getItem(`agenda_events_${user.id}`);
+      setAgendaEvents(saved ? JSON.parse(saved) : []);
+    } catch (e) {
+      setAgendaEvents([]);
     }
   }, [user]);
 
@@ -302,8 +396,11 @@ export function DataProvider({ children }) {
       setSessions([]);
       setTeam([]);
       setAdminTasks([]);
+      setAdminTaskUpdates([]);
       setBailiffTasks([]);
       setTransactions([]);
+      setAppeals([]);
+      setAgendaEvents([]);
       setLoading(false);
       return;
     }
@@ -314,12 +411,15 @@ export function DataProvider({ children }) {
       fetchSessions(),
       fetchTeam(),
       fetchAdminTasks(),
+      fetchAdminTaskUpdates(),
       fetchBailiffTasks(),
       fetchTransactions(),
+      fetchAppeals(),
+      fetchAgendaEvents(),
       fetchOfficeProfile()
     ]);
     setLoading(false);
-  }, [user, fetchCases, fetchClients, fetchSessions, fetchTeam, fetchAdminTasks, fetchBailiffTasks, fetchTransactions, fetchOfficeProfile]);
+  }, [user, fetchCases, fetchClients, fetchSessions, fetchTeam, fetchAdminTasks, fetchAdminTaskUpdates, fetchBailiffTasks, fetchTransactions, fetchAppeals, fetchAgendaEvents, fetchOfficeProfile]);
 
   useEffect(() => {
     refreshAll();
@@ -521,12 +621,12 @@ export function DataProvider({ children }) {
       requirements: taskData.requirements || '',
       notes: taskData.notes || '',
       assigned_to: taskData.assigned_to || null,
-      status: taskData.status || 'pending', // 'pending' (قيد التنفيذ) | 'completed' (مكتمل)
+      status: taskData.status || 'pending', // 'pending', 'in_progress', 'postponed', 'waiting', 'completed', 'cancelled'
       created_at: new Date().toISOString(),
       ...taskData,
     };
 
-    // Try Supabase first
+    // 1. Try Supabase first for current state
     try {
       await supabase.from('admin_tasks').insert([newTask]);
     } catch (e) {
@@ -536,6 +636,38 @@ export function DataProvider({ children }) {
     setAdminTasks(prev => {
       const updated = [newTask, ...prev];
       localStorage.setItem(`admin_tasks_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+
+    // 2. Create Initial Audit History Record (Idempotent)
+    const initialUpdate = {
+      id: `upd_init_${newTask.id}`,
+      user_id: user.id,
+      admin_task_id: newTask.id,
+      case_id: newTask.case_id || null,
+      action_type: 'created',
+      previous_status: null,
+      new_status: newTask.status || 'pending',
+      previous_due_date: null,
+      new_due_date: newTask.execution_date || null,
+      previous_assigned_to: null,
+      new_assigned_to: newTask.assigned_to || null,
+      update_text: newTask.requirements || newTask.notes || 'تم إنشاء العمل الإداري وتحديد بياناته الأولية',
+      created_by: user.id,
+      created_at: newTask.created_at || new Date().toISOString(),
+    };
+
+    try {
+      await supabase.from('admin_task_updates').insert([initialUpdate]);
+    } catch (e) {
+      // fallback
+    }
+
+    setAdminTaskUpdates(prev => {
+      const exists = prev.some(u => u.admin_task_id === newTask.id && u.action_type === 'created');
+      if (exists) return prev;
+      const updated = [initialUpdate, ...prev];
+      localStorage.setItem(`admin_task_updates_${user.id}`, JSON.stringify(updated));
       return updated;
     });
 
@@ -561,11 +693,171 @@ export function DataProvider({ children }) {
     });
   };
 
+  const updateAdminTaskWorkflow = async ({
+    taskId,
+    newStatus,
+    updateText,
+    newDueDate,
+    isDueDateCleared,
+    newAssignedTo,
+  }) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+    const currentTask = adminTasks.find(t => t.id === taskId);
+    if (!currentTask) throw new Error('العمل الإداري غير موجود');
+
+    const previousStatus = currentTask.status || 'pending';
+    const previousDueDate = currentTask.execution_date ? currentTask.execution_date.split('T')[0] : null;
+    const previousAssignedTo = currentTask.assigned_to || null;
+
+    // Resolve date explicitly (distinguishing unchanged vs changed vs cleared)
+    let resolvedDueDate = previousDueDate;
+    if (isDueDateCleared) {
+      resolvedDueDate = null;
+    } else if (newDueDate !== undefined) {
+      resolvedDueDate = newDueDate ? newDueDate.split('T')[0] : null;
+    }
+
+    // Resolve assigned_to explicitly
+    const resolvedAssignedTo = newAssignedTo !== undefined ? (newAssignedTo || null) : previousAssignedTo;
+
+    // Resolve status
+    const resolvedStatus = newStatus || previousStatus;
+
+    // Determine primary action_type
+    let actionType = 'updated';
+    if (resolvedStatus === 'postponed' && (previousDueDate !== resolvedDueDate || previousStatus !== 'postponed')) {
+      actionType = 'postponed';
+    } else if (resolvedStatus === 'completed' && previousStatus !== 'completed') {
+      actionType = 'completed';
+    } else if (previousStatus === 'completed' && resolvedStatus !== 'completed') {
+      actionType = 'reopened';
+    } else if (resolvedStatus === 'cancelled' && previousStatus !== 'cancelled') {
+      actionType = 'cancelled';
+    } else if (previousAssignedTo !== resolvedAssignedTo) {
+      actionType = 'reassigned';
+    } else if (previousDueDate !== resolvedDueDate) {
+      actionType = 'due_date_changed';
+    } else if (previousStatus !== resolvedStatus) {
+      actionType = 'status_changed';
+    } else if (updateText) {
+      actionType = 'note_added';
+    }
+
+    // 1. Update admin_tasks (Current State)
+    const taskUpdates = {
+      status: resolvedStatus,
+      execution_date: resolvedDueDate,
+      assigned_to: resolvedAssignedTo,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (resolvedStatus === 'completed') {
+      taskUpdates.completed_at = new Date().toISOString();
+      taskUpdates.completed_by = user.id;
+    } else if (previousStatus === 'completed' && resolvedStatus !== 'completed') {
+      taskUpdates.completed_at = null;
+      taskUpdates.completed_by = null;
+    }
+
+    try {
+      await supabase
+        .from('admin_tasks')
+        .update(taskUpdates)
+        .eq('id', taskId)
+        .eq('user_id', user.id);
+    } catch (e) {
+      // fallback
+    }
+
+    setAdminTasks(prev => {
+      const updated = prev.map(t => t.id === taskId ? { ...t, ...taskUpdates } : t);
+      localStorage.setItem(`admin_tasks_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+
+    // 2. Insert into admin_task_updates (Audit History)
+    const historyRecord = {
+      id: `upd_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      user_id: user.id,
+      admin_task_id: taskId,
+      case_id: currentTask.case_id || null,
+      action_type: actionType,
+      previous_status: previousStatus,
+      new_status: resolvedStatus,
+      previous_due_date: previousDueDate,
+      new_due_date: resolvedDueDate,
+      previous_assigned_to: previousAssignedTo,
+      new_assigned_to: resolvedAssignedTo,
+      update_text: updateText || null,
+      created_by: user.id,
+      created_at: new Date().toISOString(),
+    };
+
+    try {
+      await supabase.from('admin_task_updates').insert([historyRecord]);
+    } catch (e) {
+      // fallback
+    }
+
+    setAdminTaskUpdates(prev => {
+      const updated = [historyRecord, ...prev];
+      localStorage.setItem(`admin_task_updates_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+
+    // 3. Agenda Events synchronization (Do NOT touch case.next_session_date)
+    try {
+      const existingEvent = (agendaEvents || []).find(
+        ev => ev.source_id === taskId && ev.event_type === 'administrative_task'
+      );
+
+      if (resolvedStatus === 'completed' || resolvedStatus === 'cancelled' || !resolvedDueDate) {
+        if (existingEvent) {
+          await updateAgendaEvent(existingEvent.id, {
+            status: resolvedStatus === 'completed' ? 'completed' : 'cancelled'
+          });
+        }
+      } else if (resolvedDueDate) {
+        if (existingEvent) {
+          await updateAgendaEvent(existingEvent.id, {
+            event_date: resolvedDueDate,
+            status: 'scheduled',
+            details: updateText || currentTask.requirements || currentTask.notes || ''
+          });
+        } else {
+          await addAgendaEvent({
+            id: `ev_task_${Date.now()}`,
+            user_id: user.id,
+            case_id: currentTask.case_id || null,
+            event_type: 'administrative_task',
+            title: currentTask.title,
+            event_date: resolvedDueDate,
+            event_time: '09:00',
+            source_id: taskId,
+            details: updateText || currentTask.requirements || currentTask.notes || '',
+            status: 'scheduled',
+            created_at: new Date().toISOString(),
+          });
+        }
+      }
+    } catch (err) {
+      console.log('Notice: Agenda event sync skipped:', err);
+    }
+
+    return { taskUpdates, historyRecord };
+  };
+
   const toggleAdminTaskStatus = async (id) => {
     const current = adminTasks.find(t => t.id === id);
     if (!current) return;
-    const nextStatus = current.status === 'completed' ? 'pending' : 'completed';
-    await updateAdminTask(id, { status: nextStatus, completed_at: nextStatus === 'completed' ? new Date().toISOString() : null });
+    const isCurrentlyDone = current.status === 'completed';
+    const nextStatus = isCurrentlyDone ? 'in_progress' : 'completed';
+    const note = isCurrentlyDone ? 'تمت إعادة العمل الإداري للتنفيذ والمتابعة' : 'تم إتمام العمل الإداري بنجاح';
+    await updateAdminTaskWorkflow({
+      taskId: id,
+      newStatus: nextStatus,
+      updateText: note,
+    });
   };
 
   const deleteAdminTask = async (id) => {
@@ -580,9 +872,25 @@ export function DataProvider({ children }) {
       // ignore
     }
 
+    try {
+      await supabase
+        .from('admin_task_updates')
+        .delete()
+        .eq('admin_task_id', id)
+        .eq('user_id', user.id);
+    } catch (e) {
+      // ignore
+    }
+
     setAdminTasks(prev => {
       const updated = prev.filter(t => t.id !== id);
       localStorage.setItem(`admin_tasks_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+
+    setAdminTaskUpdates(prev => {
+      const updated = prev.filter(u => u.admin_task_id !== id);
+      localStorage.setItem(`admin_task_updates_${user.id}`, JSON.stringify(updated));
       return updated;
     });
   };
@@ -825,6 +1133,298 @@ export function DataProvider({ children }) {
     return fullProfile;
   };
 
+  // Appeal Actions
+  const addAppeal = async (appealData) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+    const newAppeal = {
+      id: appealData.id || `appeal_${Date.now()}`,
+      user_id: user.id,
+      created_at: new Date().toISOString(),
+      ...appealData,
+    };
+    try {
+      await supabase.from('appeals').insert([newAppeal]);
+    } catch (e) {}
+
+    setAppeals(prev => {
+      const updated = [newAppeal, ...prev.filter(a => a.id !== newAppeal.id)];
+      localStorage.setItem(`appeals_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+    return newAppeal;
+  };
+
+  const updateAppeal = async (id, updates) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+    try {
+      await supabase.from('appeals').update(updates).eq('id', id).eq('user_id', user.id);
+    } catch (e) {}
+
+    setAppeals(prev => {
+      const updated = prev.map(a => a.id === id ? { ...a, ...updates } : a);
+      localStorage.setItem(`appeals_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Agenda Event Actions
+  const addAgendaEvent = async (eventData) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+    const newEvent = {
+      id: eventData.id || `event_${Date.now()}`,
+      user_id: user.id,
+      created_at: new Date().toISOString(),
+      ...eventData,
+    };
+    try {
+      await supabase.from('agenda_events').insert([newEvent]);
+    } catch (e) {}
+
+    setAgendaEvents(prev => {
+      const updated = [newEvent, ...prev.filter(ev => ev.id !== newEvent.id)];
+      localStorage.setItem(`agenda_events_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+    return newEvent;
+  };
+
+  const updateAgendaEvent = async (id, updates) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+    try {
+      await supabase.from('agenda_events').update(updates).eq('id', id).eq('user_id', user.id);
+    } catch (e) {}
+
+    setAgendaEvents(prev => {
+      const updated = prev.map(ev => ev.id === id ? { ...ev, ...updates } : ev);
+      localStorage.setItem(`agenda_events_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const deleteAgendaEvent = async (id) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+    try {
+      await supabase.from('agenda_events').delete().eq('id', id).eq('user_id', user.id);
+    } catch (e) {}
+
+    setAgendaEvents(prev => {
+      const updated = prev.filter(ev => ev.id !== id);
+      localStorage.setItem(`agenda_events_${user.id}`, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Unified Session Decision Recorder
+  const recordSessionDecision = async ({
+    caseItem,
+    currentSessionData,
+    nextSessionData,
+    caseUpdates,
+    appealData,
+    adminTaskData,
+    transactionData,
+  }) => {
+    if (!user) throw new Error('يجب تسجيل الدخول أولاً');
+
+    // 1. Save current session record (historical record of this concluded session)
+    const currentSessionWithUser = {
+      ...currentSessionData,
+      user_id: user.id,
+      case_id: caseItem.id,
+      created_at: new Date().toISOString(),
+    };
+
+    let currentSessionResult = null;
+    try {
+      const { data: sessData, error: sessErr } = await supabase
+        .from('sessions')
+        .insert([currentSessionWithUser])
+        .select();
+      if (!sessErr && sessData && sessData[0]) {
+        currentSessionResult = sessData[0];
+      }
+    } catch (e) {
+      console.warn('Supabase session insert fallback:', e);
+    }
+
+    // 2. If nextSessionData is provided, create the scheduled court session preventing duplicates
+    let nextSessionResult = null;
+    if (nextSessionData && nextSessionData.session_date) {
+      const nextSessionWithUser = {
+        ...nextSessionData,
+        user_id: user.id,
+        case_id: caseItem.id,
+        status: nextSessionData.status || 'scheduled',
+        session_time: nextSessionData.session_time || '09:00',
+        created_at: new Date().toISOString(),
+      };
+
+      // Check if session already exists for this case on this date to prevent duplicates
+      const existingSession = sessions.find(s => s.case_id === caseItem.id && s.session_date === nextSessionData.session_date);
+      if (existingSession) {
+        try {
+          await supabase.from('sessions').update(nextSessionWithUser).eq('id', existingSession.id).eq('user_id', user.id);
+        } catch (e) {}
+      } else {
+        try {
+          const { data: nextData, error: nextErr } = await supabase
+            .from('sessions')
+            .insert([nextSessionWithUser])
+            .select();
+          if (!nextErr && nextData && nextData[0]) {
+            nextSessionResult = nextData[0];
+          }
+        } catch (e) {
+          console.warn('Supabase next session insert fallback:', e);
+        }
+      }
+    }
+
+    // 3. Update the case record
+    let updatedCaseData = null;
+    if (caseUpdates) {
+      try {
+        const { data: cData, error: cErr } = await supabase
+          .from('cases')
+          .update(caseUpdates)
+          .eq('id', caseItem.id)
+          .eq('user_id', user.id)
+          .select();
+        if (!cErr && cData && cData[0]) {
+          updatedCaseData = cData[0];
+        }
+      } catch (e) {
+        console.warn('Supabase case update fallback:', e);
+      }
+    }
+
+    // 4. If appealData is provided (Final Judgment -> Yes, Appeal)
+    if (appealData && appealData.appeal_requested) {
+      const newAppeal = {
+        id: `appeal_${Date.now()}`,
+        user_id: user.id,
+        case_id: caseItem.id,
+        session_id: currentSessionResult?.id || null,
+        judgment_date: appealData.judgment_date,
+        judgment_text: appealData.judgment_text || null,
+        appeal_requested: true,
+        follow_up_date: appealData.follow_up_date,
+        appeal_status: 'pending_filing',
+        notes: appealData.notes || null,
+        created_at: new Date().toISOString(),
+      };
+      await addAppeal(newAppeal);
+
+      // Add Agenda Event for Appeal Follow-up
+      const appealEvent = {
+        id: `ev_appeal_${Date.now()}`,
+        user_id: user.id,
+        case_id: caseItem.id,
+        event_type: 'appeal_follow_up',
+        title: `متابعة استئناف - دعوى ${caseItem.case_number}/${caseItem.case_year}`,
+        event_date: appealData.follow_up_date,
+        event_time: '09:00',
+        source_id: newAppeal.id,
+        details: `ميعاد متابعة قيد الاستئناف لدعوى ${caseItem.case_number}/${caseItem.case_year} — منطوق الحكم: ${appealData.judgment_text || 'حكم نهائي'}`,
+        status: 'scheduled',
+        created_at: new Date().toISOString(),
+      };
+      await addAgendaEvent(appealEvent);
+
+      // Sync appeal follow-up to Google Calendar
+      syncSessionToGoogleCalendar(
+        {
+          session_date: appealData.follow_up_date,
+          session_time: '09:00',
+          judgment_text: appealData.judgment_text,
+          event_type: 'appeal_follow_up',
+        },
+        updatedCaseData || caseItem,
+        'appeal_follow_up'
+      ).catch(e => console.log('Appeal Google Calendar sync notice:', e));
+    }
+
+    // 5. If adminTaskData is provided (Preliminary Judgment)
+    if (adminTaskData) {
+      const taskPayload = {
+        ...adminTaskData,
+        case_id: caseItem.id,
+        session_id: currentSessionResult?.id || null,
+      };
+      const createdTask = await addAdminTask(taskPayload);
+
+      // Add Agenda Event for Admin Task if it has an execution date
+      if (adminTaskData.execution_date) {
+        const taskEvent = {
+          id: `ev_task_${Date.now()}`,
+          user_id: user.id,
+          case_id: caseItem.id,
+          event_type: 'administrative_task',
+          title: adminTaskData.title || `عمل إداري - دعوى ${caseItem.case_number}/${caseItem.case_year}`,
+          event_date: adminTaskData.execution_date,
+          event_time: '09:00',
+          source_id: createdTask?.id || null,
+          details: adminTaskData.requirements || adminTaskData.notes || '',
+          status: 'scheduled',
+          created_at: new Date().toISOString(),
+        };
+        await addAgendaEvent(taskEvent);
+
+        // Sync admin task to Google Calendar
+        syncSessionToGoogleCalendar(
+          {
+            session_date: adminTaskData.execution_date,
+            session_time: '09:00',
+            title: adminTaskData.title,
+            requirements: adminTaskData.requirements,
+            location: adminTaskData.location,
+            notes: adminTaskData.notes,
+            event_type: 'administrative_task',
+          },
+          updatedCaseData || caseItem,
+          'administrative_task'
+        ).catch(e => console.log('Admin Task Google Calendar sync notice:', e));
+      }
+    }
+
+    // 6. If transactionData is provided (Session Expense)
+    if (transactionData && parseFloat(transactionData.amount) > 0 && caseItem.client_id) {
+      await addTransaction(transactionData).catch(e => console.log('Session expense error:', e));
+    }
+
+    // 7. Auto Google Calendar Sync if actual court session date is set
+    if (caseUpdates?.next_session_date) {
+      syncSessionToGoogleCalendar(
+        {
+          session_date: caseUpdates.next_session_date,
+          session_time: caseUpdates.next_session_time || '09:00',
+          notes: caseUpdates.notes,
+          status: caseUpdates.status || 'scheduled',
+        },
+        updatedCaseData || caseItem,
+        'court_session'
+      ).catch(e => console.log('Session Google Calendar sync notice:', e));
+    }
+
+    // 8. Auto Telegram Notification if client linked
+    const clientId = caseItem.client_id;
+    if (clientId) {
+      const clientItem = clients.find(c => c.id === clientId);
+      if (clientItem?.telegram_chat_id) {
+        notifyClientOfCaseUpdate({
+          client: clientItem,
+          caseItem: updatedCaseData || caseItem,
+          updateType: currentSessionData.status || caseUpdates?.status,
+          lawyerUser: user,
+          sessionData: currentSessionData,
+        }).catch(e => console.log('Telegram auto-notify error:', e));
+      }
+    }
+
+    await refreshAll();
+    return { success: true, currentSession: currentSessionResult, nextSession: nextSessionResult, case: updatedCaseData };
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -833,6 +1433,7 @@ export function DataProvider({ children }) {
         sessions,
         team,
         adminTasks,
+        adminTaskUpdates,
         bailiffTasks,
         transactions,
         loading,
@@ -850,6 +1451,7 @@ export function DataProvider({ children }) {
         deleteTeamMember,
         addAdminTask,
         updateAdminTask,
+        updateAdminTaskWorkflow,
         deleteAdminTask,
         toggleAdminTaskStatus,
         addBailiffTask,
@@ -862,6 +1464,14 @@ export function DataProvider({ children }) {
         officeProfile,
         updateOfficeProfile,
         DEFAULT_OFFICE_PROFILE,
+        appeals,
+        addAppeal,
+        updateAppeal,
+        agendaEvents,
+        addAgendaEvent,
+        updateAgendaEvent,
+        deleteAgendaEvent,
+        recordSessionDecision,
       }}
     >
       {children}
