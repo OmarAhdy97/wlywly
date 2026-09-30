@@ -1,15 +1,25 @@
 /**
  * Metadata-driven Legal Formula Template Engine
+ * 
  * Predictably resolves placeholders from:
  * 1. User entered values (Overrides have top priority)
  * 2. Case data (only for explicitly mapped sources)
  * 3. Client data (only for explicitly mapped sources)
  * 4. Office Profile data
  * 5. System/Runtime defaults
+ * 
+ * CRITICAL RULE: Unresolved placeholders are ERRORS, not silent replacements.
+ * In a legal system, missing data must be flagged, never hidden.
  */
+
+import { createDocumentModel, documentListToTable } from './documentModel.js';
+import { evaluateCondition } from './fieldValidation.js';
+import { createFormulaSnapshot, DEFAULT_DISCLAIMER } from './formulaSchema.js';
 
 /**
  * Renders an array of document items into a formal Arabic court table.
+ * (Preserved for backward compatibility with existing text-based rendering)
+ * 
  * @param {Array<{number: number|string, title: string, date?: string, notes?: string}>} items
  * @returns {string} Plain text table formatted for legal documents
  */
@@ -80,13 +90,16 @@ export function resolveFieldInitialValue(field, context = {}) {
   }
 
   // 2. Default value in field definition
-  if (field.defaultValue !== undefined) {
+  if (field.defaultValue !== undefined && field.defaultValue !== null) {
     return field.defaultValue;
   }
 
   // 3. Fallback per field type
   if (field.type === 'document_list') {
     return [];
+  }
+  if (field.type === 'checkbox') {
+    return false;
   }
 
   return '';
@@ -112,25 +125,33 @@ export function buildInitialFormValues(formula, context = {}) {
 /**
  * Renders template content with entered values and context.
  * Blocks if required fields are missing.
- * Handles unresolved placeholders cleanly.
+ * 
+ * CRITICAL: Unresolved placeholders are reported as warnings,
+ * NOT silently replaced with dots.
  *
  * @param {Object} formula
  * @param {Object} formValues
  * @param {Object} context
- * @returns {{ content: string, errors: string[], missingFields: string[] }}
+ * @returns {{ content: string, errors: string[], missingFields: string[], warnings: string[] }}
  */
 export function generateDocumentContent(formula, formValues = {}, context = {}) {
   const missingFields = [];
   const errors = [];
+  const warnings = [];
 
   if (!formula) {
-    return { content: '', errors: ['لم يتم تحديد الصيغة القانونية.'], missingFields: [] };
+    return { content: '', errors: ['لم يتم تحديد الصيغة القانونية.'], missingFields: [], warnings: [] };
   }
 
   const fields = formula.fields || [];
 
-  // Check required fields validation
+  // Check required fields validation (respecting conditional visibility)
   fields.forEach(field => {
+    // Skip hidden conditional fields
+    if (field.showWhen && !evaluateCondition(field.showWhen, formValues)) {
+      return;
+    }
+
     if (field.required) {
       const val = formValues[field.key];
       const isEmpty = val === undefined || val === null || String(val).trim() === '' || (Array.isArray(val) && val.length === 0);
@@ -143,8 +164,9 @@ export function generateDocumentContent(formula, formValues = {}, context = {}) 
   if (missingFields.length > 0) {
     return {
       content: '',
-      errors: [`يرجى إكمال الحقول الإلزامية المطلوبة: ${missingFields.join('، ')}`],
-      missingFields
+      errors: [`لا يمكن إنشاء المستند قبل استكمال:\n${missingFields.map(f => `- ${f}`).join('\n')}`],
+      missingFields,
+      warnings: []
     };
   }
 
@@ -169,6 +191,11 @@ export function generateDocumentContent(formula, formValues = {}, context = {}) 
 
     if (field.type === 'document_list') {
       val = formatDocumentListTable(val);
+    }
+
+    // For checkbox, convert to readable text
+    if (field.type === 'checkbox') {
+      val = val ? 'نعم' : 'لا';
     }
 
     template = template.replaceAll(placeholder, String(val).trim());
@@ -203,13 +230,88 @@ export function generateDocumentContent(formula, formValues = {}, context = {}) 
     }
   });
 
-  // 4. Handle unresolved placeholders:
-  // Cleanly replace any remaining {{key}} with an empty string or standard line
-  template = template.replace(/\{\{[a-zA-Z0-9_.-]+\}\}/g, '...........');
+  // 4. Handle unresolved placeholders — REPORT as warnings, mark visibly
+  const unresolvedMatch = template.match(/\{\{([a-zA-Z0-9_.-]+)\}\}/g);
+  if (unresolvedMatch) {
+    const unresolvedKeys = [...new Set(unresolvedMatch.map(m => m.replace(/\{\{|\}\}/g, '')))];
+    unresolvedKeys.forEach(key => {
+      warnings.push(`تحذير: الحقل «${key}» غير معرّف أو لم تتم تعبئته`);
+      // Mark the placeholder visibly instead of silent dots
+      template = template.replaceAll(`{{${key}}}`, `[${key} — غير مُعبّأ]`);
+    });
+  }
 
   return {
     content: template.trim(),
     errors: [],
-    missingFields: []
+    missingFields: [],
+    warnings
   };
+}
+
+/**
+ * NEW: Generates a full structured document model.
+ * This is the primary generation function for Phase 5+.
+ * Both preview and DOCX consume this model.
+ * 
+ * @param {Object} formula - Normalized formula
+ * @param {Object} formValues - User-entered values
+ * @param {Object} context - { selectedCase, selectedClient, officeProfile }
+ * @param {Object} settings - Editor formatting settings
+ * @returns {{ model: Object|null, errors: string[], warnings: string[] }}
+ */
+export function generateDocumentModel(formula, formValues = {}, context = {}, settings = {}) {
+  // First generate the text content
+  const result = generateDocumentContent(formula, formValues, context);
+
+  if (result.errors.length > 0) {
+    return { model: null, errors: result.errors, warnings: result.warnings || [] };
+  }
+
+  const { officeProfile } = context;
+
+  // Collect table data from document_list fields
+  const tables = [];
+  (formula.fields || []).forEach(field => {
+    if (field.type === 'document_list') {
+      const items = formValues[field.key];
+      if (items && items.length > 0) {
+        tables.push(documentListToTable(items));
+      }
+    }
+  });
+
+  // Build header data
+  const headerData = officeProfile ? {
+    officeName: officeProfile.office_name,
+    lawyerName: officeProfile.lawyer_name,
+    lawyerTitle: officeProfile.lawyer_title,
+    address: officeProfile.address,
+    phone: officeProfile.phone,
+    email: officeProfile.email,
+  } : null;
+
+  // Determine document date
+  const docDate = formValues.session_date || formValues.action_date || formValues.notice_date || formValues.contract_date || new Date().toISOString().substring(0, 10);
+
+  // Build the structured document model
+  const model = createDocumentModel({
+    title: formula.title,
+    content: result.content,
+    metadata: {
+      ...createFormulaSnapshot(formula),
+      status: 'generated',
+    },
+    header: headerData,
+    footer: {
+      date: docDate,
+      disclaimer: formula.disclaimer || DEFAULT_DISCLAIMER,
+      showPageNumbers: true,
+      signatureLabel: 'توقيع المحامي الوكيل: ............................................'
+    },
+    settings,
+    tables
+  });
+
+  return { model, errors: [], warnings: result.warnings || [] };
 }

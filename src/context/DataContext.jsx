@@ -3,6 +3,7 @@ import { supabase, USER_ROLES } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { syncSessionToGoogleCalendar } from '../lib/googleCalendar';
 import { notifyClientOfCaseUpdate } from '../lib/telegram';
+import { isDebitTransaction } from '../lib/financialCalculations';
 
 const DataContext = createContext(null);
 
@@ -990,9 +991,11 @@ export function DataProvider({ children }) {
       id: txData.id || `tx_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
       client_id: txData.client_id,
       case_id: txData.case_id || null,
-      type: txData.type, // 'expense' (مصروف/أتعاب على الموكل) or 'payment' (سداد/تحصيل من الموكل)
+      type: txData.type, // 'fee', 'client_expense', 'payment', 'advance', 'settlement', 'refund', 'adjustment', or legacy 'expense'
       amount: numAmount,
-      description: txData.description || (txData.type === 'expense' ? 'مصروف قضائي / أتعاب' : 'دفعة سداد نقدية'),
+      description: txData.description || (isDebitTransaction(txData.type) ? 'مصروف قضائي / أتعاب' : 'دفعة سداد نقدية'),
+      payment_method: txData.payment_method || null,
+      expense_category: txData.expense_category || null,
       date: txData.date || new Date().toISOString().split('T')[0],
       user_id: user.id,
       created_at: new Date().toISOString(),
@@ -1002,7 +1005,7 @@ export function DataProvider({ children }) {
     try {
       await supabase.from('client_transactions').insert([newTx]);
     } catch (e) {
-      // Table may not exist yet, fallback to localStorage
+      // Table may not exist yet or lack new columns, fallback to localStorage
     }
 
     // Save in state & localStorage
@@ -1016,8 +1019,9 @@ export function DataProvider({ children }) {
     const targetClient = clients.find(c => c.id === txData.client_id);
     if (targetClient) {
       const currentBalance = parseFloat(targetClient.financial_balance) || 0;
-      // Expense increases debt (more negative), Payment reduces debt (more positive)
-      const balanceDelta = txData.type === 'expense' ? -numAmount : numAmount;
+      // Debit increases debt (more negative in client.financial_balance), Credit reduces debt (more positive)
+      const isDebit = isDebitTransaction(txData.type);
+      const balanceDelta = isDebit ? -numAmount : numAmount;
       const updatedBalance = currentBalance + balanceDelta;
       await updateClient(txData.client_id, { financial_balance: updatedBalance });
     }
@@ -1046,8 +1050,9 @@ export function DataProvider({ children }) {
       const targetClient = clients.find(c => c.id === txToDelete.client_id);
       if (targetClient) {
         const currentBalance = parseFloat(targetClient.financial_balance) || 0;
-        // Reversal: if it was an expense, subtract the debt (- -amount = +amount); if payment, add back debt (-amount)
-        const balanceDelta = txToDelete.type === 'expense' ? txToDelete.amount : -txToDelete.amount;
+        // Reversal: if debit, add back debt (- -amount = +amount); if credit, deduct (-amount)
+        const isDebit = isDebitTransaction(txToDelete.type);
+        const balanceDelta = isDebit ? txToDelete.amount : -txToDelete.amount;
         const updatedBalance = currentBalance + balanceDelta;
         await updateClient(txToDelete.client_id, { financial_balance: updatedBalance });
       }

@@ -1,4 +1,5 @@
 import { CASE_TYPES, CASE_STATUSES, SESSION_DECISIONS } from './supabase';
+import { calculateClientFinancialSummary, formatMoney } from './financialCalculations';
 
 export const TELEGRAM_BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '8980994154:AAGJzUkUAuXHysaHn_fNl28eqHxs-uYHbdM';
 export const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'Agenda_LegalBot';
@@ -231,31 +232,21 @@ export function buildClientStatementMessage({ client, lawyerUser, transactions, 
   const lawyerName = lawyerUser?.user_metadata?.full_name || 'مكتب المحاماة';
   const lawyerPhone = lawyerUser?.user_metadata?.phone || '';
 
-  const totalExpenses = (transactions || [])
-    .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+  const summary = calculateClientFinancialSummary(transactions || [], client || {}, clientCases || []);
 
-  const totalPayments = (transactions || [])
-    .filter(t => t.type === 'payment')
-    .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-
-  const netNum = currentBalance !== undefined ? parseFloat(currentBalance) : (totalPayments - totalExpenses);
-  const isDebtor = netNum < 0;
-  const balanceText = isDebtor 
-    ? `🔴 <b>مستحق على سيادتكم:</b> ${Math.abs(netNum).toLocaleString('en-US')} ج.م` 
-    : netNum > 0 
-      ? `🟢 <b>رصيد دائن لسيادتكم:</b> ${netNum.toLocaleString('en-US')} ج.م` 
+  const balanceText = summary.isDebtor 
+    ? `🔴 <b>المبلغ المستحق على سيادتكم:</b> ${formatMoney(summary.outstandingBalance)} (مطلوب سداده للمكتب)` 
+    : summary.isCreditor 
+      ? `🟢 <b>الرصيد المتبقي لصالح سيادتكم:</b> ${formatMoney(summary.outstandingBalance)} (رصيد دائن للموكل)` 
       : '⚪ <b>الحساب خالص بالكامل:</b> (0 ج.م)';
 
   // Recent 6 transactions
   let txDetails = '';
-  if (transactions && transactions.length > 0) {
-    const recentTx = [...transactions].slice(-6).reverse();
+  if (summary.displayLedger && summary.displayLedger.length > 0) {
+    const recentTx = summary.displayLedger.slice(0, 6);
     txDetails = recentTx.map(t => {
-      const isExp = t.type === 'expense';
-      const sign = isExp ? '➖' : '➕';
-      const label = isExp ? 'مصروف/أتعاب' : 'دفعة سداد';
-      return `• ${sign} <b>${t.amount} ج.م</b> — ${escapeHtml(t.description)} (<i>${label} - ${t.date || ''}</i>)`;
+      const sign = t.isDebit ? '➖' : '➕';
+      return `• ${sign} <b>${formatMoney(t.amountNum)}</b> — ${escapeHtml(t.description || t.typeMeta?.label)} (<i>${t.typeMeta?.label} - ${(t.date || '').split('T')[0]}</i>)`;
     }).join('\n');
   } else {
     txDetails = '• لا توجد حركات تفصيلية مسجلة بعد.';
@@ -284,8 +275,8 @@ ${txDetails}
 
 ━━━━━━━━━━━━━━━━━━━
 💰 <b>الملخص المالي العام:</b>
-• إجمالي المصروفات والأتعاب: <b>${totalExpenses.toLocaleString('en-US')} ج.م</b>
-• إجمالي المبالغ المسددة: <b>${totalPayments.toLocaleString('en-US')} ج.م</b>
+• إجمالي المصروفات والأتعاب: <b>${formatMoney(summary.totalCharges)}</b>
+• إجمالي المبالغ المسددة: <b>${formatMoney(summary.totalPayments)}</b>
 ━━━━━━━━━━━━━━━━━━━
 ${balanceText}
 ━━━━━━━━━━━━━━━━━━━

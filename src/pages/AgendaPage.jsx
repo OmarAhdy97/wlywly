@@ -8,7 +8,8 @@ import {
   Gavel,
   Filter,
   FileSpreadsheet,
-  Scale
+  Scale,
+  Briefcase
 } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
@@ -19,22 +20,46 @@ import { printWithTitle, DEFAULT_APP_TITLE } from '../lib/printUtils';
 import SessionDecisionModal from '../components/common/SessionDecisionModal';
 
 export default function AgendaPage() {
-  const { cases, clients, adminTasks, appeals, agendaEvents, officeProfile } = useData();
+  const data = useData() || {};
+  const { cases = [], clients = [], adminTasks = [], appeals = [], agendaEvents = [], officeProfile = {} } = data;
   const { user } = useAuth();
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [courtFilter, setCourtFilter] = useState('ALL');
   const [mobileViewMode, setMobileViewMode] = useState('card'); // 'card' | 'table'
   const [expandedCaseId, setExpandedCaseId] = useState(null);
+
+  // Available Courts from existing cases
+  const availableCourts = React.useMemo(() => {
+    const set = new Set();
+    (cases || []).forEach(c => {
+      if (c.court_name && c.court_name.trim()) set.add(c.court_name.trim());
+    });
+    return Array.from(set);
+  }, [cases]);
 
   // Decision Modal State
   const [decisionCase, setDecisionCase] = useState(null);
 
   // Filter cases matching selected session date (Actual court sessions only)
-  const filteredCases = cases.filter(c => {
-    const matchesDate = c.next_session_date && c.next_session_date.startsWith(selectedDate);
+  const filteredCases = (cases || []).filter(c => {
+    if (c.is_archived) return false;
+    const sessionDate = c.next_session_date ? c.next_session_date.split('T')[0] : null;
+    const matchesDate = sessionDate === selectedDate;
     const matchesCourt = courtFilter === 'ALL' || (c.court_name && c.court_name.includes(courtFilter));
     return matchesDate && matchesCourt;
   });
+
+  // Safe localized date string (without UTC shift)
+  const formattedSelectedDate = React.useMemo(() => {
+    try {
+      if (!selectedDate) return '';
+      const [y, m, d] = selectedDate.split('-').map(Number);
+      const dateObj = new Date(y, m - 1, d);
+      return dateObj.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    } catch (e) {
+      return selectedDate;
+    }
+  }, [selectedDate]);
 
   // Additional follow-up events for selected date (Appeals & Administrative Tasks)
   const dayAppeals = (appeals || []).filter(a => a.follow_up_date === selectedDate);
@@ -177,12 +202,9 @@ export default function AgendaPage() {
             onChange={(e) => setCourtFilter(e.target.value)}
           >
             <option value="ALL">جميع المحاكم والدوائر</option>
-            <option value="دمياط الابتدائية">دمياط الابتدائية</option>
-            <option value="فارسكور">فارسكور</option>
-            <option value="كفر سعد">كفر سعد</option>
-            <option value="رأس البر">رأس البر</option>
-            <option value="استئناف المنصورة (مأمورية دمياط)">استئناف مأمورية دمياط</option>
-            <option value="مجلس الدولة">مجلس الدولة بدمياط</option>
+            {availableCourts.map((courtName, idx) => (
+              <option key={idx} value={courtName}>{courtName}</option>
+            ))}
           </select>
         </div>
       </div>
@@ -204,7 +226,7 @@ export default function AgendaPage() {
             رول الجلسات اليومية
           </h2>
           <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#6d0f1b' }}>
-            جلسات يوم: {new Date(selectedDate).toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            جلسات يوم: {formattedSelectedDate}
           </div>
           <div style={{ fontSize: '0.82rem', color: '#6b4c51', marginTop: '0.25rem', fontWeight: '700' }}>
             {courtFilter !== 'ALL' ? `الدائرة القضائية: ${courtFilter}` : 'كافة الدوائر والمحاكم القضائية'}

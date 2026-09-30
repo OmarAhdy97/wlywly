@@ -1,84 +1,14 @@
 import React from 'react';
 import {
-  FileText,
-  FileCheck,
-  Scale,
-  Briefcase,
-  AlertTriangle,
-  FolderArchive,
-  Users,
   Search,
   Bookmark,
-  Bell,
-  Send,
-  HelpCircle,
   Sparkles,
   ArrowLeft,
-  Star
+  Star,
+  FileText,
+  FolderArchive
 } from 'lucide-react';
-
-const CATEGORY_META = {
-  'عرائض': {
-    icon: FileText,
-    color: '#9e2f5e',
-    bgColor: 'rgba(158, 47, 94, 0.08)',
-    desc: 'صحف الدعاوى والطعون المدنية والتجارية والإدارية ومحاكم مجلس الدولة.'
-  },
-  'عقود': {
-    icon: FileCheck,
-    color: '#0d9488',
-    bgColor: 'rgba(13, 148, 136, 0.08)',
-    desc: 'عقود البيع والإيجار والشركات والشراكة والصلح والوكالات والاتفاقات.'
-  },
-  'جنح مباشرة': {
-    icon: Scale,
-    color: '#e11d48',
-    bgColor: 'rgba(225, 29, 72, 0.08)',
-    desc: 'صحف الجنح المباشرة وخيانة الأمانة والشيكات والنصب والسب والقذف.'
-  },
-  'طلبات': {
-    icon: Briefcase,
-    color: '#d97706',
-    bgColor: 'rgba(217, 119, 6, 0.08)',
-    desc: 'أوامر الأداء والأوامر على عرائض والالتماسات وطلبات الصرف والتسليم.'
-  },
-  'إنذارات': {
-    icon: Bell,
-    color: '#dc2626',
-    bgColor: 'rgba(220, 38, 38, 0.08)',
-    desc: 'إنذارات التكليف بالوفاء، إنذارات الإخلاء، إنذارات العرض والإيداع الرسمي.'
-  },
-  'تظلمات': {
-    icon: AlertTriangle,
-    color: '#8b5cf6',
-    bgColor: 'rgba(139, 92, 246, 0.08)',
-    desc: 'التظلمات القضائية والإدارية من الأوامر الوقتية وقرارات الحيازة.'
-  },
-  'إشكالات': {
-    icon: HelpCircle,
-    color: '#ea580c',
-    bgColor: 'rgba(234, 88, 12, 0.08)',
-    desc: 'إشكالات وقف التنفيذ المدنية والجنائية أمام قاضي الأمور المستعجلة.'
-  },
-  'إعلانات': {
-    icon: Send,
-    color: '#2563eb',
-    bgColor: 'rgba(37, 99, 235, 0.08)',
-    desc: 'إعلانات افتتاح الخصومة، إعادة الإعلان، إعلان شواهد التزوير، وتجديد الدعاوى.'
-  },
-  'تجهيز ملف أسرة': {
-    icon: Users,
-    color: '#db2777',
-    bgColor: 'rgba(219, 39, 119, 0.08)',
-    desc: 'دعاوى النفقات، الحضانة، الرؤية، الخلع، الطلاق، وقوائم المستندات المطلوبة.'
-  },
-  'حافظة مستندات': {
-    icon: FolderArchive,
-    color: '#059669',
-    bgColor: 'rgba(5, 150, 105, 0.08)',
-    desc: 'نماذج حوافظ المستندات القضائية للمدعي والمدعى عليه مع جداول المستندات.'
-  }
-};
+import { CATEGORY_META } from '../../lib/legalCategories';
 
 export default function FormulaCategoryView({
   categories = [],

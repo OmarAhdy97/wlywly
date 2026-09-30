@@ -3361,9 +3361,188 @@ textarea {
   }
 }
 
+/* Client Financial Manager - Mobile Responsive & Non-fixed Header/Footer */
+@media screen and (max-width: 768px) {
+  .statement-modal-backdrop.statement-modal-backdrop {
+    display: block !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 0.4rem 0.4rem 2rem !important;
+    align-items: flex-start !important;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    box-sizing: border-box !important;
+  }
+
+  .client-financial-dashboard.client-financial-dashboard {
+    max-height: none !important;
+    height: auto !important;
+    display: block !important;
+    overflow: visible !important;
+    border-radius: 12px !important;
+    margin: 0 auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .cfm-modal-header {
+    position: relative !important;
+    flex-shrink: 1 !important;
+    padding: 0.9rem 0.85rem !important;
+    padding-left: 3.25rem !important; /* space for top-left X button */
+  }
+
+  .cfm-close-btn {
+    position: absolute !important;
+    top: 0.85rem !important;
+    left: 0.85rem !important;
+    z-index: 10 !important;
+  }
+
+  .cfm-header-actions {
+    width: 100% !important;
+    margin-top: 0.65rem !important;
+  }
+
+  .cfm-header-actions button {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+
+  .cfm-modal-body {
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    overflow-x: hidden !important;
+    flex: none !important;
+    padding: 0.75rem 0.6rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .cfm-tabs-container {
+    width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    display: flex !important;
+    gap: 0.4rem !important;
+    padding-bottom: 0.35rem !important;
+    scrollbar-width: none !important;
+  }
+
+  .cfm-tabs-container::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .cfm-tabs-container button {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  .cfm-filters-container {
+    width: 100% !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+  }
+
+  .cfm-filters-container select,
+  .cfm-filters-container .cfm-search-input-wrapper {
+    flex: 1 1 130px !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .cfm-modal-footer {
+    position: static !important;
+    flex-shrink: 1 !important;
+    padding: 0.9rem 0.65rem !important;
+  }
+
+  .cfm-modal-footer button {
+    width: 100% !important;
+  }
+
+  .cfm-table-desktop {
+    display: none !important;
+  }
+
+  .cfm-cards-mobile {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0.65rem !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .cfm-cards-mobile > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+}
+
+@media screen and (min-width: 769px) {
+  .cfm-table-desktop {
+    display: block !important;
+  }
+
+  .cfm-cards-mobile {
+    display: none !important;
+  }
+
+  .cfm-close-btn {
+    position: absolute !important;
+    top: 1rem !important;
+    left: 1.25rem !important;
+    z-index: 10 !important;
+  }
+
+  .cfm-modal-header {
+    position: relative !important;
+    padding-left: 3.5rem !important;
+  }
+}
+
+/* Screen presentation: print container is 100% invisible on screen */
+#client-statement-portal-root,
+.client-statement-print-only,
+.client-statement-overlay,
+.only-print {
+  display: none !important;
+  visibility: hidden !important;
+  position: absolute !important;
+  left: -9999px !important;
+  top: -9999px !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+}
+
+.client-statement-sheet {
+  width: 100%;
+  max-width: 850px;
+  min-height: 1120px;
+  background-color: #ffffff;
+  border-radius: 6px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  padding: 2.5rem 2.8rem;
+  direction: rtl;
+  color: #1e293b;
+  font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+  box-sizing: border-box;
+  position: relative;
+  margin: 0 auto;
+}
+
 /* ========================================================================= */
 /* FINAL PRINT RULES: Full Fidelity with Official Legal Statement Format     */
-/* Enforces exact layout as shown in Screenshot 1 across all devices         */
+/* Enforces exact layout matching Roll printing across all devices           */
 /* ========================================================================= */
 @media print {
   /* Enforce exact portrait dimensions and 0 screen shadows */
@@ -3372,52 +3551,92 @@ textarea {
     margin: 14mm 12mm 14mm 12mm;
   }
 
-  /* Hide modal header, footer, and any no-print controls */
+  /* 1. Complete Print Isolation for Client Statement (matching Roll page) */
+  body:has(#client-account-printable-sheet) *,
+  body.printing-statement-document * {
+    visibility: hidden;
+  }
+
+  body:has(#client-account-printable-sheet) #client-account-printable-sheet,
+  body:has(#client-account-printable-sheet) #client-account-printable-sheet *,
+  body.printing-statement-document #client-account-printable-sheet,
+  body.printing-statement-document #client-account-printable-sheet * {
+    visibility: visible !important;
+  }
+
+  body:has(#client-account-printable-sheet) #client-account-printable-sheet,
+  body.printing-statement-document #client-account-printable-sheet {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    float: none !important;
+    overflow: visible !important;
+  }
+
+  /* Portal root and print container must remain visible in print */
+  #client-statement-portal-root,
+  .client-statement-print-only,
+  .only-print {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+    background: transparent !important;
+    background-color: #ffffff !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    opacity: 1 !important;
+    overflow: visible !important;
+  }
+
+  /* Force hide all toolbars, control bars, and non-printable elements */
+  .statement-control-bar,
+  .client-financial-dashboard,
   .no-print,
   .statement-scroll-footer,
   .statement-modal-top-header,
   .modal-header,
   .modal-footer {
     display: none !important;
-  }
-
-  /* Ensure statement modal takes full clean sheet */
-  .statement-modal-backdrop,
-  .modal-backdrop,
-  .modal-backdrop:has(.statement-modal) {
-    display: block !important;
-    position: static !important;
-    background: #ffffff !important;
-    padding: 0 !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    max-height: 0 !important;
     margin: 0 !important;
-    width: 100% !important;
-    overflow: visible !important;
-  }
-
-  .statement-modal-dialog,
-  .statement-modal,
-  .modal-dialog {
-    max-width: 100% !important;
-    width: 100% !important;
-    box-shadow: none !important;
+    padding: 0 !important;
     border: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: #ffffff !important;
-    max-height: none !important;
-    overflow: visible !important;
+    background: transparent !important;
+    background-color: transparent !important;
+    backdrop-filter: none !important;
+    opacity: 0 !important;
   }
 
-  .statement-modal-body,
-  .statement-modal-body-content,
-  .modal-body {
-    overflow: visible !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: #ffffff !important;
+  /* When printing statement document, completely hide the rest of the app */
+  body.printing-statement-document #root,
+  body.printing-statement-document .app-container,
+  body.printing-statement-document .modal-backdrop:not(.client-statement-overlay) {
+    display: none !important;
+    visibility: hidden !important;
   }
 
   .statement-document-sheet,
+  .client-statement-sheet,
   .printable-document-frame {
     border: none !important;
     box-shadow: none !important;
@@ -3426,6 +3645,7 @@ textarea {
     margin: 0 !important;
     width: 100% !important;
     background: #ffffff !important;
+    background-color: #ffffff !important;
     overflow: visible !important;
   }
 

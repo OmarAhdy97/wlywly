@@ -1,20 +1,14 @@
 /**
  * Formula Validation Utility
  * Validates formula integrity, placeholder consistency, and metadata adherence.
+ * 
+ * Categories are imported from legalCategories.js (single source of truth).
  */
 
-export const VALID_CATEGORIES = [
-  'عرائض',
-  'عقود',
-  'جنح مباشرة',
-  'طلبات',
-  'إنذارات',
-  'تظلمات',
-  'إشكالات',
-  'إعلانات',
-  'تجهيز ملف أسرة',
-  'حافظة مستندات'
-];
+import { VALID_CATEGORIES } from './legalCategories.js';
+
+// Re-export for backward compatibility
+export { VALID_CATEGORIES };
 
 /**
  * Validates a single formula definition.

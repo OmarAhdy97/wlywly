@@ -23,7 +23,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import LawFirmPrintHeader from '../common/LawFirmPrintHeader';
 import { printWithTitle } from '../../lib/printUtils';
-import { exportDocumentToDocx, exportDocumentToTxt } from '../../lib/documentExport';
+import { exportTextToDocx, exportDocumentToDocx, exportDocumentToTxt } from '../../lib/documentExport';
 import { saveDocument } from '../../lib/documentStorage';
 
 export default function LegalDocumentEditor({
@@ -42,6 +42,7 @@ export default function LegalDocumentEditor({
   const [savedNotice, setSavedNotice] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [isExportingDocx, setIsExportingDocx] = useState(false);
 
   // Editor Styling State
   const [fontSize, setFontSize] = useState('16px');
@@ -74,6 +75,26 @@ export default function LegalDocumentEditor({
   const handlePrint = () => {
     const docTitle = `${formula?.title || 'مستند قضائي'} - ${formValues.client_name || formValues.first_party_name || ''}`;
     printWithTitle(docTitle);
+  };
+
+  const handleDownloadRealDocx = async () => {
+    setIsExportingDocx(true);
+    try {
+      await exportTextToDocx({
+        title: formula?.title || 'مستند_قانوني',
+        content: documentContent,
+        officeProfile
+      });
+    } catch (err) {
+      console.warn('Real DOCX export error, falling back to .doc:', err);
+      exportDocumentToDocx({
+        title: formula?.title || 'مستند_قانوني',
+        content: documentContent,
+        officeProfile
+      });
+    } finally {
+      setIsExportingDocx(false);
+    }
   };
 
   const handleDownloadWord = () => {
@@ -189,13 +210,24 @@ export default function LegalDocumentEditor({
 
           <button
             type="button"
-            onClick={handleDownloadWord}
+            onClick={handleDownloadRealDocx}
+            disabled={isExportingDocx}
             className="btn btn-secondary btn-sm"
-            title="تنزيل ملف وورد حقيقي قابل للتعديل"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#1d4ed8' }}
+            title="تنزيل ملف وورد حقيقي DOCX"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#1d4ed8', fontWeight: 'bold' }}
           >
             <Download size={16} />
-            <span>تصدير Word (.doc)</span>
+            <span>{isExportingDocx ? 'جاري التصدير...' : 'تصدير Word (.docx)'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownloadWord}
+            className="btn btn-secondary btn-sm"
+            title="تنزيل بصيغة Word البديلة القديمة (.doc)"
+            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem' }}
+          >
+            <span>Word (.doc)</span>
           </button>
 
           <button
@@ -220,6 +252,25 @@ export default function LegalDocumentEditor({
           </button>
         </div>
       </div>
+
+      {/* Unresolved Placeholders Warning */}
+      {(documentContent.includes('⚠️ بيان مطلوب') || documentContent.includes('{{')) && (
+        <div style={{
+          background: 'rgba(234, 88, 12, 0.1)',
+          border: '1px solid rgba(234, 88, 12, 0.4)',
+          color: '#c2410c',
+          padding: '0.65rem 1rem',
+          borderRadius: '8px',
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          fontSize: '0.88rem'
+        }} className="no-print">
+          <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+          <span>تنبيه مهني: توجد بيانات ناقصة بالمستند مسبوقة بـ (⚠️). يرجى استبدالها بالبيانات الصحيحة قبل الطباعة أو التصدير.</span>
+        </div>
+      )}
 
       {/* Saved Notice */}
       {savedNotice && (

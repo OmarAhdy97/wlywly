@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import formulasCatalog from '../data/legal_formulas.json';
-import { VALID_CATEGORIES } from '../lib/formulaValidator';
+import { VALID_CATEGORIES } from '../lib/legalCategories';
 import { generateDocumentContent } from '../lib/formulaEngine';
 import { getUserFavorites, toggleUserFavorite, getSavedDocuments, deleteDocument } from '../lib/documentStorage';
 import { useAuth } from '../context/AuthContext';
@@ -15,7 +15,8 @@ import SavedDocumentsModal from '../components/formulas/SavedDocumentsModal';
 
 export default function LegalFormulasPage() {
   const { user } = useAuth();
-  const { officeProfile, cases, clients } = useData();
+  const data = useData() || {};
+  const { officeProfile = {}, cases = [], clients = [] } = data;
 
   // Navigation Views: 'CATEGORIES' | 'CATEGORY_FORMULAS' | 'FORM' | 'PREVIEW' | 'EDITOR' | 'SEARCH_RESULTS' | 'FAVORITES'
   const [currentView, setCurrentView] = useState('CATEGORIES');
@@ -25,6 +26,7 @@ export default function LegalFormulasPage() {
   const [selectedFormula, setSelectedFormula] = useState(null);
   const [activeFormValues, setActiveFormValues] = useState({});
   const [generatedContent, setGeneratedContent] = useState('');
+  const [activeDocumentModel, setActiveDocumentModel] = useState(null);
   const [activeContextData, setActiveContextData] = useState({});
 
   // Global Search Term
@@ -88,8 +90,8 @@ export default function LegalFormulasPage() {
     setActiveFormValues(values);
     setActiveContextData(contextData);
 
-    const chosenCase = cases.find(c => c.id === contextData.selectedCaseId);
-    const chosenClient = clients.find(c => c.id === contextData.selectedClientId);
+    const chosenCase = (cases || []).find(c => c.id === contextData.selectedCaseId);
+    const chosenClient = (clients || []).find(c => c.id === contextData.selectedClientId);
 
     const result = generateDocumentContent(selectedFormula, values, {
       selectedCase: chosenCase,
@@ -103,6 +105,7 @@ export default function LegalFormulasPage() {
     }
 
     setGeneratedContent(result.content);
+    setActiveDocumentModel(result.documentModel || null);
     setCurrentView('EDITOR');
   };
 
@@ -110,8 +113,8 @@ export default function LegalFormulasPage() {
     setActiveFormValues(values);
     setActiveContextData(contextData);
 
-    const chosenCase = cases.find(c => c.id === contextData.selectedCaseId);
-    const chosenClient = clients.find(c => c.id === contextData.selectedClientId);
+    const chosenCase = (cases || []).find(c => c.id === contextData.selectedCaseId);
+    const chosenClient = (clients || []).find(c => c.id === contextData.selectedClientId);
 
     const result = generateDocumentContent(selectedFormula, values, {
       selectedCase: chosenCase,
@@ -125,6 +128,7 @@ export default function LegalFormulasPage() {
     }
 
     setGeneratedContent(result.content);
+    setActiveDocumentModel(result.documentModel || null);
     setCurrentView('PREVIEW');
   };
 
@@ -246,6 +250,7 @@ export default function LegalFormulasPage() {
         <FormulaPreview
           formula={selectedFormula}
           generatedContent={generatedContent}
+          documentModel={activeDocumentModel}
           formValues={activeFormValues}
           onContinueToEditor={() => setCurrentView('EDITOR')}
           onBackToForm={() => setCurrentView('FORM')}

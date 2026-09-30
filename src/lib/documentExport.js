@@ -1,13 +1,67 @@
 /**
  * Legal Document Export Utility
+ * 
  * Provides clean exports to:
- * 1. Word-compatible Document (.doc / .docx)
- * 2. Plain Text (.txt)
+ * 1. Real Word document (.docx) via docx library
+ * 2. Legacy Word-compatible (.doc) for fallback
+ * 3. Plain Text (.txt)
+ * 
+ * Primary export is now real .docx via the structured document model.
  */
 
+import { exportDocumentModelToDocx } from './docxGenerator.js';
+import { createDocumentModel } from './documentModel.js';
+
 /**
- * Exports document content as a real, editable Word-compatible document.
- * Includes Word-specific XML declarations, page setup (A4), margins, and Arabic RTL rules.
+ * NEW PRIMARY EXPORT: Generates a real .docx from a DocumentModel.
+ * 
+ * @param {Object} docModel - Structured document model
+ * @param {string} filename - Desired filename
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function exportDocumentToRealDocx(docModel, filename) {
+  return exportDocumentModelToDocx(docModel, filename);
+}
+
+/**
+ * Quick export: Creates a document model from raw text + metadata and exports.
+ * Used when the editor has modified text (not from the structured model).
+ * 
+ * @param {Object} documentData - { title, content, officeProfile, settings, disclaimer }
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+export async function exportTextToDocx(documentData) {
+  const { title = 'مستند_قانوني', content = '', officeProfile = {}, settings = {}, disclaimer = null } = documentData;
+
+  const headerData = officeProfile.lawyer_name ? {
+    officeName: officeProfile.office_name || 'مكتب المحاماة',
+    lawyerName: officeProfile.lawyer_name,
+    lawyerTitle: officeProfile.lawyer_title || 'محامٍ ومستشار قانوني',
+    address: officeProfile.address || '',
+    phone: officeProfile.phone || '',
+    email: officeProfile.email || '',
+  } : null;
+
+  const model = createDocumentModel({
+    title,
+    content,
+    metadata: { title, status: 'exported' },
+    header: headerData,
+    footer: {
+      date: new Date().toISOString().substring(0, 10),
+      disclaimer: disclaimer,
+      showPageNumbers: true,
+      signatureLabel: 'توقيع المحامي الوكيل: ............................................'
+    },
+    settings
+  });
+
+  return exportDocumentModelToDocx(model, title);
+}
+
+/**
+ * LEGACY FALLBACK: Exports document content as Word-compatible HTML (.doc).
+ * Kept for backward compatibility — use exportTextToDocx instead when possible.
  *
  * @param {Object} documentData - { title, content, officeProfile }
  */
