@@ -13,7 +13,8 @@ import {
   Eye,
   Edit3,
   HelpCircle,
-  DollarSign
+  DollarSign,
+  ChevronDown
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import DocumentListField from './DocumentListField';
@@ -21,6 +22,16 @@ import { buildInitialFormValues } from '../../lib/formulaEngine';
 import { validateFormulaForm, isFieldVisible, isFieldRequired } from '../../lib/fieldValidation';
 import { numberToArabicWords, formatCurrencyToArabic } from '../../lib/numberToArabicWords';
 import { EGYPTIAN_COURTS, searchCourts, getChambersForCourt } from '../../lib/courtsData';
+
+const WEEKDAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+// date field -> the «يوم» field that should follow it automatically
+const DAY_PAIRS = { announce_date: 'announce_day', session_date: 'session_day' };
+const GROUP_ICONS = { 'بيانات الإعلان': Calendar, 'الطرف الأول': User, 'المحضر': FileText, 'الطرف الثاني': Users, 'الجلسة': Building };
+
+function weekdayOf(isoDate) {
+  const d = new Date(`${isoDate}T12:00:00`);
+  return Number.isNaN(d.getTime()) ? '' : WEEKDAYS_AR[d.getDay()];
+}
 
 export default function DynamicFormulaForm({
   formula,
@@ -37,6 +48,8 @@ export default function DynamicFormulaForm({
   const [fieldErrors, setFieldErrors] = useState({});
   const [autofillNotice, setAutofillNotice] = useState('');
   const [autoFilledFields, setAutoFilledFields] = useState(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   // Check if formula interacts with case or client entities
   const hasCaseField = useMemo(() => {
@@ -84,6 +97,21 @@ export default function DynamicFormulaForm({
         newAutoFilled.add(field.key);
       }
     });
+
+    // The case carries the client's name: pull the rest of the client's data from the directory
+    const caseClient = clients.find(cl => cl.name && cl.name === chosenCase.plaintiff_name);
+    if (caseClient) {
+      (formula.fields || []).forEach(field => {
+        const map = { 'client.address': caseClient.address, 'client.national_id': caseClient.national_id, 'client.phone': caseClient.phone };
+        const v = map[field.source];
+        if (v) {
+          updated[field.key] = v;
+          filledLabels.push(field.label);
+          newAutoFilled.add(field.key);
+        }
+      });
+      setSelectedClientId(caseClient.id);
+    }
 
     setFormValues(updated);
     setAutoFilledFields(newAutoFilled);
@@ -146,10 +174,14 @@ export default function DynamicFormulaForm({
 
   // Input change handler
   const handleInputChange = (key, rawVal) => {
-    setFormValues(prev => ({
-      ...prev,
-      [key]: rawVal
-    }));
+    setFormValues(prev => {
+      const next = { ...prev, [key]: rawVal };
+      const dayKey = DAY_PAIRS[key];
+      if (dayKey && rawVal && (formula?.fields || []).some(f => f.key === dayKey)) {
+        next[dayKey] = weekdayOf(rawVal);
+      }
+      return next;
+    });
 
     // Remove field error when user edits
     if (fieldErrors[key]) {
@@ -162,9 +194,27 @@ export default function DynamicFormulaForm({
   };
 
   // Validate entire form using fieldValidation.js
+  const scrollToField = (key) => {
+    const wrapper = document.querySelector(`[data-field="${key}"]`);
+    if (!wrapper) return;
+    // open the group if the user had collapsed it
+    const group = wrapper.getAttribute('data-group');
+    if (group) setCollapsedGroups(prev => ({ ...prev, [group]: false }));
+    setTimeout(() => {
+      wrapper.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const input = wrapper.querySelector('input, textarea, select');
+      if (input) input.focus({ preventScroll: true });
+    }, 60);
+  };
+
   const validateCurrentForm = () => {
     const { isValid, errors } = validateFormulaForm(formula, formValues);
     setFieldErrors(errors);
+    setSubmitAttempted(true);
+    if (!isValid) {
+      const firstKey = visibleFields.map(f => f.key).find(k => errors[k]) || Object.keys(errors)[0];
+      if (firstKey) scrollToField(firstKey);
+    }
     return isValid;
   };
 
@@ -199,6 +249,49 @@ export default function DynamicFormulaForm({
   const visibleFields = useMemo(() => {
     return (formula?.fields || []).filter(f => isFieldVisible(f, formValues));
   }, [formula, formValues]);
+
+  // Fields grouped into titled sections; the case/client pickers above replace the raw «case» field
+  const groups = useMemo(() => {
+    const order = [];
+    const map = {};
+    visibleFields.forEach(f => {
+      if (f.type === 'case') return;
+      const title = f.group || 'بيانات الصحيفة';
+      if (!map[title]) { map[title] = { title, fields: [] }; order.push(title); }
+      map[title].fields.push(f);
+    });
+    return order.map(t => map[t]);
+  }, [visibleFields]);
+
+  const progress = useMemo(() => {
+    const all = groups.flatMap(g => g.fields).filter(f => f.type !== 'document_list');
+    const isFilled = f => {
+      const v = formValues[f.key];
+      return !(v === undefined || v === null || String(v).trim() === '');
+    };
+    const required = all.filter(f => isFieldRequired(f, formValues));
+    return {
+      filled: all.filter(isFilled).length,
+      total: all.length,
+      reqFilled: required.filter(isFilled).length,
+      reqTotal: required.length
+    };
+  }, [groups, formValues]);
+
+  const wrapField = (field, groupTitle, node) => (
+    <div
+      key={field.key}
+      data-field={field.key}
+      data-group={groupTitle}
+      className={`ff-item${fieldErrors[field.key] ? ' ff-item-error' : ''}`}
+      style={{ gridColumn: ['textarea', 'document_list'].includes(field.type) ? '1 / -1' : undefined }}
+    >
+      {node}
+      {field.hint && !fieldErrors[field.key] && (
+        <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>{field.hint}</span>
+      )}
+    </div>
+  );
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto' }}>
@@ -290,7 +383,7 @@ export default function DynamicFormulaForm({
               border: '1px solid var(--border-color)',
               marginBottom: '1.5rem',
               display: 'grid',
-              gridTemplateColumns: hasCaseField && hasClientField ? '1fr 1fr' : '1fr',
+              gridTemplateColumns: hasCaseField && hasClientField ? 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))' : '1fr',
               gap: '1rem'
             }}>
               {/* Optional Case Selector */}
@@ -341,9 +434,44 @@ export default function DynamicFormulaForm({
             </div>
           )}
 
-          {/* Form Fields Rendered from Metadata */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            {visibleFields.map(field => {
+          {/* Progress */}
+          <div style={{ marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+              <span>تمت تعبئة {progress.filled} من {progress.total} بيانًا</span>
+              <span style={{ color: progress.reqFilled === progress.reqTotal ? 'var(--success, #16a34a)' : 'var(--danger, #dc2626)', fontWeight: 700 }}>
+                {progress.reqFilled === progress.reqTotal ? 'اكتملت البيانات الأساسية' : `البيانات الأساسية: ${progress.reqFilled} من ${progress.reqTotal}`}
+              </span>
+            </div>
+            <div style={{ height: '6px', borderRadius: '999px', background: 'var(--border-color)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${progress.total ? Math.round((progress.filled / progress.total) * 100) : 0}%`, background: 'var(--accent-gold, #c5a059)', transition: 'width .25s' }} />
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
+              البيانات التي لا تعرفها الآن يمكن تركها فارغة، وستظهر في المستند نقاطًا (……) لتعبئتها بخط اليد أو في المحرر.
+            </div>
+          </div>
+
+          {/* Form Fields Rendered from Metadata, grouped in sections */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {groups.map(g => {
+              const Icon = GROUP_ICONS[g.title] || FileText;
+              const collapsed = !!collapsedGroups[g.title];
+              const errCount = g.fields.filter(f => fieldErrors[f.key]).length;
+              return (
+              <section key={g.title} className="ff-group">
+                <button
+                  type="button"
+                  className="ff-group-head"
+                  onClick={() => setCollapsedGroups(prev => ({ ...prev, [g.title]: !prev[g.title] }))}
+                  aria-expanded={!collapsed}
+                >
+                  <Icon size={16} style={{ color: 'var(--primary-700)' }} />
+                  <span style={{ fontWeight: 800 }}>{g.title}</span>
+                  {errCount > 0 && <span className="ff-badge-error">{errCount} ناقص</span>}
+                  <ChevronDown size={16} style={{ marginRight: 'auto', transform: collapsed ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }} />
+                </button>
+                {!collapsed && (
+                <div className="ff-grid">
+            {g.fields.map(field => wrapField(field, g.title, (() => {
               const errorMsg = fieldErrors[field.key];
               const isRequired = isFieldRequired(field, formValues);
               const val = formValues[field.key] !== undefined ? formValues[field.key] : '';
@@ -704,25 +832,40 @@ export default function DynamicFormulaForm({
                   )}
                 </div>
               );
+            })()))}
+                </div>
+                )}
+              </section>
+              );
             })}
           </div>
         </div>
 
-        {/* Validation Alert */}
+        {/* Validation Alert: lists exactly what is missing, each item jumps to its field */}
         {Object.keys(fieldErrors).length > 0 && (
-          <div style={{
-            background: 'var(--status-dismissed-bg, rgba(220, 38, 38, 0.1))',
+          <div role="alert" style={{
+            background: 'rgba(220, 38, 38, 0.08)',
+            border: '1px solid rgba(220, 38, 38, 0.35)',
             color: 'var(--danger, #dc2626)',
             padding: '0.85rem 1rem',
             borderRadius: '8px',
             marginBottom: '1.25rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
             fontSize: '0.88rem'
           }}>
-            <AlertCircle size={18} />
-            <span>يرجى إكمال وتصحيح الحقول المشار إليها باللون الأحمر أعلاه قبل المتابعة.</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, marginBottom: '0.5rem' }}>
+              <AlertCircle size={18} />
+              <span>أكمل البيانات التالية للمتابعة (اضغط على أي بيان للانتقال إليه):</span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+              {Object.keys(fieldErrors).map(k => {
+                const f = (formula?.fields || []).find(x => x.key === k);
+                return (
+                  <button key={k} type="button" className="ff-error-chip" onClick={() => scrollToField(k)}>
+                    {f?.label || k}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 

@@ -1,3 +1,4 @@
+import RowAction, { RowActions } from '../components/common/RowAction';
 import React, { useState } from 'react';
 import {
   ClipboardList,
@@ -219,312 +220,46 @@ export default function AdministrativePage() {
   };
 
   return (
-    <div className="page-wrapper" style={{ maxWidth: '1400px' }}>
-      {/* Top Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '1.25rem',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        borderBottom: '1px solid var(--border-subtle)',
-        paddingBottom: '1rem'
-      }}>
+    <div className="page-wrapper">
+      <div className="page-head">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-gold)' }}></span>
-            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
-              الإدارة والمعاملات ومسار الأعمال الخارجية
-            </span>
-          </div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-            الأعمال الإدارية ودورة حياة المتابعة
-          </h1>
+          <div className="page-eyebrow"><span className="page-dot" />الإدارة والمعاملات ومسار الأعمال الخارجية</div>
+          <h1>الأعمال الإدارية</h1>
         </div>
-
-        <div style={{ display: 'flex', gap: '0.65rem' }}>
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{
-              background: 'var(--primary-800)',
-              color: '#ffffff',
-              borderRadius: '10px',
-              padding: '0.55rem 1.15rem',
-              fontSize: '0.88rem',
-              fontWeight: '700',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              border: '1px solid var(--accent-gold)'
-            }}
-            onClick={handleOpenNew}
-          >
-            <Plus size={17} strokeWidth={2.5} />
+        <div className="page-head-actions">
+          <button type="button" className="btn btn-primary" onClick={handleOpenNew}>
+            <Plus size={16} />
             <span>إضافة عمل إداري</span>
           </button>
         </div>
       </div>
 
-      {/* Action Bar (Search + Add Button) */}
-      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.2rem', alignItems: 'center' }}>
-        <button
-          type="button"
-          className="btn btn-primary"
-          style={{
-            background: 'var(--primary-800)',
-            color: '#ffffff',
-            borderRadius: '12px',
-            padding: '0.75rem 1.4rem',
-            fontSize: '0.95rem',
-            fontWeight: '700',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            flexShrink: 0,
-            boxShadow: '0 4px 14px rgba(55, 4, 10, 0.25)',
-            border: '1px solid var(--accent-gold)'
-          }}
-          onClick={handleOpenNew}
-        >
-          <Plus size={18} strokeWidth={2.5} />
-          <span>إضافة عمل</span>
-        </button>
-
-        <div style={{
-          flex: 1,
-          position: 'relative',
-          display: 'flex',
-          alignItems: 'center',
-          background: 'var(--bg-card)',
-          borderRadius: '12px',
-          border: '1px solid var(--border-color)',
-          boxShadow: 'var(--shadow-sm)',
-          padding: '0 1rem',
-          minHeight: '46px'
-        }}>
-          <Search size={18} style={{ color: 'var(--text-subtle)', flexShrink: 0 }} />
+      <div className="page-toolbar">
+        <div className="fin-search page-search">
+          <Search size={15} />
           <input
             type="text"
+            className="form-input"
             placeholder="ابحث عن عمل إداري، موكل، قضية، أو مكان تنفيذ..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.65rem 0.75rem',
-              fontSize: '0.92rem',
-              color: 'var(--text-main)',
-              border: 'none',
-              outline: 'none',
-              background: 'transparent'
-            }}
           />
-          <Mic size={17} style={{ color: 'var(--text-subtle)', opacity: 0.6, cursor: 'pointer', flexShrink: 0 }} />
         </div>
-      </div>
-
-      {/* Filter Tabs (Pills) */}
-      <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1.2rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        {/* 1. Active Tab */}
-        <button
-          type="button"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            padding: '0.5rem 1.1rem',
-            borderRadius: '24px',
-            fontSize: '0.9rem',
-            fontWeight: '700',
-            cursor: 'pointer',
-            border: filterStatus === 'active' ? '1.5px solid var(--primary-700)' : '1px solid var(--border-color)',
-            background: filterStatus === 'active' ? 'var(--primary-800)' : 'var(--bg-card)',
-            color: filterStatus === 'active' ? '#ffffff' : 'var(--text-main)',
-            boxShadow: filterStatus === 'active' ? '0 3px 10px rgba(55, 4, 10, 0.25)' : 'none',
-            transition: 'all 0.15s ease'
-          }}
-          onClick={() => setFilterStatus('active')}
-        >
-          <Clock size={16} />
-          <span>قيد المتابعة والتنفيذ</span>
-          <span style={{
-            background: filterStatus === 'active' ? 'rgba(255,255,255,0.25)' : 'var(--bg-card-subtle)',
-            padding: '0.1rem 0.5rem',
-            borderRadius: '12px',
-            fontSize: '0.78rem'
-          }}>
-            {activeCount}
-          </span>
-        </button>
-
-        {/* 2. Postponed Tab */}
-        <button
-          type="button"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            padding: '0.5rem 1.1rem',
-            borderRadius: '24px',
-            fontSize: '0.9rem',
-            fontWeight: '700',
-            cursor: 'pointer',
-            border: filterStatus === 'postponed' ? '1.5px solid #ea580c' : '1px solid var(--border-color)',
-            background: filterStatus === 'postponed' ? '#ea580c' : 'var(--bg-card)',
-            color: filterStatus === 'postponed' ? '#ffffff' : 'var(--text-main)',
-            boxShadow: filterStatus === 'postponed' ? '0 3px 10px rgba(234, 88, 12, 0.2)' : 'none',
-            transition: 'all 0.15s ease'
-          }}
-          onClick={() => setFilterStatus('postponed')}
-        >
-          <AlertTriangle size={16} />
-          <span>المؤجلة</span>
-          <span style={{
-            background: filterStatus === 'postponed' ? 'rgba(255,255,255,0.25)' : 'var(--bg-card-subtle)',
-            padding: '0.1rem 0.5rem',
-            borderRadius: '12px',
-            fontSize: '0.78rem'
-          }}>
-            {postponedCount}
-          </span>
-        </button>
-
-        {/* 3. Waiting Tab */}
-        <button
-          type="button"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            padding: '0.5rem 1.1rem',
-            borderRadius: '24px',
-            fontSize: '0.9rem',
-            fontWeight: '700',
-            cursor: 'pointer',
-            border: filterStatus === 'waiting' ? '1.5px solid #7c3aed' : '1px solid var(--border-color)',
-            background: filterStatus === 'waiting' ? '#7c3aed' : 'var(--bg-card)',
-            color: filterStatus === 'waiting' ? '#ffffff' : 'var(--text-main)',
-            boxShadow: filterStatus === 'waiting' ? '0 3px 10px rgba(124, 58, 237, 0.2)' : 'none',
-            transition: 'all 0.15s ease'
-          }}
-          onClick={() => setFilterStatus('waiting')}
-        >
-          <RotateCcw size={16} />
-          <span>بانتظار إجراء</span>
-          <span style={{
-            background: filterStatus === 'waiting' ? 'rgba(255,255,255,0.25)' : 'var(--bg-card-subtle)',
-            padding: '0.1rem 0.5rem',
-            borderRadius: '12px',
-            fontSize: '0.78rem'
-          }}>
-            {waitingCount}
-          </span>
-        </button>
-
-        {/* 4. Completed Tab */}
-        <button
-          type="button"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            padding: '0.5rem 1.1rem',
-            borderRadius: '24px',
-            fontSize: '0.9rem',
-            fontWeight: '700',
-            cursor: 'pointer',
-            border: filterStatus === 'completed' ? '1.5px solid #16a34a' : '1px solid var(--border-color)',
-            background: filterStatus === 'completed' ? '#16a34a' : 'var(--bg-card)',
-            color: filterStatus === 'completed' ? '#ffffff' : 'var(--text-main)',
-            boxShadow: filterStatus === 'completed' ? '0 3px 10px rgba(22, 163, 74, 0.2)' : 'none',
-            transition: 'all 0.15s ease'
-          }}
-          onClick={() => setFilterStatus('completed')}
-        >
-          <CheckCircle2 size={16} />
-          <span>تم التنفيذ</span>
-          <span style={{
-            background: filterStatus === 'completed' ? 'rgba(255,255,255,0.25)' : 'var(--bg-card-subtle)',
-            padding: '0.1rem 0.5rem',
-            borderRadius: '12px',
-            fontSize: '0.78rem'
-          }}>
-            {completedCount}
-          </span>
-        </button>
-
-        {/* 5. Cancelled Tab */}
-        <button
-          type="button"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            padding: '0.5rem 1.1rem',
-            borderRadius: '24px',
-            fontSize: '0.9rem',
-            fontWeight: '700',
-            cursor: 'pointer',
-            border: filterStatus === 'cancelled' ? '1.5px solid #dc2626' : '1px solid var(--border-color)',
-            background: filterStatus === 'cancelled' ? '#dc2626' : 'var(--bg-card)',
-            color: filterStatus === 'cancelled' ? '#ffffff' : 'var(--text-main)',
-            boxShadow: filterStatus === 'cancelled' ? '0 3px 10px rgba(220, 38, 38, 0.2)' : 'none',
-            transition: 'all 0.15s ease'
-          }}
-          onClick={() => setFilterStatus('cancelled')}
-        >
-          <Ban size={16} />
-          <span>ملغاة</span>
-          <span style={{
-            background: filterStatus === 'cancelled' ? 'rgba(255,255,255,0.25)' : 'var(--bg-card-subtle)',
-            padding: '0.1rem 0.5rem',
-            borderRadius: '12px',
-            fontSize: '0.78rem'
-          }}>
-            {cancelledCount}
-          </span>
-        </button>
-
-        {/* 6. All Tab */}
-        <button
-          type="button"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            padding: '0.5rem 1.1rem',
-            borderRadius: '24px',
-            fontSize: '0.9rem',
-            fontWeight: '700',
-            cursor: 'pointer',
-            border: filterStatus === 'all' ? '1.5px solid var(--primary-700)' : '1px solid var(--border-color)',
-            background: filterStatus === 'all' ? 'var(--primary-800)' : 'var(--bg-card)',
-            color: filterStatus === 'all' ? '#ffffff' : 'var(--text-main)',
-            boxShadow: filterStatus === 'all' ? '0 3px 10px rgba(55, 4, 10, 0.25)' : 'none',
-            transition: 'all 0.15s ease'
-          }}
-          onClick={() => setFilterStatus('all')}
-        >
-          <ListFilter size={16} />
-          <span>الكل</span>
-          <span style={{
-            background: filterStatus === 'all' ? 'rgba(255,255,255,0.25)' : 'var(--bg-card-subtle)',
-            padding: '0.1rem 0.5rem',
-            borderRadius: '12px',
-            fontSize: '0.78rem'
-          }}>
-            {totalCount}
-          </span>
-        </button>
-      </div>
-
-      {/* Task Count indicator */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem', fontWeight: '600' }}>
-        <span style={{ background: 'var(--primary-100)', color: 'var(--primary-800)', padding: '0.15rem 0.6rem', borderRadius: '12px', fontWeight: '800' }}>
-          {filteredTasks.length}
-        </span>
-        <span>أعمال إدارية معروضة</span>
+        <div className="seg-tabs">
+          {[
+            { id: 'active', label: 'قيد المتابعة', count: activeCount },
+            { id: 'postponed', label: 'المؤجلة', count: postponedCount },
+            { id: 'waiting', label: 'بانتظار إجراء', count: waitingCount },
+            { id: 'completed', label: 'تم التنفيذ', count: completedCount },
+            { id: 'cancelled', label: 'ملغاة', count: cancelledCount },
+            { id: 'all', label: 'الكل', count: totalCount },
+          ].map(t => (
+            <button key={t.id} type="button" className={`seg-tab ${filterStatus === t.id ? 'is-active' : ''}`} onClick={() => setFilterStatus(t.id)}>
+              <span>{t.label}</span>
+              <span className="seg-count">{t.count}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Task List or Empty State */}
@@ -566,7 +301,7 @@ export default function AdministrativePage() {
           <button
             type="button"
             className="btn btn-primary"
-            style={{ background: 'var(--primary-800)', borderRadius: '10px', padding: '0.6rem 1.4rem', fontWeight: '700' }}
+            style={{ background: 'var(--accent)', borderRadius: '10px', padding: '0.6rem 1.4rem', fontWeight: '700' }}
             onClick={handleOpenNew}
           >
             <Plus size={16} />
@@ -598,7 +333,7 @@ export default function AdministrativePage() {
                 key={task.id}
                 style={{
                   background: 'var(--bg-card)',
-                  border: isDone ? '1px solid #dcfce7' : (isCancelled ? '1px solid #fee2e2' : '1px solid var(--border-color)'),
+                  border: isDone ? '1px solid var(--status-active)' : (isCancelled ? '1px solid var(--status-dismissed)' : '1px solid var(--border-color)'),
                   borderRadius: '14px',
                   padding: '1.2rem',
                   boxShadow: 'var(--shadow-sm)',
@@ -634,7 +369,7 @@ export default function AdministrativePage() {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.35rem',
-                        background: '#eff6ff',
+                        background: 'var(--status-prelim-bg)',
                         color: '#1d4ed8',
                         padding: '0.25rem 0.6rem',
                         borderRadius: '8px',
@@ -707,7 +442,7 @@ export default function AdministrativePage() {
                         fontSize: '0.72rem',
                         fontWeight: '800',
                         color: '#c2410c',
-                        background: '#fff7ed',
+                        background: 'var(--status-adjourned-bg)',
                         padding: '0.1rem 0.45rem',
                         borderRadius: '6px',
                         border: '1px solid #ffedd5'
@@ -770,8 +505,8 @@ export default function AdministrativePage() {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.4rem',
-                        background: 'var(--primary-800)',
-                        color: '#ffffff',
+                        background: 'var(--accent)',
+                        color: 'var(--on-accent)',
                         border: '1px solid var(--accent-gold)',
                         padding: '0.38rem 0.85rem',
                         borderRadius: '8px',
@@ -820,49 +555,16 @@ export default function AdministrativePage() {
                     </button>
                   </div>
 
-                  {/* Right side icon actions */}
-                  <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-                    {/* Quick Toggle Done/Reopen */}
-                    <button
-                      type="button"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '8px',
-                        border: isDone ? '1px solid #fecaca' : '1px solid #bbf7d0',
-                        background: isDone ? '#fef2f2' : '#f0fdf4',
-                        color: isDone ? '#dc2626' : '#16a34a',
-                        cursor: 'pointer'
-                      }}
-                      title={isDone ? 'إعادة المهمة للتنفيذ' : 'إتمام العمل بنجاح'}
+                  <RowActions>
+                    <RowAction
+                      icon={isDone ? RotateCcw : Check}
+                      label={isDone ? 'إعادة المهمة للتنفيذ' : 'إتمام العمل بنجاح'}
+                      tone={isDone ? undefined : 'primary'}
                       onClick={() => toggleAdminTaskStatus(task.id)}
-                    >
-                      {isDone ? <RotateCcw size={14} /> : <Check size={14} strokeWidth={3} />}
-                    </button>
-
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-icon"
-                      style={{ width: '32px', height: '32px', padding: 0, borderRadius: '8px' }}
-                      title="تعديل البيانات الأساسية"
-                      onClick={() => handleOpenEdit(task)}
-                    >
-                      <Edit3 size={14} />
-                    </button>
-
-                    <button
-                      type="button"
-                      className="btn btn-danger btn-icon"
-                      style={{ width: '32px', height: '32px', padding: 0, borderRadius: '8px' }}
-                      title="حذف"
-                      onClick={() => handleDelete(task.id)}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+                    />
+                    <RowAction icon={Edit3} label="تعديل البيانات الأساسية" onClick={() => handleOpenEdit(task)} />
+                    <RowAction icon={Trash2} label="حذف" tone="danger" onClick={() => handleDelete(task.id)} />
+                  </RowActions>
                 </div>
 
                 {/* ========================================================================= */}
@@ -1015,7 +717,7 @@ export default function AdministrativePage() {
                                   <div style={{
                                     fontSize: '0.78rem',
                                     color: '#c2410c',
-                                    background: '#fff7ed',
+                                    background: 'var(--status-adjourned-bg)',
                                     padding: '0.25rem 0.5rem',
                                     borderRadius: '6px',
                                     display: 'flex',
@@ -1083,30 +785,24 @@ export default function AdministrativePage() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-icon"
-                  style={{ width: '34px', height: '34px', padding: 0, borderRadius: '8px' }}
-                  onClick={() => setIsModalOpen(false)}
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
+            <div className="modal-header">
+              <h3>
                   {editingTask ? 'تعديل العمل الإداري' : 'إضافة عمل إداري جديد'}
                 </h3>
-              </div>
-
-              <button
+              <div className="modal-header-actions">
+                <button
                 type="button"
                 className="btn btn-secondary btn-icon"
-                style={{ width: '34px', height: '34px', padding: 0, borderRadius: '8px' }}
                 title="إعادة تعيين الحقول"
+                aria-label="إعادة تعيين الحقول"
                 onClick={handleResetForm}
               >
                 <RotateCcw size={16} />
               </button>
+                <button type="button" className="btn btn-secondary btn-icon" title="إغلاق" aria-label="إغلاق" onClick={() => setIsModalOpen(false)}>
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             {/* Modal Body / Form */}
@@ -1275,7 +971,7 @@ export default function AdministrativePage() {
                   type="submit"
                   disabled={isSaving}
                   className="btn btn-primary"
-                  style={{ background: 'var(--primary-800)', color: '#ffffff', borderRadius: '10px', padding: '0.6rem 1.6rem', fontWeight: '700', border: '1px solid var(--accent-gold)' }}
+                  style={{ background: 'var(--accent)', color: 'var(--on-accent)', borderRadius: '10px', padding: '0.6rem 1.6rem', fontWeight: '700', border: '1px solid var(--accent-gold)' }}
                 >
                   {isSaving ? 'جاري الحفظ...' : (editingTask ? 'تحديث العمل الإداري' : 'حفظ العمل الإداري')}
                 </button>

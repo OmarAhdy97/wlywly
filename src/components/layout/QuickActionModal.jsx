@@ -5,7 +5,7 @@ import { CASE_TYPES, COURT_LEVELS, CASE_STATUSES, SESSION_DECISIONS } from '../.
 
 export default function QuickActionModal({ isOpen, onClose, initialMode = 'case' }) {
   const [activeMode, setActiveMode] = useState(initialMode);
-  const { clients, cases, addCase, addClient, addSession, addTeamMember } = useData();
+  const { clients, cases, addCase, addClient, addSession, addTeamMember, addTransaction } = useData();
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -79,16 +79,28 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
     e.preventDefault();
     setLoading(true);
     try {
-      await addClient({
+      const created = await addClient({
         name: clientName,
         phone: clientPhone || null,
         national_id: clientNationalId || null,
         power_of_attorney_number: clientPoaNumber || null,
         power_of_attorney_type: clientPoaType || null,
-        financial_balance: parseFloat(financialBalance) || 0,
+        financial_balance: 0,
         is_power_of_attorney_active: true,
         active_cases_count: 0,
       });
+
+      // The opening balance is recorded as a ledger entry so the card and the statement agree
+      const opening = parseFloat(financialBalance) || 0;
+      const newClientId = Array.isArray(created) ? created[0]?.id : created?.id;
+      if (opening !== 0 && newClientId) {
+        await addTransaction({
+          client_id: newClientId,
+          type: opening < 0 ? 'fee' : 'advance',
+          amount: Math.abs(opening),
+          description: opening < 0 ? 'رصيد افتتاحي مستحق على الموكل' : 'رصيد افتتاحي دائن للموكل',
+        });
+      }
       setSuccessMsg('تمت إضافة الموكل بنجاح!');
       setTimeout(() => {
         setSuccessMsg('');

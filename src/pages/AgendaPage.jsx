@@ -130,8 +130,8 @@ export default function AgendaPage() {
                   borderRadius: '6px',
                   border: 'none',
                   cursor: 'pointer',
-                  background: mobileViewMode === 'card' ? 'var(--primary-800)' : 'transparent',
-                  color: mobileViewMode === 'card' ? '#ffffff' : 'var(--text-muted)'
+                  background: mobileViewMode === 'card' ? 'var(--accent)' : 'transparent',
+                  color: mobileViewMode === 'card' ? 'var(--on-accent)' : 'var(--text-muted)'
                 }}
                 onClick={() => setMobileViewMode('card')}
               >
@@ -146,8 +146,8 @@ export default function AgendaPage() {
                   borderRadius: '6px',
                   border: 'none',
                   cursor: 'pointer',
-                  background: mobileViewMode === 'table' ? 'var(--primary-800)' : 'transparent',
-                  color: mobileViewMode === 'table' ? '#ffffff' : 'var(--text-muted)'
+                  background: mobileViewMode === 'table' ? 'var(--accent)' : 'transparent',
+                  color: mobileViewMode === 'table' ? 'var(--on-accent)' : 'var(--text-muted)'
                 }}
                 onClick={() => setMobileViewMode('table')}
               >
@@ -246,7 +246,7 @@ export default function AgendaPage() {
             color: '#4f0810',
             flexWrap: 'wrap',
           }}>
-            <span>إجمالي الجلسات: <strong style={{ color: '#37040a', background: '#ffffff', padding: '0.15rem 0.5rem' }}>{filteredCases.length} قضية</strong></span>
+            <span>إجمالي الجلسات: <strong style={{ color: 'var(--text-main)', background: 'var(--bg-card)', padding: '0.15rem 0.5rem' }}>{filteredCases.length} قضية</strong></span>
             <span>المحامي الحاضر: <strong style={{ color: '#37040a' }}>{officeProfile?.lawyer_name ? `أ/ ${officeProfile.lawyer_name}` : '.....................'}</strong></span>
             <span>القاعة / الرول: <strong style={{ color: '#37040a' }}>.....................</strong></span>
           </div>

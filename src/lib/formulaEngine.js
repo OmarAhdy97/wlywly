@@ -198,7 +198,23 @@ export function generateDocumentContent(formula, formValues = {}, context = {}) 
       val = val ? 'نعم' : 'لا';
     }
 
-    template = template.replaceAll(placeholder, String(val).trim());
+    let text = String(val).trim();
+    // dates are entered as yyyy-mm-dd but court papers write them day/month/year
+    const isoDate = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (field.type === 'date' && isoDate) text = `${isoDate[3]}/${isoDate[2]}/${isoDate[1]}`;
+    if (text === '' && !field.required) {
+      // An optional field left empty: drop a line that holds only that field,
+      // otherwise leave a visible dotted blank for the lawyer to fill by hand.
+      const lineOnly = new RegExp(`^[ \\t]*\\{\\{${field.key}\\}\\}[ \\t]*\\n?`, 'm');
+      if (lineOnly.test(template)) {
+        template = template.replace(lineOnly, '');
+        return;
+      }
+      template = template.replaceAll(placeholder, '..........');
+      return;
+    }
+
+    template = template.replaceAll(placeholder, text);
   });
 
   // 3. Replace entity dot-notations if present in template
@@ -300,6 +316,8 @@ export function generateDocumentModel(formula, formValues = {}, context = {}, se
     content: result.content,
     metadata: {
       ...createFormulaSnapshot(formula),
+      layout: formula.layout || 'plain',
+      subject: formula.subject || null,
       status: 'generated',
     },
     header: headerData,

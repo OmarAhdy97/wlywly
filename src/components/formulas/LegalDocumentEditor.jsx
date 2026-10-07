@@ -444,6 +444,7 @@ export default function LegalDocumentEditor({
         {/* The Authentic A4 Page */}
         <div
           id="legal-document-print-area"
+          className="legal-editor-sheet"
           style={{
             width: '100%',
             maxWidth: '820px',

@@ -20,9 +20,9 @@ export const ADMIN_TASK_STATUSES = {
   pending: {
     key: 'pending',
     label: 'قيد الانتظار',
-    color: '#64748b',
-    bg: '#f1f5f9',
-    border: '#cbd5e1',
+    color: 'var(--status-settled)',
+    bg: 'var(--status-settled-bg)',
+    border: 'transparent',
     icon: Clock
   },
   in_progress: {
@@ -36,33 +36,33 @@ export const ADMIN_TASK_STATUSES = {
   postponed: {
     key: 'postponed',
     label: 'تأجيل',
-    color: '#c2410c',
-    bg: '#fff7ed',
-    border: '#ffedd5',
+    color: 'var(--status-adjourned)',
+    bg: 'var(--status-adjourned-bg)',
+    border: 'transparent',
     icon: AlertTriangle
   },
   waiting: {
     key: 'waiting',
     label: 'بانتظار إجراء',
-    color: '#7c3aed',
-    bg: '#f5f3ff',
-    border: '#ddd6fe',
+    color: 'var(--status-reserved)',
+    bg: 'var(--status-reserved-bg)',
+    border: 'transparent',
     icon: RotateCcw
   },
   completed: {
     key: 'completed',
     label: 'تم التنفيذ',
-    color: '#15803d',
-    bg: '#f0fdf4',
-    border: '#bbf7d0',
+    color: 'var(--status-active)',
+    bg: 'var(--status-active-bg)',
+    border: 'transparent',
     icon: CheckCircle2
   },
   cancelled: {
     key: 'cancelled',
     label: 'إلغاء',
-    color: '#dc2626',
-    bg: '#fef2f2',
-    border: '#fecaca',
+    color: 'var(--status-dismissed)',
+    bg: 'var(--status-dismissed-bg)',
+    border: 'transparent',
     icon: Ban
   }
 };
@@ -214,11 +214,11 @@ export default function AdministrativeTaskUpdateModal({
                 width: '36px',
                 height: '36px',
                 borderRadius: '10px',
-                background: 'var(--primary-800)',
+                background: 'var(--accent)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#ffffff',
+                color: 'var(--on-accent)',
                 border: '1px solid var(--accent-gold)'
               }}
             >
@@ -335,8 +335,8 @@ export default function AdministrativeTaskUpdateModal({
           {errorMessage && (
             <div
               style={{
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
+                background: 'var(--status-dismissed-bg)',
+                border: '1px solid transparent',
                 borderRadius: '10px',
                 padding: '0.75rem 0.9rem',
                 display: 'flex',
@@ -403,7 +403,7 @@ export default function AdministrativeTaskUpdateModal({
             {newStatus === 'postponed' && (
               <div
                 style={{
-                  background: '#fff7ed',
+                  background: 'var(--status-adjourned-bg)',
                   border: '1px solid #ffedd5',
                   borderRadius: '10px',
                   padding: '0.65rem 0.85rem',
@@ -586,8 +586,8 @@ export default function AdministrativeTaskUpdateModal({
                 className="btn btn-primary"
                 disabled={isSaving}
                 style={{
-                  background: 'var(--primary-800)',
-                  color: '#ffffff',
+                  background: 'var(--accent)',
+                  color: 'var(--on-accent)',
                   borderRadius: '8px',
                   padding: '0.55rem 1.4rem',
                   fontWeight: '800',

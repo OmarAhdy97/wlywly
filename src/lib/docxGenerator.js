@@ -183,6 +183,51 @@ function createTable(tableData) {
 }
 
 /**
+ * Two-cell table: opening paragraphs (right in RTL) beside the framed
+ * «الموضوع» box (left), as on the office's court papers.
+ */
+function createOpeningWithSubjectBox(openingElements, subject, settings = {}) {
+  const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+  const line = { style: BorderStyle.SINGLE, size: 8, color: '000000' };
+  const noBorders = { top: none, bottom: none, left: none, right: none };
+  const openingChildren = openingElements.flatMap(el => elementToDocx(
+    { ...el, type: 'paragraph', align: 'right' }, settings));
+  const boxPara = (text, opts = {}) => new Paragraph({
+    alignment: AlignmentType.CENTER,
+    bidirectional: true,
+    spacing: { before: 60, after: 60 },
+    children: [createTextRun(text, { bold: opts.bold, size: opts.size || 26 })],
+  });
+  const boxRow = (children, borders, fill) => new TableRow({
+    children: [new TableCell({ children, borders, shading: fill ? { fill } : undefined, verticalAlign: 'center' })],
+  });
+  const box = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    layout: TableLayoutType.FIXED,
+    visuallyRightToLeft: true,
+    borders: { top: line, bottom: line, left: line, right: line, insideHorizontal: line, insideVertical: none },
+    rows: [
+      boxRow([boxPara('الموضوع', { bold: true })], undefined, 'F3F4F6'),
+      boxRow([boxPara(subject, { bold: true })]),
+      boxRow([boxPara('المحامي', { size: 22 })]),
+    ],
+  });
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    layout: TableLayoutType.FIXED,
+    visuallyRightToLeft: true,
+    borders: { ...noBorders, insideHorizontal: none, insideVertical: none },
+    columnWidths: [7000, 2400],
+    rows: [new TableRow({
+      children: [
+        new TableCell({ children: openingChildren, borders: noBorders, width: { size: 74, type: WidthType.PERCENTAGE } }),
+        new TableCell({ children: [box], borders: noBorders, width: { size: 26, type: WidthType.PERCENTAGE } }),
+      ],
+    })],
+  });
+}
+
+/**
  * Creates a signature section.
  */
 function createSignatureSection(label) {
@@ -245,6 +290,52 @@ function buildDocxHeader(headerData) {
   }));
 
   return new Header({ children });
+}
+
+function emptyHeader() {
+  return new Header({ children: [new Paragraph({ children: [] })] });
+}
+
+function emptyFooter() {
+  return new Footer({ children: [new Paragraph({ children: [] })] });
+}
+
+/**
+ * Letterhead for court papers: contact details on the right, office name and
+ * title on the left, rule underneath — the same arrangement as the on-screen paper.
+ */
+function buildCourtLetterhead(headerData) {
+  const none = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+  const noBorders = { top: none, bottom: none, left: none, right: none };
+  const line = (text, opts = {}) => new Paragraph({
+    alignment: opts.align || AlignmentType.RIGHT,
+    bidirectional: true,
+    spacing: { after: 20 },
+    children: [createTextRun(text, { size: opts.size || 20, bold: opts.bold, color: opts.color || '37040a' })],
+  });
+  const contact = [headerData.address, headerData.phone, headerData.email].filter(Boolean).map(t => line(t, { size: 18 }));
+  const identity = [
+    line(headerData.officeName || 'مكتب المحاماة', { size: 30, bold: true, align: AlignmentType.CENTER }),
+    line(headerData.lawyerTitle || 'محامون ومستشارون قانونيون', { size: 20, align: AlignmentType.CENTER, color: '6d0f1b' }),
+  ];
+  const table = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    layout: TableLayoutType.FIXED,
+    visuallyRightToLeft: true,
+    borders: { ...noBorders, insideHorizontal: none, insideVertical: none },
+    rows: [new TableRow({
+      children: [
+        new TableCell({ children: contact.length ? contact : [line(' ')], borders: noBorders, verticalAlign: 'center', width: { size: 45, type: WidthType.PERCENTAGE } }),
+        new TableCell({ children: identity, borders: noBorders, verticalAlign: 'center', width: { size: 55, type: WidthType.PERCENTAGE } }),
+      ],
+    })],
+  });
+  const rule = new Paragraph({
+    spacing: { before: 60, after: 160 },
+    border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: '37040a' } },
+    children: [createTextRun(' ', { size: 4 })],
+  });
+  return new Header({ children: [table, rule] });
 }
 
 /**
@@ -351,13 +442,25 @@ export async function generateDocx(docModel) {
 
   // Convert all body elements to docx elements
   const docxChildren = [];
-  for (const element of body) {
+  let bodyElements = body;
+  if (metadata.layout === 'announcement' && metadata.subject) {
+    // Court-paper layout: the «الموضوع» box sits beside the opening block.
+    let cut = body.findIndex(el => /^\s*(وأعلنته|وأنذرته|وأعلنتهما)/.test(el.text || ''));
+    if (cut < 0) cut = Math.min(5, body.length);
+    docxChildren.push(createOpeningWithSubjectBox(body.slice(0, cut), metadata.subject, settings));
+    docxChildren.push(new Paragraph({ spacing: { after: 120 }, children: [] }));
+    bodyElements = body.slice(cut);
+  }
+  for (const element of bodyElements) {
     const converted = elementToDocx(element, settings);
     docxChildren.push(...converted);
   }
 
+  const isCourtPaper = metadata.layout === 'announcement';
+
   // Add signature footer if present and not already in body
-  if (footer && footer.signatureLabel) {
+  // (court papers end with «ولأجل العلم/», so no extra date or signature line)
+  if (!isCourtPaper && footer && footer.signatureLabel) {
     const hasSignatureInBody = body.some(el => el.type === 'signature');
     if (!hasSignatureInBody) {
       docxChildren.push(createSignatureSection(footer.signatureLabel));
@@ -365,7 +468,7 @@ export async function generateDocx(docModel) {
   }
 
   // Add document date
-  if (footer && footer.date) {
+  if (!isCourtPaper && footer && footer.date) {
     docxChildren.push(new Paragraph({
       alignment: AlignmentType.RIGHT,
       bidirectional: true,
@@ -425,9 +528,15 @@ export async function generateDocx(docModel) {
           },
         },
         bidi: true,
+        titlePage: isCourtPaper,
       },
-      headers: header ? { default: buildDocxHeader(header) } : undefined,
-      footers: { default: buildDocxFooter(footer) },
+      headers: isCourtPaper
+        // letterhead on the first page only, as on the office's printed paper
+        ? { first: header ? buildCourtLetterhead(header) : emptyHeader(), default: emptyHeader() }
+        : (header ? { default: buildDocxHeader(header) } : undefined),
+      footers: isCourtPaper
+        ? { first: emptyFooter(), default: buildDocxFooter({ ...footer, disclaimer: null }) }
+        : { default: buildDocxFooter(footer) },
       children: docxChildren,
     }]
   });

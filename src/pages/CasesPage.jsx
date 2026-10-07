@@ -25,6 +25,7 @@ import {
 import { useData } from '../context/DataContext';
 import { CASE_TYPES, COURT_LEVELS, CASE_STATUSES, SESSION_DECISIONS, USER_ROLES } from '../lib/supabase';
 import SessionDecisionModal from '../components/common/SessionDecisionModal';
+import RowAction, { RowActions } from '../components/common/RowAction';
 
 export default function CasesPage() {
   const { cases, clients, sessions, team, adminTasks, adminTaskUpdates, appeals, updateCase, deleteCase } = useData();
@@ -188,12 +189,12 @@ export default function CasesPage() {
               <thead>
                 <tr>
                   <th>رقم الدعوى والسنة</th>
-                  <th style={{ minWidth: '170px', maxWidth: '250px' }}>موضوع الدعوى</th>
+                  <th className="cell-wide">موضوع الدعوى</th>
                   <th>المحكمة / الدائرة</th>
                   <th>المدعي والمدعى عليه</th>
-                  <th>الجلسة القادمة</th>
-                  <th>الحالة</th>
-                  <th style={{ textAlign: 'center' }}>الإجراءات</th>
+                  <th className="cell-center">الجلسة القادمة</th>
+                  <th className="cell-center">الحالة</th>
+                  <th className="cell-actions">الإجراءات</th>
                 </tr>
               </thead>
               <tbody>
@@ -202,80 +203,53 @@ export default function CasesPage() {
                   return (
                     <tr key={c.id}>
                       <td>
-                        <strong style={{ fontSize: '1rem', color: 'var(--primary-700)' }}>{c.case_number}</strong> / {c.case_year}
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{CASE_TYPES[c.case_type] || c.case_type}</div>
-                      </td>
-                      <td style={{ minWidth: '170px', maxWidth: '250px', whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                        <div className="case-title-cell" title={c.case_title || ''}>
-                          {c.case_title || '—'}
+                        <div className="cell-stack">
+                          <span className="case-no"><strong>{c.case_number}</strong> / {c.case_year}</span>
+                          <span className="cell-sub">{CASE_TYPES[c.case_type] || c.case_type}</span>
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{COURT_LEVELS[c.court_level] || c.court_level}</div>
                       </td>
-                      <td>
-                        <div>{c.court_name}</div>
-                        {c.court_room && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>الدائرة: {c.court_room}</div>}
-                      </td>
-                      <td>
-                        <div><strong>المدعي:</strong> {c.plaintiff_name}</div>
-                        <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}><strong>المدعى عليه:</strong> {c.defendant_name}</div>
-                      </td>
-                      <td>
-                        {c.next_session_date ? (
-                          <div style={{ fontWeight: '600', color: 'var(--primary-600)' }}>
-                            {new Date(c.next_session_date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}
-                          </div>
-                        ) : (
-                          <span style={{ color: 'var(--text-subtle)', fontSize: '0.85rem' }}>غير محدد</span>
-                        )}
-                      </td>
-                      <td>
-                        <span className="badge" style={{ background: st.bg, color: st.color }}>
-                          {st.label}
-                        </span>
-                      </td>
-                      <td style={{ textAlign: 'center' }}>
-                        <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
-                          <button
-                            className="btn btn-secondary btn-icon"
-                            style={{ width: '32px', height: '32px', padding: 0 }}
-                            title="عرض التفاصيل وتاريخ القضية"
-                            onClick={() => setSelectedCase(c)}
-                          >
-                            <Eye size={15} />
-                          </button>
-                          <button
-                            className="btn btn-secondary btn-icon"
-                            style={{ width: '32px', height: '32px', padding: 0 }}
-                            title="تسجيل قرار / تأجيل"
-                            onClick={() => handleOpenDecision(c)}
-                          >
-                            <Clock size={15} color="var(--primary-600)" />
-                          </button>
-                          <button
-                            className="btn btn-secondary btn-icon"
-                            style={{ width: '32px', height: '32px', padding: 0 }}
-                            title="تعديل القضية"
-                            onClick={() => setEditingCase({ ...c })}
-                          >
-                            <Edit3 size={15} />
-                          </button>
-                          <button
-                            className="btn btn-secondary btn-icon"
-                            style={{ width: '32px', height: '32px', padding: 0 }}
-                            title="نقل للأرشيف"
-                            onClick={() => handleArchiveCase(c.id)}
-                          >
-                            <Archive size={15} />
-                          </button>
-                          <button
-                            className="btn btn-danger btn-icon"
-                            style={{ width: '32px', height: '32px', padding: 0 }}
-                            title="حذف"
-                            onClick={() => handleDeleteCase(c.id)}
-                          >
-                            <Trash2 size={15} />
-                          </button>
+                      <td className="cell-wide">
+                        <div className="cell-stack">
+                          <div className="case-title-cell" title={c.case_title || ''}>{c.case_title || '—'}</div>
+                          <span className="cell-sub">{COURT_LEVELS[c.court_level] || c.court_level}</span>
                         </div>
+                      </td>
+                      <td>
+                        <div className="cell-stack">
+                          <span>{c.court_name}</span>
+                          {c.court_room && <span className="cell-sub">الدائرة: {c.court_room}</span>}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="cell-stack">
+                          <span><b>المدعي:</b> {c.plaintiff_name}</span>
+                          <span className="cell-sub"><b>المدعى عليه:</b> {c.defendant_name}</span>
+                        </div>
+                      </td>
+                      <td className="cell-center">
+                        <div className="cell-stack">
+                          {c.next_session_date ? (
+                            <span className="cell-date">
+                              {new Date(c.next_session_date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}
+                            </span>
+                          ) : (
+                            <span className="cell-sub">غير محدد</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="cell-center">
+                        <div className="cell-stack">
+                          <span className="badge" style={{ background: st.bg, color: st.color }}>{st.label}</span>
+                        </div>
+                      </td>
+                      <td className="cell-actions">
+                        <RowActions>
+                          <RowAction icon={Eye} label="عرض التفاصيل وتاريخ القضية" onClick={() => setSelectedCase(c)} />
+                          <RowAction icon={Gavel} label="تسجيل قرار / تأجيل" tone="primary" onClick={() => handleOpenDecision(c)} />
+                          <RowAction icon={Edit3} label="تعديل القضية" onClick={() => setEditingCase({ ...c })} />
+                          <RowAction icon={Archive} label="نقل للأرشيف" onClick={() => handleArchiveCase(c.id)} />
+                          <RowAction icon={Trash2} label="حذف" tone="danger" onClick={() => handleDeleteCase(c.id)} />
+                        </RowActions>
                       </td>
                     </tr>
                   );
@@ -368,7 +342,7 @@ export default function CasesPage() {
               {/* Modal Header */}
               <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'var(--primary-800)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', flexShrink: 0 }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-accent)', flexShrink: 0 }}>
                     <Scale size={20} />
                   </div>
                   <h3 style={{ fontSize: '1.25rem', fontWeight: '900', margin: 0, color: 'var(--text-main)' }}>
@@ -492,7 +466,7 @@ export default function CasesPage() {
                   <button
                     type="button"
                     className="btn btn-primary"
-                    style={{ background: 'var(--primary-800)', color: '#ffffff', borderRadius: '8px', padding: '0.45rem 1rem', fontSize: '0.88rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
+                    style={{ background: 'var(--accent)', color: 'var(--on-accent)', borderRadius: '8px', padding: '0.45rem 1rem', fontSize: '0.88rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
                     onClick={() => handleOpenDecision(current)}
                   >
                     <Plus size={16} />
@@ -512,7 +486,7 @@ export default function CasesPage() {
                 ) : (
                   <div style={{ position: 'relative', paddingRight: '26px' }}>
                     {/* Continuous vertical dashed line */}
-                    <div style={{ position: 'absolute', right: '9px', top: '16px', bottom: '16px', width: '2px', background: '#e2e8f0', borderRight: '2px dashed #cbd5e1' }} />
+                    <div style={{ position: 'absolute', right: '9px', top: '16px', bottom: '16px', width: '2px', background: 'var(--border-color)', borderRight: '2px dashed var(--border-color)' }} />
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
                       {timelineItems.map((item, idx) => {
@@ -521,69 +495,54 @@ export default function CasesPage() {
                         const isAdminTask = item.type === 'admin_task';
                         const isAdminTaskMilestone = item.type === 'admin_task_milestone';
 
+                        // colours come from the project status tokens so the timeline follows the theme
+                        const TONES = {
+                          adjourned: ['--status-adjourned', '--status-adjourned-bg'],
+                          final: ['--status-judgment', '--status-judgment-bg'],
+                          prelim: ['--status-prelim', '--status-prelim-bg'],
+                          appeal: ['--status-reserved', '--status-reserved-bg'],
+                          admin: ['--accent-gold', '--accent-gold-bg'],
+                          done: ['--status-active', '--status-active-bg'],
+                          cancelled: ['--status-dismissed', '--status-dismissed-bg'],
+                          scheduled: ['--status-settled', '--status-settled-bg'],
+                        };
                         let statusBadgeText = 'مؤجلة';
-                        let statusBadgeBg = '#fff7ed';
-                        let statusBadgeColor = '#c2410c';
-                        let statusBadgeBorder = '#ffedd5';
-                        let nodeColor = '#ea580c';
+                        let tone = 'adjourned';
 
                         if (item.status === 'finalJudgment') {
                           statusBadgeText = 'حكم نهائي';
-                          statusBadgeBg = '#f0fdf4';
-                          statusBadgeColor = '#15803d';
-                          statusBadgeBorder = '#dcfce7';
-                          nodeColor = '#15803d';
+                          tone = 'final';
                         } else if (item.status === 'preliminaryJudgment') {
                           statusBadgeText = 'حكم تمهيدي';
-                          statusBadgeBg = '#eff6ff';
-                          statusBadgeColor = '#1d4ed8';
-                          statusBadgeBorder = '#dbeafe';
-                          nodeColor = '#1d4ed8';
+                          tone = 'prelim';
                         } else if (isAppeal) {
                           statusBadgeText = 'متابعة استئناف';
-                          statusBadgeBg = '#eff6ff';
-                          statusBadgeColor = '#1e40af';
-                          statusBadgeBorder = '#bfdbfe';
-                          nodeColor = '#2563eb';
+                          tone = 'appeal';
                         } else if (isAdminTask) {
                           statusBadgeText = 'عمل إداري';
-                          statusBadgeBg = '#fffbeb';
-                          statusBadgeColor = '#b45309';
-                          statusBadgeBorder = '#fef3c7';
-                          nodeColor = '#d97706';
+                          tone = 'admin';
                         } else if (isAdminTaskMilestone) {
                           if (item.status === 'completed') {
                             statusBadgeText = 'إتمام عمل إداري';
-                            statusBadgeBg = '#f0fdf4';
-                            statusBadgeColor = '#15803d';
-                            statusBadgeBorder = '#dcfce7';
-                            nodeColor = '#15803d';
+                            tone = 'done';
                           } else if (item.status === 'postponed') {
                             statusBadgeText = 'تأجيل عمل إداري';
-                            statusBadgeBg = '#fff7ed';
-                            statusBadgeColor = '#c2410c';
-                            statusBadgeBorder = '#ffedd5';
-                            nodeColor = '#ea580c';
+                            tone = 'adjourned';
                           } else if (item.status === 'cancelled') {
                             statusBadgeText = 'إلغاء عمل إداري';
-                            statusBadgeBg = '#fef2f2';
-                            statusBadgeColor = '#dc2626';
-                            statusBadgeBorder = '#fecaca';
-                            nodeColor = '#dc2626';
+                            tone = 'cancelled';
                           } else {
                             statusBadgeText = 'متابعة إدارية';
-                            statusBadgeBg = '#eff6ff';
-                            statusBadgeColor = '#0284c7';
-                            statusBadgeBorder = '#bae6fd';
-                            nodeColor = '#0284c7';
+                            tone = 'prelim';
                           }
                         } else if (item.status === 'scheduled') {
                           statusBadgeText = 'جلسة قادمة';
-                          statusBadgeBg = '#f1f5f9';
-                          statusBadgeColor = '#475569';
-                          statusBadgeBorder = '#e2e8f0';
-                          nodeColor = '#64748b';
+                          tone = 'scheduled';
                         }
+                        const statusBadgeColor = `var(${TONES[tone][0]})`;
+                        const statusBadgeBg = `var(${TONES[tone][1]})`;
+                        const statusBadgeBorder = 'transparent';
+                        const nodeColor = statusBadgeColor;
 
                         const itemDateStr = item.date
                           ? new Date(item.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -606,11 +565,11 @@ export default function CasesPage() {
                               height: '20px',
                               borderRadius: '50%',
                               background: nodeColor,
-                              color: '#ffffff',
+                              color: 'var(--bg-card)',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              border: '2px solid #ffffff',
+                              border: '2px solid var(--bg-card)',
                               boxShadow: `0 0 0 2px ${nodeColor}`,
                               zIndex: 2
                             }}>
@@ -719,7 +678,7 @@ export default function CasesPage() {
                 <button
                   type="button"
                   className="btn btn-primary"
-                  style={{ background: 'var(--primary-800)', color: '#ffffff', borderRadius: '8px', padding: '0.55rem 1.35rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                  style={{ background: 'var(--accent)', color: 'var(--on-accent)', borderRadius: '8px', padding: '0.55rem 1.35rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                   onClick={() => handleOpenDecision(current)}
                 >
                   <Clock size={16} />

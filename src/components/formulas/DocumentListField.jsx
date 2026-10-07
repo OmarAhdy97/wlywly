@@ -87,6 +87,7 @@ export default function DocumentListField({ value = [], onChange, label = 'قا�
           {items.map((item, index) => (
             <div
               key={index}
+              className="doc-row"
               style={{
                 display: 'grid',
                 gridTemplateColumns: '40px 2fr 1.2fr 1.5fr auto',

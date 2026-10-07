@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Archive, Search, RotateCcw, Trash2, Eye, X, FileText, CheckCircle } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { CASE_TYPES, COURT_LEVELS } from '../lib/supabase';
+import RowAction, { RowActions } from '../components/common/RowAction';
 
 export default function ArchivePage() {
   const { cases, updateCase, deleteCase } = useData();
@@ -94,61 +95,46 @@ export default function ArchivePage() {
               <thead>
                 <tr>
                   <th>رقم الدعوى والسنة</th>
-                  <th style={{ minWidth: '170px', maxWidth: '250px' }}>موضوع الدعوى</th>
+                  <th className="cell-wide">موضوع الدعوى</th>
                   <th>المحكمة</th>
                   <th>المدعي والخصم</th>
                   <th>تاريخ الأرشفة</th>
-                  <th style={{ textAlign: 'center' }}>الإجراءات</th>
+                  <th className="cell-actions">الإجراءات</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(c => (
                   <tr key={c.id}>
                     <td>
-                      <strong style={{ fontSize: '1rem', color: 'var(--primary-700)' }}>{c.case_number}</strong> / {c.case_year}
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{CASE_TYPES[c.case_type] || c.case_type}</div>
-                    </td>
-                    <td style={{ minWidth: '170px', maxWidth: '250px', whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                      <div className="case-title-cell" title={c.case_title || ''}>
-                        {c.case_title || '—'}
+                      <div className="cell-stack">
+                        <span className="case-no"><strong>{c.case_number}</strong> / {c.case_year}</span>
+                        <span className="cell-sub">{CASE_TYPES[c.case_type] || c.case_type}</span>
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{COURT_LEVELS[c.court_level] || c.court_level}</div>
                     </td>
-                    <td>{c.court_name}</td>
-                    <td>
-                      <div>{c.plaintiff_name}</div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>ضد: {c.defendant_name}</div>
-                    </td>
-                    <td>
-                      {c.archive_date ? new Date(c.archive_date).toLocaleDateString('ar-EG') : '—'}
-                    </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
-                        <button 
-                          className="btn btn-secondary btn-icon" 
-                          style={{ width: '32px', height: '32px', padding: 0 }}
-                          title="عرض التفاصيل"
-                          onClick={() => setSelectedCase(c)}
-                        >
-                          <Eye size={15} />
-                        </button>
-                        <button 
-                          className="btn btn-secondary btn-icon" 
-                          style={{ width: '32px', height: '32px', padding: 0 }}
-                          title="استعادة للقضايا النشطة"
-                          onClick={() => handleRestore(c.id)}
-                        >
-                          <RotateCcw size={15} color="var(--primary-600)" />
-                        </button>
-                        <button 
-                          className="btn btn-danger btn-icon" 
-                          style={{ width: '32px', height: '32px', padding: 0 }}
-                          title="حذف نهائي"
-                          onClick={() => handleDelete(c.id)}
-                        >
-                          <Trash2 size={15} />
-                        </button>
+                    <td className="cell-wide">
+                      <div className="cell-stack">
+                        <div className="case-title-cell" title={c.case_title || ''}>{c.case_title || '—'}</div>
+                        <span className="cell-sub">{COURT_LEVELS[c.court_level] || c.court_level}</span>
                       </div>
+                    </td>
+                    <td><div className="cell-stack"><span>{c.court_name}</span></div></td>
+                    <td>
+                      <div className="cell-stack">
+                        <span>{c.plaintiff_name}</span>
+                        <span className="cell-sub">ضد: {c.defendant_name}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="cell-stack">
+                        <span>{c.archive_date ? new Date(c.archive_date).toLocaleDateString('ar-EG') : '—'}</span>
+                      </div>
+                    </td>
+                    <td className="cell-actions">
+                      <RowActions>
+                        <RowAction icon={Eye} label="عرض التفاصيل" onClick={() => setSelectedCase(c)} />
+                        <RowAction icon={RotateCcw} label="استعادة للقضايا النشطة" tone="primary" onClick={() => handleRestore(c.id)} />
+                        <RowAction icon={Trash2} label="حذف نهائي" tone="danger" onClick={() => handleDelete(c.id)} />
+                      </RowActions>
                     </td>
                   </tr>
                 ))}
@@ -164,7 +150,7 @@ export default function ArchivePage() {
           <div className="modal-dialog" style={{ maxWidth: '780px', maxHeight: '92vh', display: 'flex', flexDirection: 'column', borderRadius: '16px', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'var(--primary-800)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ffffff', flexShrink: 0 }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-accent)', flexShrink: 0 }}>
                   <Archive size={20} />
                 </div>
                 <h3 style={{ fontSize: '1.25rem', fontWeight: '900', margin: 0, color: 'var(--text-main)' }}>
@@ -226,7 +212,7 @@ export default function ArchivePage() {
               <button className="btn btn-secondary" style={{ borderRadius: '8px', padding: '0.55rem 1.5rem', fontWeight: '700' }} onClick={() => setSelectedCase(null)}>
                 إغلاق
               </button>
-              <button className="btn btn-primary" style={{ background: 'var(--primary-800)', borderRadius: '8px', padding: '0.55rem 1.35rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }} onClick={() => handleRestore(selectedCase.id)}>
+              <button className="btn btn-primary" style={{ background: 'var(--accent)', borderRadius: '8px', padding: '0.55rem 1.35rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }} onClick={() => handleRestore(selectedCase.id)}>
                 <RotateCcw size={16} />
                 <span>استعادة إلى القضايا المتداولة</span>
               </button>

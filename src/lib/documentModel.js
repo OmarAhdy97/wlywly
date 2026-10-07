@@ -110,6 +110,12 @@ function parseContentToElements(content, tables = []) {
       continue;
     }
 
+    // «## عنوان» → centred title (contract title)
+    if (trimmed.startsWith('## ')) {
+      elements.push({ type: 'heading', level: 1, text: trimmed.slice(3), align: 'center', bold: true });
+      continue;
+    }
+
     // بسم الله الرحمن الرحيم → centered heading
     if (trimmed === 'بسم الله الرحمن الرحيم') {
       elements.push({ type: 'heading', level: 1, text: trimmed, align: 'center', bold: true });
@@ -209,6 +215,8 @@ function isLikelyHeading(trimmed, lineIndex, allLines) {
     trimmed === 'الطلبات:' || trimmed === 'الطلبات' ||
     trimmed === 'الأسباب:' || trimmed === 'الأسباب' ||
     trimmed === 'بناءً عليه' ||
+    trimmed === 'لذلك' ||
+    trimmed === 'تحية طيبة وبعد،' ||
     trimmed === 'المستندات:'
   )) {
     return true;

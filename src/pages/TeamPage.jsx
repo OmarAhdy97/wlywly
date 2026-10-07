@@ -1,3 +1,4 @@
+import RowAction, { RowActions } from '../components/common/RowAction';
 import React, { useState } from 'react';
 import {
   UserCheck,
@@ -240,49 +241,15 @@ export default function TeamPage() {
   };
 
   return (
-    <div className="page-wrapper" style={{ maxWidth: '1400px' }}>
-      {/* Top Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '1.25rem',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        borderBottom: '1px solid var(--border-subtle)',
-        paddingBottom: '1rem'
-      }}>
+    <div className="page-wrapper">
+      <div className="page-head">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-gold)' }}></span>
-            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
-              منظومة التعاون وإدارة الفريق
-            </span>
-          </div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-            فريق العمل والمحامين المعاونين
-          </h1>
+          <div className="page-eyebrow"><span className="page-dot" />منظومة التعاون وإدارة الفريق</div>
+          <h1>فريق العمل</h1>
         </div>
-
-        <div style={{ display: 'flex', gap: '0.65rem' }}>
-          <button 
-            type="button"
-            className="btn btn-primary" 
-            style={{
-              background: 'var(--primary-800)',
-              color: '#ffffff',
-              borderRadius: '10px',
-              padding: '0.55rem 1.15rem',
-              fontSize: '0.88rem',
-              fontWeight: '700',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              border: '1px solid var(--accent-gold)'
-            }}
-            onClick={() => setIsAddModalOpen(true)}
-          >
-            <Plus size={17} strokeWidth={2.5} />
+        <div className="page-head-actions">
+          <button type="button" className="btn btn-primary" onClick={() => setIsAddModalOpen(true)}>
+            <Plus size={16} />
             <span>إضافة عضو جديد</span>
           </button>
         </div>
@@ -295,7 +262,7 @@ export default function TeamPage() {
           <p style={{ fontSize: '0.9rem' }}>أضف محامين معاونين أو سكرتارية المكتب لتوزيع الحضور والجلسات.</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 290px), 1fr))', gap: '1.25rem' }}>
+        <div className="clients-cards-grid">
           {team.map((member) => {
             const memberCases = cases.filter(
               c => !c.is_archived && (c.next_steps === member.id || c.next_steps === 'assigned:' + member.id)
@@ -311,125 +278,53 @@ export default function TeamPage() {
             );
 
             return (
-              <div key={member.id} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '1rem' }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
-                      <div className="avatar" style={{ background: 'linear-gradient(135deg, var(--primary-900), var(--primary-700))', width: '46px', height: '46px', fontSize: '1.1rem', color: '#ffffff' }}>
-                        {member.name ? member.name.charAt(0) : 'م'}
-                      </div>
-                      <div>
-                        <h3 style={{ fontSize: '1.05rem', fontWeight: '700', margin: 0, color: 'var(--text-main)' }}>الأستاذ / {member.name}</h3>
-                        <span className="badge" style={{ background: 'var(--primary-100)', color: 'var(--primary-700)', marginTop: '0.25rem' }}>
-                          {USER_ROLES[member.role] || member.role}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.3rem' }}>
-                      <button 
-                        className="btn btn-secondary btn-icon" 
-                        style={{ width: '30px', height: '30px', padding: 0 }}
-                        title="تعديل البيانات"
-                        onClick={() => setEditingMember({ ...member })}
-                      >
-                        <Edit3 size={14} />
-                      </button>
-                      <button 
-                        className="btn btn-danger btn-icon" 
-                        style={{ width: '30px', height: '30px', padding: 0 }}
-                        title="حذف"
-                        onClick={() => handleDelete(member.id)}
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+              <article key={member.id} className="card client-card">
+                <header className="client-card-head">
+                  <div className="avatar client-avatar">{member.name ? member.name.charAt(0) : 'م'}</div>
+                  <div className="client-card-id">
+                    <h3>الأستاذ / {member.name}</h3>
+                    <span className="cell-sub">{USER_ROLES[member.role] || member.role}</span>
                   </div>
+                  <RowActions>
+                    <RowAction icon={Edit3} label="تعديل البيانات" onClick={() => setEditingMember({ ...member })} />
+                    <RowAction icon={Trash2} label="حذف" tone="danger" onClick={() => handleDelete(member.id)} />
+                  </RowActions>
+                </header>
 
-                  {/* Contact Info */}
-                  <div style={{ padding: '0.75rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1rem', fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                    {member.phone && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', direction: 'ltr' }}>
-                        <Phone size={13} color="var(--primary-700)" />
-                        <span>🇪🇬 +20 {member.phone.startsWith('0') ? member.phone.substring(1) : member.phone}</span>
-                      </div>
-                    )}
-                    {member.email && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <Mail size={13} color="var(--primary-700)" />
-                        <span>{member.email}</span>
-                      </div>
-                    )}
-                    {!member.phone && !member.email && (
-                      <span style={{ color: 'var(--text-subtle)' }}>لا توجد بيانات اتصال مسجلة</span>
-                    )}
-                  </div>
-
-                  {/* Workload Stats - 4 KPI metrics */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.8rem' }}>
-                    <div style={{ padding: '0.55rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-sm)', textAlign: 'center', border: '1px solid var(--border-subtle)' }}>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>قضايا مسندة</div>
-                      <strong style={{ fontSize: '1.15rem', color: 'var(--primary-800)' }}>{memberCases.length}</strong>
-                    </div>
-
-                    <div style={{ padding: '0.55rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-sm)', textAlign: 'center', border: '1px solid var(--border-subtle)' }}>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>جلسات اليوم</div>
-                      <strong style={{ fontSize: '1.15rem', color: memberTodaySessions.length > 0 ? 'var(--status-warning)' : 'var(--text-main)' }}>
-                        {memberTodaySessions.length}
-                      </strong>
-                    </div>
-
-                    <div style={{ padding: '0.55rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-sm)', textAlign: 'center', border: '1px solid var(--border-subtle)' }}>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>أعمال إدارية</div>
-                      <strong style={{ fontSize: '1.15rem', color: memberAdminTasks.length > 0 ? 'var(--primary-700)' : 'var(--text-main)' }}>
-                        {memberAdminTasks.length}
-                      </strong>
-                    </div>
-
-                    <div style={{ padding: '0.55rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-sm)', textAlign: 'center', border: '1px solid var(--border-subtle)' }}>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>أوراق محضرين</div>
-                      <strong style={{ fontSize: '1.15rem', color: memberBailiffTasks.length > 0 ? 'var(--accent-gold)' : 'var(--text-main)' }}>
-                        {memberBailiffTasks.length}
-                      </strong>
-                    </div>
-                  </div>
+                <div className="client-poa team-contact">
+                  {member.phone && (
+                    <span dir="ltr" className="team-contact-line"><Phone size={13} /> +20 {member.phone.startsWith('0') ? member.phone.substring(1) : member.phone}</span>
+                  )}
+                  {member.email && (
+                    <span className="team-contact-line"><Mail size={13} /> {member.email}</span>
+                  )}
+                  {!member.phone && !member.email && <span className="cell-sub">لا توجد بيانات اتصال مسجلة</span>}
                 </div>
 
-                {/* Assignment Action Buttons */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.75rem' }}>
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    style={{ width: '100%', fontSize: '0.82rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', padding: '0.5rem 0.8rem' }}
-                    onClick={() => handleOpenAssignModal(member)}
-                  >
-                    <Briefcase size={14} />
+                <div className="client-stats is-quad">
+                  <div className="client-stat"><span className="cell-sub">قضايا مسندة</span><b>{memberCases.length}</b></div>
+                  <div className="client-stat"><span className="cell-sub">جلسات اليوم</span><b className={memberTodaySessions.length > 0 ? 'is-warn' : ''}>{memberTodaySessions.length}</b></div>
+                  <div className="client-stat"><span className="cell-sub">أعمال إدارية</span><b>{memberAdminTasks.length}</b></div>
+                  <div className="client-stat"><span className="cell-sub">أوراق محضرين</span><b>{memberBailiffTasks.length}</b></div>
+                </div>
+
+                <footer className="team-actions">
+                  <button type="button" className="btn btn-primary" onClick={() => handleOpenAssignModal(member)}>
+                    <Briefcase size={15} />
                     <span>إسناد القضايا ({memberCases.length})</span>
                   </button>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.4rem' }}>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '0.45rem 0.6rem' }}
-                      onClick={() => handleOpenAssignAdminModal(member)}
-                    >
-                      <ClipboardList size={13} color="var(--primary-700)" />
-                      <span>الأعمال الإدارية ({memberAdminTasks.length})</span>
+                  <div className="client-card-actions">
+                    <button type="button" className="btn btn-secondary" onClick={() => handleOpenAssignAdminModal(member)}>
+                      <ClipboardList size={15} />
+                      <span>الأعمال الإدارية</span>
                     </button>
-
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', padding: '0.45rem 0.6rem' }}
-                      onClick={() => handleOpenAssignBailiffModal(member)}
-                    >
-                      <Send size={13} color="var(--primary-700)" />
-                      <span>المحضرين ({memberBailiffTasks.length})</span>
+                    <button type="button" className="btn btn-secondary" onClick={() => handleOpenAssignBailiffModal(member)}>
+                      <Send size={15} />
+                      <span>المحضرون</span>
                     </button>
                   </div>
-                </div>
-              </div>
+                </footer>
+              </article>
             );
           })}
         </div>

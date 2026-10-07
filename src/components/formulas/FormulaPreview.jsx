@@ -65,7 +65,7 @@ export default function FormulaPreview({
   return (
     <div style={{ maxWidth: '920px', margin: '0 auto' }}>
       {/* Header Bar */}
-      <div style={{
+      <div className="no-print" style={{
         background: 'var(--bg-card)',
         padding: '1rem 1.5rem',
         borderRadius: 'var(--radius-lg, 12px)',
@@ -140,7 +140,7 @@ export default function FormulaPreview({
 
       {/* Warning Alert if Placeholders are missing */}
       {hasUnresolvedPlaceholders && (
-        <div style={{
+        <div className="no-print" style={{
           background: 'rgba(234, 88, 12, 0.1)',
           border: '1px solid rgba(234, 88, 12, 0.4)',
           color: '#c2410c',
@@ -160,40 +160,66 @@ export default function FormulaPreview({
       )}
 
       {/* Sheet Preview A4 Style */}
-      <div style={{
+      <div className="formula-preview-bg" style={{
         background: 'var(--bg-app)',
-        padding: '1.5rem 1rem',
         borderRadius: 'var(--radius-lg, 12px)',
         border: '1px solid var(--border-color)',
         display: 'flex',
         justifyContent: 'center'
       }}>
-        <div style={{
+        <div id="formula-printable-sheet" className="formula-sheet" style={{
           width: '100%',
           maxWidth: '820px',
           background: '#ffffff',
           color: '#1f2937',
-          padding: '45px 50px',
           boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
           borderRadius: '4px',
           fontFamily: "'Simplified Arabic', Cairo, 'Traditional Arabic', Arial, sans-serif",
-          fontSize: '15px',
           lineHeight: '1.9',
           textAlign: 'justify',
           direction: 'rtl'
         }}>
           <LawFirmPrintHeader />
-          <div style={{
-            marginTop: '1.5rem',
-            whiteSpace: 'pre-wrap',
-            wordBreak: 'break-word',
-            color: '#111827'
-          }}>
-            {generatedContent}
-          </div>
+          {(() => {
+            const bodyStyle = { whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#111827' };
+            if (formula?.layout !== 'announcement' || !formula?.subject || !generatedContent) {
+              // contracts and plain papers: «## عنوان» lines are centred headings (contract title)
+              const lines = (generatedContent || '').split('\n');
+              return (
+                <div style={{ marginTop: '1.5rem', ...bodyStyle }}>
+                  {lines.map((l, i) => l.startsWith('## ')
+                    ? <div key={i} style={{ textAlign: 'center', fontWeight: 800, fontSize: '1.25em', margin: '0.6rem 0' }}>{l.slice(3)}</div>
+                    : <div key={i} style={{ minHeight: l.trim() ? undefined : '0.9em' }}>{l}</div>)}
+                </div>
+              );
+            }
+            // Court-paper layout: the «الموضوع» box sits beside the opening block
+            // (date, requester, bailiff, addressee); the rest runs full width.
+            const lines = generatedContent.split('\n');
+            let cut = lines.findIndex(l => /^\s*(وأعلنته|وأنذرته|وأعلنتهما)/.test(l));
+            if (cut < 0) cut = Math.min(5, lines.length);
+            const opening = lines.slice(0, cut).join('\n');
+            const rest = lines.slice(cut).join('\n');
+            return (
+              <div style={{ marginTop: '1.5rem' }}>
+                <div className="formula-open-row">
+                  <div style={{ flex: 1, ...bodyStyle }}>{opening}</div>
+                  <div className="formula-subject-box" style={{
+                    width: '150px', flexShrink: 0, border: '1.5px solid #111827',
+                    textAlign: 'center', fontWeight: 'bold', fontSize: '0.95rem'
+                  }}>
+                    <div style={{ borderBottom: '1.5px solid #111827', padding: '0.35rem', background: '#f3f4f6' }}>الموضوع</div>
+                    <div style={{ padding: '0.7rem 0.4rem', lineHeight: 1.6 }}>{formula.subject}</div>
+                    <div style={{ borderTop: '1px solid #111827', margin: '0 0.6rem', padding: '0.35rem 0', fontWeight: 'normal', fontSize: '0.85rem' }}>المحامي</div>
+                  </div>
+                </div>
+                <div style={{ marginTop: '0.25rem', ...bodyStyle }}>{rest}</div>
+              </div>
+            );
+          })()}
 
-          {/* Footer signature line */}
-          <div style={{
+          {/* Footer signature line (not on court papers: the paper ends with «ولأجل العلم») */}
+          {formula?.layout !== 'announcement' && <div style={{
             marginTop: '3.5rem',
             paddingTop: '1rem',
             borderTop: '1px dashed #e5e7eb',
@@ -206,7 +232,7 @@ export default function FormulaPreview({
             <div style={{ fontWeight: 'bold' }}>
               توقيع المحامي الوكيل: ............................................
             </div>
-          </div>
+          </div>}
         </div>
       </div>
     </div>

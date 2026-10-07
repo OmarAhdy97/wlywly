@@ -47,6 +47,12 @@ export function normalizeFormula(raw) {
     status: raw.status || 'active',
     disclaimer: raw.disclaimer || DEFAULT_DISCLAIMER,
 
+    // ─── Court-paper layout (v2 formulas) ───
+    layout: raw.layout || 'plain',          // 'announcement' | 'petition' | 'contract' | 'plain'
+    subject: raw.subject || null,           // text of the «الموضوع» side box
+    legal_basis: raw.legal_basis || [],     // [{ law, article, text }]
+    sources: raw.sources || [],             // provenance of the wording
+
     // ─── Normalized fields ───
     fields: (raw.fields || []).map(normalizeField),
   };

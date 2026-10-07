@@ -510,7 +510,7 @@ export default function CalendarPage({ setActiveTab }) {
                     <span
                       className="badge"
                       style={{
-                        background: evt.type === 'appeal_follow_up' ? '#eff6ff' : (evt.type === 'administrative_task' ? '#fffbeb' : 'var(--status-adjourned-bg)'),
+                        background: evt.type === 'appeal_follow_up' ? 'var(--status-prelim-bg)' : (evt.type === 'administrative_task' ? 'var(--status-adjourned-bg)' : 'var(--status-adjourned-bg)'),
                         color: evt.type === 'appeal_follow_up' ? '#1e40af' : (evt.type === 'administrative_task' ? '#b45309' : 'var(--status-adjourned)'),
                         fontSize: "0.72rem",
                         fontWeight: '700',

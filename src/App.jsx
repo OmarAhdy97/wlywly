@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import Sidebar from './components/layout/Sidebar';
@@ -18,9 +18,15 @@ import AdministrativePage from './pages/AdministrativePage';
 import BailiffsPage from './pages/BailiffsPage';
 import ProfilePage from './pages/ProfilePage';
 import LegalFormulasPage from './pages/LegalFormulasPage';
+import FinancePage from './pages/FinancePage';
+import LibraryPage from './pages/LibraryPage';
+import useResponsiveTables from './lib/useResponsiveTables';
+import useModalSafety from './lib/useModalSafety';
 
 function MainApp() {
   const { user, loading } = useAuth();
+  useResponsiveTables();
+  useModalSafety();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -127,6 +133,14 @@ function MainApp() {
               />
             )}
 
+            {activeTab === 'library' && (
+              <LibraryPage />
+            )}
+
+            {activeTab === 'finance' && (
+              <FinancePage />
+            )}
+
             {activeTab === 'archive' && (
               <ArchivePage />
             )}
@@ -173,3 +187,4 @@ export default function App() {
     </AuthProvider>
   );
 }
+

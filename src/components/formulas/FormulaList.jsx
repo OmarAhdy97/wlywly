@@ -152,7 +152,7 @@ export default function FormulaList({
       ) : (
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))',
           gap: '1.25rem',
           marginBottom: '2rem'
         }}>
@@ -246,7 +246,7 @@ export default function FormulaList({
                   gap: '0.5rem'
                 }}>
                   <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                    {formula.fields?.length || 0} حقول مطلوبة
+                    {(formula.fields || []).filter(f => f.type !== 'case').length} بيانًا · {(formula.fields || []).filter(f => f.required).length} أساسي
                   </span>
 
                   <button

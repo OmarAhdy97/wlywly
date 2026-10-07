@@ -1,3 +1,4 @@
+import RowAction, { RowActions } from '../components/common/RowAction';
 import React, { useState } from 'react';
 import {
   Send,
@@ -167,213 +168,43 @@ export default function BailiffsPage() {
   const totalCount = bailiffTasks.length;
 
   return (
-    <div className="page-wrapper" style={{ maxWidth: '1400px' }}>
-      {/* Top Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '1.25rem',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        borderBottom: '1px solid var(--border-subtle)',
-        paddingBottom: '1rem'
-      }}>
+    <div className="page-wrapper">
+      <div className="page-head">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-gold)' }}></span>
-            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
-              محاضر المحاكم والإعلانات القضائية
-            </span>
-          </div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-            قائمة المحضرين
-          </h1>
+          <div className="page-eyebrow"><span className="page-dot" />محاضر المحاكم والإعلانات القضائية</div>
+          <h1>المحضرون</h1>
         </div>
-
-        <div style={{ display: 'flex', gap: '0.65rem' }}>
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{
-              background: 'var(--primary-800)',
-              color: '#ffffff',
-              borderRadius: '10px',
-              padding: '0.55rem 1.15rem',
-              fontSize: '0.88rem',
-              fontWeight: '700',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              border: '1px solid var(--accent-gold)'
-            }}
-            onClick={handleOpenNew}
-          >
-            <Plus size={17} strokeWidth={2.5} />
+        <div className="page-head-actions">
+          <button type="button" className="btn btn-primary" onClick={handleOpenNew}>
+            <Plus size={16} />
             <span>إضافة ورقة محضرين</span>
           </button>
         </div>
       </div>
 
-      {/* Action Bar (Search + Add Button) */}
-      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.2rem', alignItems: 'center' }}>
-        <button
-          type="button"
-          className="btn btn-primary"
-          style={{
-            background: 'var(--primary-800)',
-            color: '#ffffff',
-            borderRadius: '12px',
-            padding: '0.75rem 1.4rem',
-            fontSize: '0.95rem',
-            fontWeight: '700',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            flexShrink: 0,
-            boxShadow: '0 4px 14px rgba(55, 4, 10, 0.25)',
-            border: '1px solid var(--accent-gold)'
-          }}
-          onClick={handleOpenNew}
-        >
-          <Plus size={18} strokeWidth={2.5} />
-          <span>إضافة</span>
-        </button>
-
-        <div style={{
-          flex: 1,
-          position: 'relative',
-          display: 'flex',
-          alignItems: 'center',
-          background: 'var(--bg-card)',
-          borderRadius: '12px',
-          border: '1px solid var(--border-color)',
-          boxShadow: 'var(--shadow-sm)',
-          padding: '0 1rem',
-          minHeight: '46px'
-        }}>
-          <Search size={18} style={{ color: 'var(--text-subtle)', flexShrink: 0 }} />
+      <div className="page-toolbar">
+        <div className="fin-search page-search">
+          <Search size={15} />
           <input
             type="text"
-            placeholder="البحث في المحضرين..."
+            className="form-input"
+            placeholder="البحث في أوراق المحضرين..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '0.65rem 0.75rem',
-              fontSize: '0.92rem',
-              color: 'var(--text-main)',
-              border: 'none',
-              outline: 'none',
-              background: 'transparent'
-            }}
           />
-          <Mic size={17} style={{ color: 'var(--text-subtle)', opacity: 0.6, cursor: 'pointer', flexShrink: 0 }} />
         </div>
-      </div>
-
-      {/* Filter Tabs (Pills) */}
-      <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1.2rem', flexWrap: 'wrap', alignItems: 'center' }}>
-        <button
-          type="button"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            padding: '0.5rem 1.1rem',
-            borderRadius: '24px',
-            fontSize: '0.9rem',
-            fontWeight: '700',
-            cursor: 'pointer',
-            border: filterStatus === 'pending' ? '1.5px solid var(--primary-700)' : '1px solid var(--border-color)',
-            background: filterStatus === 'pending' ? 'var(--primary-800)' : 'var(--bg-card)',
-            color: filterStatus === 'pending' ? '#ffffff' : 'var(--text-main)',
-            boxShadow: filterStatus === 'pending' ? '0 3px 10px rgba(55, 4, 10, 0.25)' : 'none',
-            transition: 'all 0.15s ease'
-          }}
-          onClick={() => setFilterStatus('pending')}
-        >
-          <Clock size={16} />
-          <span>غير مستلم</span>
-          <span style={{
-            background: filterStatus === 'pending' ? 'rgba(255,255,255,0.25)' : 'var(--bg-card-subtle)',
-            padding: '0.1rem 0.5rem',
-            borderRadius: '12px',
-            fontSize: '0.78rem'
-          }}>
-            {pendingCount}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            padding: '0.5rem 1.1rem',
-            borderRadius: '24px',
-            fontSize: '0.9rem',
-            fontWeight: '700',
-            cursor: 'pointer',
-            border: filterStatus === 'delivered' ? '1.5px solid #16a34a' : '1px solid var(--border-color)',
-            background: filterStatus === 'delivered' ? '#16a34a' : 'var(--bg-card)',
-            color: filterStatus === 'delivered' ? '#ffffff' : 'var(--text-main)',
-            boxShadow: filterStatus === 'delivered' ? '0 3px 10px rgba(22, 163, 74, 0.2)' : 'none',
-            transition: 'all 0.15s ease'
-          }}
-          onClick={() => setFilterStatus('delivered')}
-        >
-          <CheckCircle2 size={16} />
-          <span>مستلم</span>
-          <span style={{
-            background: filterStatus === 'delivered' ? 'rgba(255,255,255,0.25)' : 'var(--bg-card-subtle)',
-            padding: '0.1rem 0.5rem',
-            borderRadius: '12px',
-            fontSize: '0.78rem'
-          }}>
-            {deliveredCount}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.45rem',
-            padding: '0.5rem 1.1rem',
-            borderRadius: '24px',
-            fontSize: '0.9rem',
-            fontWeight: '700',
-            cursor: 'pointer',
-            border: filterStatus === 'all' ? '1.5px solid var(--primary-700)' : '1px solid var(--border-color)',
-            background: filterStatus === 'all' ? 'var(--primary-800)' : 'var(--bg-card)',
-            color: filterStatus === 'all' ? '#ffffff' : 'var(--text-main)',
-            boxShadow: filterStatus === 'all' ? '0 3px 10px rgba(55, 4, 10, 0.25)' : 'none',
-            transition: 'all 0.15s ease'
-          }}
-          onClick={() => setFilterStatus('all')}
-        >
-          <ListFilter size={16} />
-          <span>الكل</span>
-          <span style={{
-            background: filterStatus === 'all' ? 'rgba(255,255,255,0.25)' : 'var(--bg-card-subtle)',
-            padding: '0.1rem 0.5rem',
-            borderRadius: '12px',
-            fontSize: '0.78rem'
-          }}>
-            {totalCount}
-          </span>
-        </button>
-      </div>
-
-      {/* Task Count indicator */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '1rem', fontWeight: '600' }}>
-        <span style={{ background: 'var(--primary-100)', color: 'var(--primary-800)', padding: '0.15rem 0.6rem', borderRadius: '12px', fontWeight: '800' }}>
-          {filteredRecords.length}
-        </span>
-        <span>عدد المحاضر المعروضة</span>
+        <div className="seg-tabs">
+          {[
+            { id: 'pending', label: 'غير مستلم', count: pendingCount },
+            { id: 'delivered', label: 'تم التسليم', count: deliveredCount },
+            { id: 'all', label: 'الكل', count: totalCount },
+          ].map(t => (
+            <button key={t.id} type="button" className={`seg-tab ${filterStatus === t.id ? 'is-active' : ''}`} onClick={() => setFilterStatus(t.id)}>
+              <span>{t.label}</span>
+              <span className="seg-count">{t.count}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Records List or Empty State */}
@@ -415,7 +246,7 @@ export default function BailiffsPage() {
           <button
             type="button"
             className="btn btn-primary"
-            style={{ background: 'var(--primary-800)', borderRadius: '10px', padding: '0.6rem 1.4rem', fontWeight: '700' }}
+            style={{ background: 'var(--accent)', borderRadius: '10px', padding: '0.6rem 1.4rem', fontWeight: '700' }}
             onClick={handleOpenNew}
           >
             <Plus size={16} />
@@ -457,7 +288,7 @@ export default function BailiffsPage() {
                     borderRadius: '20px',
                     fontSize: '0.78rem',
                     fontWeight: '700',
-                    background: isDone ? '#f0fdf4' : 'var(--primary-50)',
+                    background: isDone ? 'var(--status-active-bg)' : 'var(--primary-50)',
                     color: isDone ? '#15803d' : 'var(--primary-800)',
                     border: isDone ? '1px solid #bbf7d0' : '1px solid var(--primary-100)'
                   }}>
@@ -539,48 +370,15 @@ export default function BailiffsPage() {
 
                 {/* Card Actions Footer */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '0.6rem', borderTop: '1px solid var(--border-subtle)' }}>
-                  <button
-                    type="button"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.4rem',
-                      background: isDone ? '#fef2f2' : '#f0fdf4',
-                      color: isDone ? '#dc2626' : '#16a34a',
-                      border: isDone ? '1px solid #fecaca' : '1px solid #bbf7d0',
-                      padding: '0.35rem 0.75rem',
-                      borderRadius: '8px',
-                      fontSize: '0.82rem',
-                      fontWeight: '700',
-                      cursor: 'pointer'
-                    }}
-                    onClick={() => toggleBailiffStatus(record.id)}
-                  >
+                  <button type="button" className={`btn ${isDone ? 'btn-secondary' : 'btn-primary'} dash-row-btn`} onClick={() => toggleBailiffStatus(record.id)}>
                     {isDone ? <RotateCcw size={14} /> : <Check size={14} strokeWidth={3} />}
                     <span>{isDone ? 'إعادة لغير مستلم' : 'تم الاستلام'}</span>
                   </button>
 
-                  <div style={{ display: 'flex', gap: '0.4rem' }}>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-icon"
-                      style={{ width: '32px', height: '32px', padding: 0 }}
-                      title="تعديل ورقة المحضرين"
-                      onClick={() => handleOpenEdit(record)}
-                    >
-                      <Edit3 size={15} />
-                    </button>
-
-                    <button
-                      type="button"
-                      className="btn btn-danger btn-icon"
-                      style={{ width: '32px', height: '32px', padding: 0 }}
-                      title="حذف"
-                      onClick={() => handleDelete(record.id)}
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
+                  <RowActions>
+                    <RowAction icon={Edit3} label="تعديل ورقة المحضرين" onClick={() => handleOpenEdit(record)} />
+                    <RowAction icon={Trash2} label="حذف" tone="danger" onClick={() => handleDelete(record.id)} />
+                  </RowActions>
                 </div>
               </div>
             );
@@ -599,30 +397,24 @@ export default function BailiffsPage() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.1rem 1.4rem', borderBottom: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary btn-icon"
-                  style={{ width: '34px', height: '34px', padding: 0, borderRadius: '8px' }}
-                  onClick={() => setIsModalOpen(false)}
-                >
-                  <ChevronLeft size={18} />
-                </button>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
+            <div className="modal-header">
+              <h3>
                   {editingTask ? 'تعديل بيانات المحضر' : 'إضافة محضرين'}
                 </h3>
-              </div>
-
-              <button
+              <div className="modal-header-actions">
+                <button
                 type="button"
                 className="btn btn-secondary btn-icon"
-                style={{ width: '34px', height: '34px', padding: 0, borderRadius: '8px' }}
                 title="إعادة تعيين الحقول"
+                aria-label="إعادة تعيين الحقول"
                 onClick={handleResetForm}
               >
                 <RotateCcw size={16} />
               </button>
+                <button type="button" className="btn btn-secondary btn-icon" title="إغلاق" aria-label="إغلاق" onClick={() => setIsModalOpen(false)}>
+                  <X size={18} />
+                </button>
+              </div>
             </div>
 
             {/* Modal Body / Form */}
@@ -821,7 +613,7 @@ export default function BailiffsPage() {
                   type="submit"
                   disabled={isSaving}
                   className="btn btn-primary"
-                  style={{ background: 'var(--primary-800)', color: '#ffffff', borderRadius: '10px', padding: '0.6rem 1.6rem', fontWeight: '700', border: '1px solid var(--accent-gold)' }}
+                  style={{ background: 'var(--accent)', color: 'var(--on-accent)', borderRadius: '10px', padding: '0.6rem 1.6rem', fontWeight: '700', border: '1px solid var(--accent-gold)' }}
                 >
                   {isSaving ? 'جاري الحفظ...' : (editingTask ? 'تحديث المحضر' : 'حفظ المحضر')}
                 </button>

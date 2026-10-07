@@ -473,30 +473,27 @@ export default function SearchDeadlinesPage({ searchTerm, setSearchTerm, setActi
           </h1>
         </div>
 
-        <div className="search-tools-nav" style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+        <div className="search-tools-nav seg-tabs">
           <button 
             type="button"
-            className={`btn ${activeTabSub === 'fees' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`seg-tab ${activeTabSub === 'fees' ? 'is-active' : ''}`}
             onClick={() => setActiveTabSub('fees')}
-            style={{ fontWeight: '700', borderRadius: '10px', fontSize: '0.84rem', padding: '0.45rem 0.9rem' }}
           >
             <Coins size={15} />
             <span>حاسبة الرسوم القضائية</span>
           </button>
           <button 
             type="button"
-            className={`btn ${activeTabSub === 'deadlines' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`seg-tab ${activeTabSub === 'deadlines' ? 'is-active' : ''}`}
             onClick={() => setActiveTabSub('deadlines')}
-            style={{ fontWeight: '700', borderRadius: '10px', fontSize: '0.84rem', padding: '0.45rem 0.9rem' }}
           >
             <Clock size={15} />
             <span>حاسبة المواعيد والطعون</span>
           </button>
           <button 
             type="button"
-            className={`btn ${activeTabSub === 'search' ? 'btn-primary' : 'btn-secondary'}`}
+            className={`seg-tab ${activeTabSub === 'search' ? 'is-active' : ''}`}
             onClick={() => setActiveTabSub('search')}
-            style={{ fontWeight: '700', borderRadius: '10px', fontSize: '0.84rem', padding: '0.45rem 0.9rem' }}
           >
             <Search size={15} />
             <span>البحث الشامل</span>
@@ -644,10 +641,9 @@ export default function SearchDeadlinesPage({ searchTerm, setSearchTerm, setActi
             <div style={{
               padding: '1.35rem 1.5rem',
               borderRadius: '14px',
-              background: calculatedFees.isExempt ? '#f0fdf4' : 'linear-gradient(135deg, var(--primary-800) 0%, var(--primary-900) 100%)',
-              color: calculatedFees.isExempt ? '#15803d' : '#ffffff',
-              border: calculatedFees.isExempt ? '1px solid #bbf7d0' : 'none',
-              boxShadow: 'var(--shadow-md)',
+              background: calculatedFees.isExempt ? 'var(--status-active-bg)' : 'var(--bg-card-subtle)',
+              color: calculatedFees.isExempt ? 'var(--status-active)' : 'var(--text-main)',
+              border: calculatedFees.isExempt ? '1px solid transparent' : '1px solid var(--border-color)',
               position: 'relative'
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -657,7 +653,7 @@ export default function SearchDeadlinesPage({ searchTerm, setSearchTerm, setActi
                 <span style={{
                   padding: '0.2rem 0.65rem',
                   borderRadius: '20px',
-                  background: calculatedFees.isExempt ? '#dcfce7' : 'rgba(255, 255, 255, 0.2)',
+                  background: calculatedFees.isExempt ? 'var(--bg-card)' : 'var(--accent-gold-bg)',
                   fontSize: '0.78rem',
                   fontWeight: '700'
                 }}>

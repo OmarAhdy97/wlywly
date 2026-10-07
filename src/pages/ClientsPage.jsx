@@ -45,6 +45,15 @@ import {
 } from '../lib/telegram';
 import { printWithTitle, DEFAULT_APP_TITLE } from '../lib/printUtils';
 import ClientFinancialManager from '../components/financial/ClientFinancialManager';
+import QuickActionModal from '../components/layout/QuickActionModal';
+import RowAction, { RowActions } from '../components/common/RowAction';
+import { calculateClientFinancialSummary, formatMoney } from '../lib/financialCalculations';
+
+const CLIENT_FILTERS = [
+  { id: 'all', label: 'الكل' },
+  { id: 'debt', label: 'عليهم مستحقات' },
+  { id: 'notg', label: 'بلا تليجرام' },
+];
 
 export default function ClientsPage({ setActiveTab }) {
   const {
@@ -60,6 +69,8 @@ export default function ClientsPage({ setActiveTab }) {
   const { user } = useAuth();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [clientFilter, setClientFilter] = useState('all');
+  const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
   const [editingClient, setEditingClient] = useState(null);
 
@@ -135,7 +146,6 @@ export default function ClientsPage({ setActiveTab }) {
         national_id: editingClient.national_id || null,
         power_of_attorney_number: editingClient.power_of_attorney_number || null,
         power_of_attorney_type: editingClient.power_of_attorney_type || null,
-        financial_balance: parseFloat(editingClient.financial_balance) || 0,
         telegram_chat_id: editingClient.telegram_chat_id ? parseInt(editingClient.telegram_chat_id) : null,
       });
       setEditingClient(null);
@@ -290,46 +300,6 @@ export default function ClientsPage({ setActiveTab }) {
     }
   };
 
-  // Add a new transaction from the statement modal
-  const handleAddTransactionSubmit = async (e) => {
-    e.preventDefault();
-    if (!statementClient) return;
-    const amountNum = parseFloat(txAmount);
-    if (!amountNum || amountNum <= 0) {
-      alert('يرجى إدخال مبلغ صحيح أكبر من الصفر');
-      return;
-    }
-    if (!txDesc.trim()) {
-      alert('يرجى إدخال بيان الحركة (مثال: أمانة خبير، رسم إيداع، دفعة نقدية)');
-      return;
-    }
-
-    setIsSavingTx(true);
-    try {
-      await addTransaction({
-        client_id: statementClient.id,
-        case_id: txCaseId || null,
-        type: txType,
-        amount: amountNum,
-        description: txDesc.trim(),
-        date: txDate || new Date().toISOString().split('T')[0],
-      });
-
-      // Update local statementClient balance
-      const currentBal = parseFloat(statementClient.financial_balance) || 0;
-      const delta = txType === 'expense' ? -amountNum : amountNum;
-      setStatementClient(prev => ({ ...prev, financial_balance: currentBal + delta }));
-
-      setTxAmount('');
-      setTxDesc('');
-      setTxCaseId('');
-    } catch (err) {
-      alert('خطأ أثناء حفظ المعاملة: ' + err.message);
-    } finally {
-      setIsSavingTx(false);
-    }
-  };
-
   // Handle sending bill via Telegram (called after lawyer confirmation)
   const handleConfirmSendBillTelegram = async () => {
     if (!statementClient || !statementClient.telegram_chat_id) return;
@@ -344,7 +314,6 @@ export default function ClientsPage({ setActiveTab }) {
         client: statementClient,
         lawyerUser: user,
         transactions: clientTx,
-        currentBalance: statementClient.financial_balance,
         clientCases,
       });
 
@@ -364,407 +333,193 @@ export default function ClientsPage({ setActiveTab }) {
     }
   };
 
-  // Helper to render financial balance on a single line without minus sign
+  // ONE source of truth for money: the transactions ledger (the same engine the statement uses).
+  // Positive = the client owes the office, negative = the client has credit.
+  const ledgerBalance = (clientId) =>
+    calculateClientFinancialSummary(transactions || [], { id: clientId }, []).closingBalance;
+
   const renderBalanceBadge = (balance, isDetailed = false) => {
     const num = parseFloat(balance) || 0;
-    if (num < 0) {
-      const formatted = Math.abs(num).toLocaleString('en-US');
-      return (
-        <span style={{
-          color: 'var(--status-dismissed)',
-          fontWeight: '700',
-          whiteSpace: 'nowrap',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.2rem',
-          fontSize: '0.8rem',
-          lineHeight: '1.2'
-        }}>
-          <span>{isDetailed ? 'مستحق على الموكل: ' : 'مستحق: '}</span>
-          <span dir="ltr" style={{ direction: 'ltr', display: 'inline-block', fontWeight: '800' }}>
-            {formatted}
-          </span>
-          <span style={{ display: 'inline-block' }}>ج.م</span>
-        </span>
-      );
+    if (Math.abs(num) < 0.01) {
+      return <span className="bal-badge is-settled">{isDetailed ? 'الحساب خالص (0 ج.م)' : 'خالص (0 ج.م)'}</span>;
     }
-    if (num > 0) {
-      const formatted = num.toLocaleString('en-US');
-      return (
-        <span style={{
-          color: 'var(--status-active)',
-          fontWeight: '700',
-          whiteSpace: 'nowrap',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '0.2rem',
-          fontSize: '0.8rem',
-          lineHeight: '1.2'
-        }}>
-          <span>{isDetailed ? 'رصيد دائن للموكل: ' : 'مسدد: '}</span>
-          <span dir="ltr" style={{ direction: 'ltr', display: 'inline-block', fontWeight: '800' }}>
-            {formatted}
-          </span>
-          <span style={{ display: 'inline-block' }}>ج.م</span>
-        </span>
-      );
-    }
+    const owes = num > 0;
+    const label = owes ? (isDetailed ? 'مستحق على الموكل: ' : 'مستحق: ') : (isDetailed ? 'رصيد دائن للموكل: ' : 'رصيد دائن: ');
     return (
-      <span style={{ color: 'var(--text-muted)', fontWeight: '600', whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
-        {isDetailed ? 'الحساب خالص (0 ج.م)' : 'خالص (0 ج.م)'}
+      <span className={`bal-badge ${owes ? 'is-debt' : 'is-credit'}`}>
+        <span>{label}</span>
+        <b dir="ltr">{formatMoney(Math.abs(num), false)}</b>
+        <span>ج.م</span>
       </span>
     );
   };
 
+  // Balance comes from the ledger, so the filter and the card always agree
+  const visibleClients = filteredClients.filter(c => {
+    if (clientFilter === 'debt') return ledgerBalance(c.id) > 0.01;
+    if (clientFilter === 'notg') return !c.telegram_chat_id;
+    return true;
+  });
+
   return (
     <div className="page-wrapper" style={{ maxWidth: '1400px' }}>
-      {/* Header */}
-      <div className="no-print" style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '1.25rem',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        borderBottom: '1px solid var(--border-subtle)',
-        paddingBottom: '1rem'
-      }}>
+      <div className="page-head no-print">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-gold)' }}></span>
-            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
-              قاعدة بيانات الموكلين والتوكيلات
-            </span>
-          </div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-            سجل الموكلين والتوكيلات والحسابات
-          </h1>
+          <div className="page-eyebrow"><span className="page-dot" />قاعدة بيانات الموكلين والتوكيلات</div>
+          <h1>الموكلون</h1>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span className="badge" style={{ background: 'var(--primary-100)', color: 'var(--primary-800)', fontWeight: '700', padding: '0.4rem 0.85rem', fontSize: '0.82rem' }}>
-            {filteredClients.length} موكل مسجل
-          </span>
+        <div className="page-head-actions">
+          <button type="button" className="btn btn-primary" onClick={() => setIsAddClientOpen(true)}>
+            <Plus size={16} />
+            <span>موكل جديد</span>
+          </button>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="card no-print" style={{ marginBottom: '1.25rem', padding: '0.9rem 1.15rem', borderRadius: '14px' }}>
-        <div className="header-search" style={{ width: '100%', minHeight: '40px', borderRadius: '10px' }}>
-          <Search size={17} style={{ color: 'var(--text-subtle)' }} />
+      <div className="clients-toolbar no-print">
+        <div className="fin-search clients-search">
+          <Search size={15} />
           <input
             type="text"
-            placeholder="ابحث باسم الموكل، رقم الهاتف، الرقم القومي، أو التوكيل..."
+            className="form-input"
+            placeholder="ابحث باسم الموكل أو هاتفه أو رقمه القومي أو التوكيل..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ fontSize: '0.88rem' }}
           />
         </div>
+        <div className="seg-tabs">
+          {CLIENT_FILTERS.map(f => (
+            <button key={f.id} type="button" className={`seg-tab ${clientFilter === f.id ? 'is-active' : ''}`} onClick={() => setClientFilter(f.id)}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <span className="clients-count">{visibleClients.length} موكل</span>
       </div>
 
-      {/* Clients Grid */}
-      {filteredClients.length === 0 ? (
-        <div className="card no-print" style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: 'var(--text-muted)' }}>
-          <Users size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-          <h3 style={{ fontSize: '1.2rem', marginBottom: '0.4rem' }}>لا يوجد موكلين مطابقين للبحث</h3>
-          <p style={{ fontSize: '0.9rem' }}>يمكنك إضافة موكل جديد باستخدام زر الإضافة أعلاه.</p>
+      {visibleClients.length === 0 ? (
+        <div className="card no-print dash-empty">
+          <Users size={32} />
+          <b>لا يوجد موكلون مطابقون</b>
         </div>
       ) : (
         <div className="no-print clients-cards-grid">
-          {filteredClients.map((client) => {
+          {visibleClients.map((client) => {
             const clientCases = cases.filter(c => c.client_id === client.id);
             const isTelegramLinked = !!client.telegram_chat_id;
-
             return (
-              <div key={client.id} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div className="avatar" style={{ background: 'linear-gradient(135deg, var(--primary-700), var(--primary-500))', width: '44px', height: '44px', fontSize: '1.1rem' }}>
-                        {client.name ? client.name.charAt(0) : 'م'}
-                      </div>
-                      <div>
-                        <h3 style={{ fontSize: '1.05rem', fontWeight: '700' }}>{client.name}</h3>
-                        {client.phone && (
-                          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem', direction: 'ltr' }}>
-                            <span>🇪🇬 +20</span>
-                            <span>{client.phone.startsWith('0') ? client.phone.substring(1) : client.phone}</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '0.3rem' }}>
-                      <button
-                        className="btn btn-secondary btn-icon"
-                        style={{ width: '30px', height: '30px', padding: 0 }}
-                        onClick={() => setEditingClient({ ...client })}
-                        title="تعديل"
-                      >
-                        <Edit3 size={14} />
-                      </button>
-                      <button
-                        className="btn btn-danger btn-icon"
-                        style={{ width: '30px', height: '30px', padding: 0 }}
-                        onClick={() => handleDeleteClient(client.id)}
-                        title="حذف"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
+              <article key={client.id} className="card client-card">
+                <header className="client-card-head">
+                  <div className="avatar client-avatar">{client.name ? client.name.charAt(0) : 'م'}</div>
+                  <div className="client-card-id">
+                    <h3>{client.name}</h3>
+                    {client.phone && <span className="cell-sub" dir="ltr">+20 {client.phone.startsWith('0') ? client.phone.substring(1) : client.phone}</span>}
                   </div>
+                  <RowActions>
+                    <RowAction icon={Edit3} label="تعديل" onClick={() => setEditingClient({ ...client })} />
+                    <RowAction icon={Trash2} label="حذف" tone="danger" onClick={() => handleDeleteClient(client.id)} />
+                  </RowActions>
+                </header>
 
-                  {/* PoA Info */}
-                  <div style={{ padding: '0.75rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '0.8rem', fontSize: '0.82rem' }}>
-                    <div><strong>رقم التوكيل:</strong> {client.power_of_attorney_number || 'غير مسجل'}</div>
-                    <div style={{ color: 'var(--text-muted)', marginTop: '0.2rem' }}>{client.power_of_attorney_type || 'توكيل رسمي في القضايا'}</div>
-                  </div>
-
-                  {/* Financial Balance & Cases count (Unified Modern Tiles) */}
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '0.8rem', fontSize: '0.82rem' }}>
-                    <div style={{
-                      padding: '0.65rem 0.5rem',
-                      background: 'var(--bg-card-subtle)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: 'var(--radius-md)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      whiteSpace: 'nowrap',
-                      minWidth: 0,
-                      overflow: 'hidden'
-                    }}>
-                      {renderBalanceBadge(client.financial_balance)}
-                    </div>
-
-                    <div style={{
-                      padding: '0.65rem 0.5rem',
-                      background: 'var(--bg-card-subtle)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: 'var(--radius-md)',
-                      color: 'var(--text-main)',
-                      fontWeight: '700',
-                      textAlign: 'center',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      whiteSpace: 'nowrap',
-                      minWidth: 0,
-                      overflow: 'hidden'
-                    }}>
-                      <span>{clientCases.length} قضايا متداولة</span>
-                    </div>
-                  </div>
-
-                  {/* Telegram Link Status Row */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0.5rem 0.75rem',
-                    background: isTelegramLinked ? 'rgba(34, 197, 94, 0.08)' : 'var(--bg-card-subtle)',
-                    border: `1px solid ${isTelegramLinked ? 'rgba(34, 197, 94, 0.3)' : 'var(--border-color)'}`,
-                    borderRadius: 'var(--radius-md)',
-                    marginBottom: '1rem',
-                    fontSize: '0.8rem'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <MessageSquare size={14} style={{ color: isTelegramLinked ? '#16a34a' : '#0284c7' }} />
-                      <span style={{ fontWeight: '600', color: isTelegramLinked ? '#16a34a' : 'var(--text-muted)' }}>
-                        {isTelegramLinked ? 'تليجرام مربوط ومفعل' : 'تليجرام غير مربوط'}
-                      </span>
-                    </div>
-                    <button
-                      className="btn btn-secondary"
-                      style={{
-                        fontSize: '0.75rem',
-                        padding: '0.25rem 0.6rem',
-                        height: 'auto',
-                        background: isTelegramLinked ? '#fff' : 'var(--primary-700)',
-                        color: isTelegramLinked ? '#16a34a' : '#fff',
-                        borderColor: isTelegramLinked ? 'rgba(34, 197, 94, 0.4)' : 'var(--primary-700)',
-                        fontWeight: '700'
-                      }}
-                      onClick={() => openTelegramModal(client)}
-                    >
-                      {isTelegramLinked ? 'إدارة' : 'ربط 📱'}
-                    </button>
-                  </div>
+                <div className="client-poa">
+                  <span className="cell-sub">التوكيل</span>
+                  <b>{client.power_of_attorney_number || 'غير مسجل'}</b>
+                  <span className="cell-sub">{client.power_of_attorney_type || 'توكيل رسمي عام في القضايا'}</span>
                 </div>
 
-                {/* Footer Action Buttons with Exactly the Same Style and No Icons */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    style={{
-                      fontSize: '0.85rem',
-                      padding: '0.6rem 0.5rem',
-                      whiteSpace: 'nowrap',
-                      textAlign: 'center',
-                      fontWeight: '700',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: 'var(--radius-md)',
-                      background: 'var(--bg-card-subtle)',
-                      color: 'var(--text-main)',
-                      boxShadow: 'none',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '100%',
-                      transition: 'all 0.15s ease'
-                    }}
-                    onClick={() => setSelectedClient(client)}
-                  >
-                    ملف الموكل
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    style={{
-                      fontSize: '0.85rem',
-                      padding: '0.6rem 0.5rem',
-                      whiteSpace: 'nowrap',
-                      textAlign: 'center',
-                      fontWeight: '700',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: 'var(--radius-md)',
-                      background: 'var(--bg-card-subtle)',
-                      color: 'var(--text-main)',
-                      boxShadow: 'none',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '100%',
-                      transition: 'all 0.15s ease'
-                    }}
-                    onClick={() => {
-                      setStatementClient(client);
-                      setBillFeedback(null);
-                    }}
-                  >
-                    كشف الحساب
+                <div className="client-stats">
+                  <div className="client-stat is-wide">
+                    <span className="cell-sub">الرصيد</span>
+                    {renderBalanceBadge(ledgerBalance(client.id))}
+                  </div>
+                  <div className="client-stat">
+                    <span className="cell-sub">القضايا</span>
+                    <b>{clientCases.length}</b>
+                  </div>
+                  <button type="button" className={`client-stat client-stat-tg ${isTelegramLinked ? 'is-linked' : ''}`} onClick={() => openTelegramModal(client)}>
+                    <span className="cell-sub">تليجرام</span>
+                    <b><MessageSquare size={13} /> {isTelegramLinked ? 'مربوط' : 'ربط'}</b>
                   </button>
                 </div>
-              </div>
+
+                <footer className="client-card-actions">
+                  <button type="button" className="btn btn-secondary" onClick={() => setSelectedClient(client)}>
+                    <Briefcase size={15} />
+                    <span>ملف الموكل</span>
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={() => { setStatementClient(client); setBillFeedback(null); }}>
+                    <Receipt size={15} />
+                    <span>كشف الحساب</span>
+                  </button>
+                </footer>
+              </article>
             );
           })}
         </div>
       )}
 
-      {/* Client Details Modal */}
+      {/* Client file (read-only) */}
       {selectedClient && (
         <div className="modal-backdrop" onClick={() => setSelectedClient(null)}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <div className="avatar" style={{ background: 'linear-gradient(135deg, var(--primary-700), var(--primary-500))', width: '38px', height: '38px', fontSize: '1rem' }}>
-                  {selectedClient.name ? selectedClient.name.charAt(0) : 'م'}
-                </div>
-                <div>
-                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800' }}>بيانات الموكل: {selectedClient.name}</h3>
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>الملف التعريفي والبيانات القضائية</span>
+              <div className="fin-header-main">
+                <div className="avatar client-avatar">{selectedClient.name ? selectedClient.name.charAt(0) : 'م'}</div>
+                <div className="fin-header-text">
+                  <h3>{selectedClient.name}</h3>
+                  <div className="fin-header-sub">الملف التعريفي والبيانات القضائية</div>
                 </div>
               </div>
-              <button className="btn btn-secondary btn-icon" onClick={() => setSelectedClient(null)}>
+              <button className="btn btn-secondary btn-icon" onClick={() => setSelectedClient(null)} aria-label="إغلاق">
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body">
-              <div className="client-details-grid">
+              <dl className="client-facts">
+                <div><dt>الهاتف</dt><dd dir="ltr">{selectedClient.phone ? (selectedClient.phone.startsWith('+') ? selectedClient.phone : `+20 ${selectedClient.phone}`) : 'غير مسجل'}</dd></div>
+                <div><dt>الرقم القومي</dt><dd>{selectedClient.national_id || 'غير مسجل'}</dd></div>
+                <div><dt>رقم التوكيل</dt><dd>{selectedClient.power_of_attorney_number || 'غير مسجل'}</dd></div>
+                <div><dt>نوع التوكيل</dt><dd>{selectedClient.power_of_attorney_type || 'غير مسجل'}</dd></div>
+                <div><dt>الموقف المالي</dt><dd>{renderBalanceBadge(ledgerBalance(selectedClient.id), true)}</dd></div>
                 <div>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>الهاتف:</span>
-                  <div dir="ltr" style={{ fontWeight: '600', textAlign: 'right' }}>
-                    {selectedClient.phone
-                      ? (selectedClient.phone.startsWith('+') ? selectedClient.phone : `+20 ${selectedClient.phone}`)
-                      : 'غير مسجل'}
-                  </div>
+                  <dt>تليجرام</dt>
+                  <dd>{selectedClient.telegram_chat_id ? `مربوط (${selectedClient.telegram_chat_id})` : 'غير مربوط'}</dd>
                 </div>
-                <div>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>الرقم القومي:</span>
-                  <div style={{ fontWeight: '600' }}>{selectedClient.national_id || 'غير مسجل'}</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>التوكيل:</span>
-                  <div style={{ fontWeight: '600' }}>{selectedClient.power_of_attorney_number || 'غير مسجل'}</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>الموقف المالي:</span>
-                  <div style={{ marginTop: '0.2rem' }}>
-                    {renderBalanceBadge(selectedClient.financial_balance, true)}
-                  </div>
-                  <button
-                    className="btn btn-secondary"
-                    style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem', marginTop: '0.45rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
-                    onClick={() => {
-                      const c = selectedClient;
-                      setSelectedClient(null);
-                      setStatementClient(c);
-                      setBillFeedback(null);
-                    }}
-                  >
-                    <Receipt size={13} />
-                    <span>عرض كشف الحساب وفاتورة الأتعاب</span>
-                  </button>
-                </div>
+              </dl>
+
+              <div className="client-file-actions">
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => { const c = selectedClient; setSelectedClient(null); setStatementClient(c); setBillFeedback(null); }}
+                >
+                  <Receipt size={15} />
+                  <span>كشف الحساب</span>
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => { const c = selectedClient; setSelectedClient(null); openTelegramModal(c); }}
+                >
+                  <MessageSquare size={15} />
+                  <span>{selectedClient.telegram_chat_id ? 'إدارة ربط التليجرام' : 'ربط بالتليجرام'}</span>
+                </button>
               </div>
 
-              {/* Telegram Integration Panel in Details */}
-              <div style={{
-                padding: '0.9rem 1.1rem',
-                background: selectedClient.telegram_chat_id ? 'rgba(34, 197, 94, 0.06)' : 'var(--bg-card-subtle)',
-                borderRadius: '12px',
-                border: `1px solid ${selectedClient.telegram_chat_id ? 'rgba(34, 197, 94, 0.3)' : 'var(--border-color)'}`,
-                marginBottom: '1.5rem'
-              }}>
-                <div className="client-details-telegram-box">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <MessageSquare size={18} style={{ color: selectedClient.telegram_chat_id ? '#16a34a' : '#0284c7' }} />
-                    <div>
-                      <strong style={{ fontSize: '0.9rem', color: 'var(--text-main)' }}>إشعارات التليجرام التلقائية</strong>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        {selectedClient.telegram_chat_id
-                          ? `مربوط بالمعرف: ${selectedClient.telegram_chat_id}`
-                          : 'غير مربوط بعد — اضغط لربط الموكل لإرسال التحديثات'}
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    className="btn btn-secondary"
-                    style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
-                    onClick={() => {
-                      const c = selectedClient;
-                      setSelectedClient(null);
-                      openTelegramModal(c);
-                    }}
-                  >
-                    {selectedClient.telegram_chat_id ? 'إدارة الربط والرسائل' : 'ربط بالتليجرام 📱'}
-                  </button>
-                </div>
-              </div>
-
-              <h4 style={{ marginBottom: '0.8rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.4rem' }}>
-                الدعاوى القضائية المربوطة بهذا الموكل
-              </h4>
+              <h4 className="client-section-title">الدعاوى المرتبطة بهذا الموكل</h4>
               {cases.filter(c => c.client_id === selectedClient.id).length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>لا توجد دعاوى قضائية مسجلة باسم هذا الموكل حالياً.</p>
+                <p className="cell-sub">لا توجد دعاوى مسجلة باسم هذا الموكل حاليًا.</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <ul className="dash-list">
                   {cases.filter(c => c.client_id === selectedClient.id).map(c => (
-                    <div key={c.id} style={{ padding: '0.8rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                      <div style={{ fontWeight: '700', color: 'var(--primary-700)' }}>
-                        دعوى {c.case_number}/{c.case_year} — {c.case_title || c.plaintiff_name}
+                    <li key={c.id} className="dash-row">
+                      <div className="dash-row-main">
+                        <b>دعوى {c.case_number}/{c.case_year} — {c.case_title || c.plaintiff_name}</b>
+                        <span className="cell-sub">
+                          {c.court_name} · الجلسة القادمة: {c.next_session_date ? new Date(c.next_session_date).toLocaleDateString('ar-EG') : 'غير محدد'}
+                        </span>
                       </div>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        المحكمة: {c.court_name} | الجلسة القادمة: {c.next_session_date ? new Date(c.next_session_date).toLocaleDateString('ar-EG') : 'غير محدد'}
-                      </div>
-                    </div>
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
             </div>
             <div className="modal-footer">
@@ -826,7 +581,7 @@ export default function ClientsPage({ setActiveTab }) {
                 </p>
 
                 <div style={{ padding: '0.8rem', background: 'var(--bg-card-subtle)', borderRadius: '10px', border: '1px solid var(--border-color)', fontSize: '0.85rem' }}>
-                  <div>• الموقف المالي: {renderBalanceBadge(statementClient.financial_balance, true)}</div>
+                  <div>• الموقف المالي: {renderBalanceBadge(ledgerBalance(statementClient.id), true)}</div>
                   <div style={{ marginTop: '0.3rem', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
                     • سيتم إرسال ملخص الحساب مع تفاصيل آخر المعاملات المالية وطرق السداد المتاحة.
                   </div>
@@ -897,9 +652,9 @@ export default function ClientsPage({ setActiveTab }) {
                     borderRadius: '10px',
                     fontSize: '0.85rem',
                     lineHeight: '1.5',
-                    background: telegramStatusMsg.type === 'success' ? '#f0fdf4' : telegramStatusMsg.type === 'error' ? '#fef2f2' : '#f0f9ff',
-                    border: `1px solid ${telegramStatusMsg.type === 'success' ? '#86efac' : telegramStatusMsg.type === 'error' ? '#fca5a5' : '#bae6fd'}`,
-                    color: telegramStatusMsg.type === 'success' ? '#15803d' : telegramStatusMsg.type === 'error' ? '#b91c1c' : '#0369a1',
+                    background: telegramStatusMsg.type === 'success' ? 'var(--status-active-bg)' : telegramStatusMsg.type === 'error' ? 'var(--status-dismissed-bg)' : 'var(--status-prelim-bg)',
+                    border: '1px solid transparent',
+                    color: telegramStatusMsg.type === 'success' ? 'var(--status-active)' : telegramStatusMsg.type === 'error' ? 'var(--status-dismissed)' : 'var(--status-prelim)',
                   }}>
                     {telegramStatusMsg.text}
                   </div>
@@ -911,9 +666,9 @@ export default function ClientsPage({ setActiveTab }) {
                     padding: '0.85rem 1rem',
                     borderRadius: '10px',
                     fontSize: '0.83rem',
-                    background: '#fffbeb',
-                    border: '1px solid #fde68a',
-                    color: '#92400e',
+                    background: 'var(--status-adjourned-bg)',
+                    border: '1px solid transparent',
+                    color: 'var(--status-adjourned)',
                     lineHeight: '1.5'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: '700', marginBottom: '0.3rem' }}>
@@ -921,7 +676,7 @@ export default function ClientsPage({ setActiveTab }) {
                       <span>تنبيه: يلزم إضافة العمود في Supabase</span>
                     </div>
                     يرجى فتح لوحة Supabase وكتابة هذا الأمر في SQL Editor:
-                    <pre style={{ background: '#f8fafc', padding: '0.5rem', borderRadius: '6px', direction: 'ltr', fontSize: '0.75rem', margin: '0.4rem 0' }}>
+                    <pre style={{ background: 'var(--bg-card)', color: 'var(--text-main)', padding: '0.5rem', borderRadius: '6px', direction: 'ltr', fontSize: '0.75rem', margin: '0.4rem 0' }}>
                       ALTER TABLE clients ADD COLUMN telegram_chat_id BIGINT DEFAULT NULL;
                     </pre>
                   </div>
@@ -930,8 +685,8 @@ export default function ClientsPage({ setActiveTab }) {
                 {/* If Linked */}
                 {telegramModalClient.telegram_chat_id ? (
                   <div style={{
-                    background: 'linear-gradient(to bottom, #f0fdf4, #ffffff)',
-                    border: '1px solid #bbf7d0',
+                    background: 'var(--status-active-bg)',
+                    border: '1px solid transparent',
                     borderRadius: '14px',
                     padding: '1.25rem',
                     display: 'flex',
@@ -939,11 +694,11 @@ export default function ClientsPage({ setActiveTab }) {
                     gap: '1rem'
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#16a34a' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--status-active)' }}>
                         <CheckCircle size={22} />
                       </div>
                       <div>
-                        <h4 style={{ margin: 0, fontSize: '1rem', color: '#15803d', fontWeight: '800' }}>
+                        <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--status-active)', fontWeight: '800' }}>
                           الحساب مربوط ونشط ✅
                         </h4>
                         <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
@@ -956,7 +711,7 @@ export default function ClientsPage({ setActiveTab }) {
                       ستصل الموكل إشعارات تلقائية فورية عند تأجيل الجلسات، أو صدور قرارات وأحكام، أو تحديث حالة قضاياه المسجلة، بالإضافة لفواتير الأتعاب.
                     </p>
 
-                    <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', paddingTop: '0.5rem', borderTop: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
                       <button
                         className="btn btn-primary"
                         style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
@@ -988,7 +743,7 @@ export default function ClientsPage({ setActiveTab }) {
                       padding: '1rem'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                        <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--primary-700)', color: '#fff', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800' }}>1</span>
+                        <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800' }}>1</span>
                         <strong style={{ fontSize: '0.9rem' }}>شارك رابط الدعوة مع الموكل:</strong>
                       </div>
                       <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 0.6rem 0' }}>
@@ -1040,7 +795,7 @@ export default function ClientsPage({ setActiveTab }) {
                       padding: '1rem'
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                        <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--primary-700)', color: '#fff', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800' }}>2</span>
+                        <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800' }}>2</span>
                         <strong style={{ fontSize: '0.9rem' }}>التحقق والربط التلقائي:</strong>
                       </div>
                       <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 0.8rem 0' }}>
@@ -1190,15 +945,9 @@ export default function ClientsPage({ setActiveTab }) {
 
                   <div className="client-form-grid-2col">
                     <div className="form-group">
-                      <label className="form-label">الرصيد المالي (الأتعاب)</label>
-                      <input
-                        type="number"
-                        step="any"
-                        className="form-input"
-                        style={{ direction: 'ltr', textAlign: 'left' }}
-                        value={editingClient.financial_balance}
-                        onChange={(e) => setEditingClient({ ...editingClient, financial_balance: e.target.value })}
-                      />
+                      <label className="form-label">الرصيد المالي الحالي</label>
+                      <div className="bal-readonly">{renderBalanceBadge(ledgerBalance(editingClient.id), true)}</div>
+                      <div className="sd-help">محسوب من الحركات المسجلة. لتعديله أضف حركة من «كشف الحساب».</div>
                     </div>
 
                     <div className="form-group">
@@ -1223,6 +972,7 @@ export default function ClientsPage({ setActiveTab }) {
           </div>
         )
       }
+      <QuickActionModal isOpen={isAddClientOpen} initialMode="client" onClose={() => setIsAddClientOpen(false)} />
     </div >
   );
 }

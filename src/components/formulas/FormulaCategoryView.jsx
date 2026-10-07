@@ -148,7 +148,7 @@ export default function FormulaCategoryView({
       {/* The 10 Categories Grid */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))',
         gap: '1.25rem',
         marginBottom: '2rem'
       }}>
@@ -160,6 +160,8 @@ export default function FormulaCategoryView({
             bgColor: 'rgba(55, 4, 10, 0.05)',
             desc: 'صيغ وقوالب قانونية متخصصة.'
           };
+          meta.color = 'var(--accent)';
+          meta.bgColor = 'var(--accent-soft)';
           const Icon = meta.icon;
 
           return (

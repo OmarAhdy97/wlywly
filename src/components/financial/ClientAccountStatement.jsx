@@ -637,7 +637,7 @@ export default function ClientAccountStatement({
           </div>
         </div>
 
-        {/* Footer Emblem */}
+        {/* Footer Emblem (Centered with balanced lines on both sides) */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -648,11 +648,15 @@ export default function ClientAccountStatement({
           color: '#94a3b8',
           fontSize: '0.76rem',
           fontWeight: '700',
-          pageBreakInside: 'avoid'
+          pageBreakInside: 'avoid',
+          width: '100%'
         }}>
           <span style={{ height: '1px', background: '#e2e8f0', flex: 1 }}></span>
-          {/* <span>معًا نحو تحقيق العدالة وإرساء سيادة القانون</span> */}
-          <Scale size={14} color="#37040a" />
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
+            {/* <span>معًا نحو تحقيق العدالة وإرساء سيادة القانون</span> */}
+            <Scale size={14} color="#37040a" />
+          </div>
+          <span style={{ height: '1px', background: '#e2e8f0', flex: 1 }}></span>
         </div>
       </div>
     </div>
