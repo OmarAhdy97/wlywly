@@ -1,7 +1,7 @@
-import { CASE_TYPES, CASE_STATUSES, SESSION_DECISIONS } from './supabase';
+﻿import { CASE_TYPES, CASE_STATUSES, SESSION_DECISIONS } from './supabase';
 import { calculateClientFinancialSummary, formatMoney } from './financialCalculations';
 
-export const TELEGRAM_BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '8980994154:AAGJzUkUAuXHysaHn_fNl28eqHxs-uYHbdM';
+export const TELEGRAM_BOT_TOKEN = import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '';
 export const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'Agenda_LegalBot';
 
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
