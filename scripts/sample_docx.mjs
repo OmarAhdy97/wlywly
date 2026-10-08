@@ -1,0 +1,12 @@
+import fs from 'fs';
+import { generateDocumentModel, buildInitialFormValues } from '../src/lib/formulaEngine.js';
+import { generateDocx } from '../src/lib/docxGenerator.js';
+const [id, out] = process.argv.slice(2);
+const cat = JSON.parse(fs.readFileSync('src/data/legal_formulas.json', 'utf8'));
+const f = cat.find(x => x.id === id);
+const v = buildInitialFormValues(f, {});
+if (id === 'formula_204') Object.assign(v, { announce_day: 'الأحد', announce_date: '2026-10-11', client_name: 'أدهم أحمد', client_address: 'دمياط', lawyer_name: 'محمود جمال', opponent_name: 'أحمد مصطفى مصطفى', opponent_address: 'الشعراء', court_name: 'دمياط الجديدة الجزئية', document_title: 'عقد بيع ابتدائي', document_date: '2026-10-01', document_subject: 'بيع قطعة أرض مساحتها 200 م²' });
+const { model } = generateDocumentModel(f, v, { officeProfile: { office_name: 'مكتب الأستاذ / عمر عهدي', lawyer_name: 'عمر عهدي', lawyer_title: 'محامون ومستشارون قانونيون', address: 'دمياط الجديدة', phone: '01099912381', email: 'a@b.com' } }, {});
+const blob = await generateDocx(model);
+fs.writeFileSync(out, Buffer.from(await blob.arrayBuffer()));
+console.log('wrote', out);

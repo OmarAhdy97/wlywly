@@ -1,11 +1,18 @@
+import PhoneField from '../common/PhoneField';
 import React, { useState } from 'react';
 import { X, Briefcase, Users, CalendarPlus, UserCheck } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { CASE_TYPES, COURT_LEVELS, CASE_STATUSES, SESSION_DECISIONS } from '../../lib/supabase';
+import { notify } from '../../lib/dialog';
+import Select from '../common/Select';
+import CourtInput from '../common/CourtInput';
+import DateInput from '../common/DateInput';
+import { formatEgyptPhone } from '../../lib/phone';
 
 export default function QuickActionModal({ isOpen, onClose, initialMode = 'case' }) {
   const [activeMode, setActiveMode] = useState(initialMode);
   const { clients, cases, addCase, addClient, addSession, addTeamMember, addTransaction } = useData();
+  const usedCourts = React.useMemo(() => [...new Set((cases || []).map((c) => c.court_name).filter(Boolean))], [cases]);
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -69,7 +76,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
         onClose();
       }, 1000);
     } catch (err) {
-      alert('خطأ أثناء إضافة القضية: ' + err.message);
+      notify('خطأ أثناء إضافة القضية: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -107,7 +114,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
         onClose();
       }, 1000);
     } catch (err) {
-      alert('خطأ أثناء إضافة الموكل: ' + err.message);
+      notify('خطأ أثناء إضافة الموكل: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -116,7 +123,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
   const handleSaveSession = async (e) => {
     e.preventDefault();
     if (!selectedCaseId) {
-      alert('يرجى اختيار القضية أولاً');
+      notify('يرجى اختيار القضية أولاً', 'warn');
       return;
     }
     setLoading(true);
@@ -144,7 +151,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
         onClose();
       }, 1000);
     } catch (err) {
-      alert('خطأ أثناء تسجيل الجلسة: ' + err.message);
+      notify('خطأ أثناء تسجيل الجلسة: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -154,37 +161,26 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-            <button 
-              type="button"
-              className={`btn ${activeMode === 'case' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setActiveMode('case')}
-              style={{ fontSize: '0.84rem', padding: '0.45rem 0.8rem' }}
-            >
-              <Briefcase size={15} />
-              <span>إضافة قضية</span>
-            </button>
-            <button 
-              type="button"
-              className={`btn ${activeMode === 'client' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setActiveMode('client')}
-              style={{ fontSize: '0.84rem', padding: '0.45rem 0.8rem' }}
-            >
-              <Users size={15} />
-              <span>إضافة موكل</span>
-            </button>
-            <button 
-              type="button"
-              className={`btn ${activeMode === 'session' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setActiveMode('session')}
-              style={{ fontSize: '0.84rem', padding: '0.45rem 0.8rem' }}
-            >
-              <CalendarPlus size={15} />
-              <span>تسجيل جلسة</span>
-            </button>
+        <div className="modal-header quick-header">
+          <div className="seg-tabs" role="tablist">
+            {[
+              ['case', 'قضية'],
+              ['client', 'موكل'],
+              ['session', 'جلسة'],
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={activeMode === id}
+                className={`seg-tab ${activeMode === id ? 'is-active' : ''}`}
+                onClick={() => setActiveMode(id)}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-          <button className="btn btn-secondary btn-icon" onClick={onClose} style={{ flexShrink: 0 }}>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="إغلاق">
             <X size={18} />
           </button>
         </div>
@@ -192,9 +188,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
         {/* Body */}
         <div className="modal-body">
           {successMsg && (
-            <div style={{ padding: '0.8rem', background: 'var(--status-active-bg)', color: 'var(--status-active)', borderRadius: '8px', marginBottom: '1rem', fontWeight: 'bold' }}>
-              {successMsg}
-            </div>
+            <div className="inline-notice" role="status">{successMsg}</div>
           )}
 
           {/* Mode 1: Case */}
@@ -249,16 +243,10 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+              <div className="form-grid">
                 <div className="form-group">
                   <label className="form-label">المحكمة *</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="مثال: محكمة دمياط الابتدائية" 
-                    value={courtName} 
-                    onChange={(e) => setCourtName(e.target.value)} 
-                  />
+                  <CourtInput value={courtName} onChange={setCourtName} extra={usedCourts} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">الدائرة</label>
@@ -309,25 +297,23 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
               <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">الموكل المرتبط بالدعوى</label>
-                  <select 
+                  <Select 
                     className="form-select" 
                     value={selectedClientId} 
                     onChange={(e) => setSelectedClientId(e.target.value)}
                   >
                     <option value="">-- بدون ربط أو اختر لاحقاً --</option>
                     {clients.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name} ({c.phone || 'بدون هاتف'})</option>
+                      <option key={c.id} value={c.id}>{c.name} ({c.phone ? formatEgyptPhone(c.phone) : 'بدون هاتف'})</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div className="form-group">
                   <label className="form-label">تاريخ أول / أقرب جلسة</label>
-                  <input 
-                    type="date" 
+                  <DateInput 
                     className="form-input" 
                     value={nextSessionDate} 
-                    onChange={(e) => setNextSessionDate(e.target.value)} 
-                  />
+                    onChange={(e) => setNextSessionDate(e.target.value)} />
                 </div>
               </div>
 
@@ -358,32 +344,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
               <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">رقم الهاتف (مصر)</label>
-                  <div style={{ display: 'flex', direction: 'ltr', alignItems: 'center' }}>
-                    <span style={{ 
-                      padding: '0.6rem 0.75rem', 
-                      background: 'var(--bg-card-subtle)', 
-                      border: '1px solid var(--border-color)', 
-                      borderRight: 'none', 
-                      borderRadius: 'var(--radius-md) 0 0 var(--radius-md)', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '0.35rem', 
-                      fontWeight: '700', 
-                      fontSize: '0.85rem',
-                      color: 'var(--text-main)'
-                    }}>
-                      <span>🇪🇬</span>
-                      <span>+20</span>
-                    </span>
-                    <input 
-                      type="tel" 
-                      className="form-input" 
-                      placeholder="010XXXXXXXX" 
-                      style={{ borderRadius: '0 var(--radius-md) var(--radius-md) 0', textAlign: 'left', direction: 'ltr' }}
-                      value={clientPhone} 
-                      onChange={(e) => setClientPhone(e.target.value)} 
-                    />
-                  </div>
+                  <PhoneField value={clientPhone} onChange={setClientPhone} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">الرقم القومي (14 رقم)</label>
@@ -443,7 +404,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
             <form onSubmit={handleSaveSession}>
               <div className="form-group">
                 <label className="form-label">اختر الدعوى / القضية *</label>
-                <select 
+                <Select 
                   className="form-select" 
                   required 
                   value={selectedCaseId} 
@@ -455,23 +416,21 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
                       قضية رقم {c.case_number}/{c.case_year} — {c.case_title || c.plaintiff_name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div className="form-grid-2">
                 <div className="form-group">
                   <label className="form-label">تاريخ الجلسة المتداولة *</label>
-                  <input 
-                    type="date" 
+                  <DateInput 
                     className="form-input" 
                     required 
                     value={sessionDate} 
-                    onChange={(e) => setSessionDate(e.target.value)} 
-                  />
+                    onChange={(e) => setSessionDate(e.target.value)} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">قرار الجلسة / الحالة</label>
-                  <select 
+                  <Select 
                     className="form-select" 
                     value={sessionStatus} 
                     onChange={(e) => setSessionStatus(e.target.value)}
@@ -479,7 +438,7 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
                     {Object.entries(SESSION_DECISIONS).map(([k, v]) => (
                       <option key={k} value={k}>{v.label}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               </div>
 
@@ -497,12 +456,10 @@ export default function QuickActionModal({ isOpen, onClose, initialMode = 'case'
                   </div>
                   <div className="form-group">
                     <label className="form-label">تاريخ الجلسة القادمة *</label>
-                    <input 
-                      type="date" 
+                    <DateInput 
                       className="form-input" 
                       value={futureSessionDate} 
-                      onChange={(e) => setFutureSessionDate(e.target.value)} 
-                    />
+                      onChange={(e) => setFutureSessionDate(e.target.value)} />
                   </div>
                 </div>
               )}

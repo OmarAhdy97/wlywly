@@ -12,6 +12,7 @@ import DynamicFormulaForm from '../components/formulas/DynamicFormulaForm';
 import FormulaPreview from '../components/formulas/FormulaPreview';
 import LegalDocumentEditor from '../components/formulas/LegalDocumentEditor';
 import SavedDocumentsModal from '../components/formulas/SavedDocumentsModal';
+import { notify } from '../lib/dialog';
 
 export default function LegalFormulasPage() {
   const { user } = useAuth();
@@ -100,7 +101,7 @@ export default function LegalFormulasPage() {
     });
 
     if (result.errors.length > 0) {
-      alert(result.errors.join('\n'));
+      notify(result.errors.join('\n'));
       return;
     }
 
@@ -123,7 +124,7 @@ export default function LegalFormulasPage() {
     });
 
     if (result.errors.length > 0) {
-      alert(result.errors.join('\n'));
+      notify(result.errors.join('\n'));
       return;
     }
 
@@ -168,7 +169,7 @@ export default function LegalFormulasPage() {
   }, [currentView, selectedCategory, globalSearch, favorites]);
 
   return (
-    <div className="page-wrapper" style={{ maxWidth: '1400px' }}>
+    <div className="page-wrapper">
       {/* 1. Main 10 Categories View (when no global search is active) */}
       {currentView === 'CATEGORIES' && !globalSearch.trim() && (
         <FormulaCategoryView

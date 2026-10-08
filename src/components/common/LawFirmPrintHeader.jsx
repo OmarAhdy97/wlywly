@@ -1,12 +1,13 @@
 import React from 'react';
 import { MapPin, Phone, Mail } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { formatEgyptPhone } from '../../lib/phone';
 
 /**
  * LawFirmDefaultLogo
  * Simple, elegant Law Scale vector emblem (ميزان بسيط فقط)
  */
-export function LawFirmDefaultLogo({ size = 54, color = '#37040a' }) {
+export function LawFirmDefaultLogo({ size = 54, color = '#111827' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none">
       {/* Central Post */}
@@ -56,7 +57,7 @@ export default function LawFirmPrintHeader({ customProfile = null, className = '
       position: 'relative',
       paddingBottom: '0.85rem',
       marginBottom: '1rem',
-      borderBottom: '2.5px solid #37040a',
+      borderBottom: '2.5px solid #111827',
       direction: 'rtl',
       flexShrink: 0,
       width: '100%',
@@ -73,33 +74,33 @@ export default function LawFirmPrintHeader({ customProfile = null, className = '
       }}>
         <svg width="125" height="110" viewBox="0 0 64 64" fill="none">
           {/* Central Post */}
-          <line x1="32" y1="8" x2="32" y2="54" stroke="#37040a" strokeWidth="2.8" strokeLinecap="round" />
+          <line x1="32" y1="8" x2="32" y2="54" stroke="#111827" strokeWidth="2.8" strokeLinecap="round" />
           {/* Top Finial Ring */}
-          <circle cx="32" cy="7" r="3.2" stroke="#37040a" strokeWidth="1.8" fill="none" />
+          <circle cx="32" cy="7" r="3.2" stroke="#111827" strokeWidth="1.8" fill="none" />
           
           {/* Horizontal Crossbeam */}
-          <line x1="12" y1="17" x2="52" y2="17" stroke="#37040a" strokeWidth="2.4" strokeLinecap="round" />
+          <line x1="12" y1="17" x2="52" y2="17" stroke="#111827" strokeWidth="2.4" strokeLinecap="round" />
           {/* Center Pivot Hub */}
-          <circle cx="32" cy="17" r="2.8" fill="#37040a" />
+          <circle cx="32" cy="17" r="2.8" fill="#111827" />
 
           {/* Left Scale Strings & Pan */}
-          <line x1="15" y1="17" x2="9" y2="35" stroke="#37040a" strokeWidth="1.2" />
-          <line x1="15" y1="17" x2="21" y2="35" stroke="#37040a" strokeWidth="1.2" />
-          <line x1="15" y1="17" x2="15" y2="35" stroke="#37040a" strokeWidth="1.2" />
-          <path d="M 7 35 Q 15 44 23 35 Z" fill="#37040a" />
-          <rect x="6" y="34.2" width="18" height="1.6" rx="0.8" fill="#37040a" />
+          <line x1="15" y1="17" x2="9" y2="35" stroke="#111827" strokeWidth="1.2" />
+          <line x1="15" y1="17" x2="21" y2="35" stroke="#111827" strokeWidth="1.2" />
+          <line x1="15" y1="17" x2="15" y2="35" stroke="#111827" strokeWidth="1.2" />
+          <path d="M 7 35 Q 15 44 23 35 Z" fill="#111827" />
+          <rect x="6" y="34.2" width="18" height="1.6" rx="0.8" fill="#111827" />
 
           {/* Right Scale Strings & Pan */}
-          <line x1="49" y1="17" x2="43" y2="35" stroke="#37040a" strokeWidth="1.2" />
-          <line x1="49" y1="17" x2="55" y2="35" stroke="#37040a" strokeWidth="1.2" />
-          <line x1="49" y1="17" x2="49" y2="35" stroke="#37040a" strokeWidth="1.2" />
-          <path d="M 41 35 Q 49 44 57 35 Z" fill="#37040a" />
-          <rect x="40" y="34.2" width="18" height="1.6" rx="0.8" fill="#37040a" />
+          <line x1="49" y1="17" x2="43" y2="35" stroke="#111827" strokeWidth="1.2" />
+          <line x1="49" y1="17" x2="55" y2="35" stroke="#111827" strokeWidth="1.2" />
+          <line x1="49" y1="17" x2="49" y2="35" stroke="#111827" strokeWidth="1.2" />
+          <path d="M 41 35 Q 49 44 57 35 Z" fill="#111827" />
+          <rect x="40" y="34.2" width="18" height="1.6" rx="0.8" fill="#111827" />
 
           {/* Stepped Pedestal Base */}
-          <path d="M 22 54 C 25 51 29 50 32 50 C 35 50 39 51 42 54 Z" fill="#37040a" />
-          <rect x="18" y="54" width="28" height="3" rx="1.5" fill="#37040a" />
-          <rect x="14" y="57" width="36" height="2.5" rx="1.2" fill="#37040a" />
+          <path d="M 22 54 C 25 51 29 50 32 50 C 35 50 39 51 42 54 Z" fill="#111827" />
+          <rect x="18" y="54" width="28" height="3" rx="1.5" fill="#111827" />
+          <rect x="14" y="57" width="36" height="2.5" rx="1.2" fill="#111827" />
         </svg>
       </div>
 
@@ -118,29 +119,29 @@ export default function LawFirmPrintHeader({ customProfile = null, className = '
           flexDirection: 'column',
           gap: '0.35rem',
           fontSize: '0.84rem',
-          color: '#37040a',
+          color: '#111827',
           textAlign: 'right',
         }}>
           {profile.address && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <MapPin size={14} style={{ color: '#6d0f1b', flexShrink: 0 }} />
-              <span className="contact-address" style={{ fontWeight: '700', color: '#37040a' }}>{profile.address}</span>
+              <MapPin size={14} style={{ color: '#111827', flexShrink: 0 }} />
+              <span className="contact-address" style={{ fontWeight: '700', color: '#111827' }}>{profile.address}</span>
             </div>
           )}
 
           {profile.phone && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Phone size={14} style={{ color: '#6d0f1b', flexShrink: 0 }} />
-              <span className="contact-phone" dir="ltr" style={{ fontWeight: '700', direction: 'ltr', color: '#37040a' }}>
-                {profile.phone.startsWith('+') ? profile.phone : `+20 ${profile.phone}`}
+              <Phone size={14} style={{ color: '#111827', flexShrink: 0 }} />
+              <span className="contact-phone" dir="ltr" style={{ fontWeight: '700', direction: 'ltr', color: '#111827' }}>
+                {formatEgyptPhone(profile.phone, { isolate: false })}
               </span>
             </div>
           )}
 
           {profile.email && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Mail size={14} style={{ color: '#6d0f1b', flexShrink: 0 }} />
-              <span className="contact-email" dir="ltr" style={{ fontWeight: '600', color: '#6d0f1b' }}>{profile.email}</span>
+              <Mail size={14} style={{ color: '#111827', flexShrink: 0 }} />
+              <span className="contact-email" dir="ltr" style={{ fontWeight: '600', color: '#111827' }}>{profile.email}</span>
             </div>
           )}
         </div>
@@ -169,7 +170,7 @@ export default function LawFirmPrintHeader({ customProfile = null, className = '
                 style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
               />
             ) : (
-              <LawFirmDefaultLogo size={54} color="#37040a" />
+              <LawFirmDefaultLogo size={54} color="#111827" />
             )}
           </div>
 
@@ -178,9 +179,9 @@ export default function LawFirmPrintHeader({ customProfile = null, className = '
             margin: 0,
             fontSize: '1.24rem',
             fontWeight: '900',
-            color: '#37040a',
+            color: '#111827',
             lineHeight: 1.25,
-            fontFamily: "'Alexandria', 'Cairo', 'Tahoma', sans-serif",
+            fontFamily: "'Noto Sans Arabic', 'Tahoma', sans-serif",
           }}>
             {profile.office_name || 'مكتب المحاماة والاستشارات القانونية'}
           </h2>
@@ -189,7 +190,7 @@ export default function LawFirmPrintHeader({ customProfile = null, className = '
           <div style={{
             fontSize: '0.82rem',
             fontWeight: '700',
-            color: '#6d0f1b',
+            color: '#111827',
             marginTop: '0.15rem',
           }}>
             {profile.lawyer_title || 'محامون ومستشارون قانونيون'}
@@ -199,7 +200,7 @@ export default function LawFirmPrintHeader({ customProfile = null, className = '
           <div style={{
             width: '110px',
             height: '1.5px',
-            backgroundColor: '#37040a',
+            backgroundColor: '#111827',
             opacity: 0.35,
             margin: '0.35rem auto 0.25rem',
           }}></div>
@@ -209,7 +210,7 @@ export default function LawFirmPrintHeader({ customProfile = null, className = '
             <div style={{
               fontSize: '0.74rem',
               fontWeight: '600',
-              color: '#6b4c51',
+              color: '#475569',
               letterSpacing: '0.3px',
             }}>
               {profile.slogan}

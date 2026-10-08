@@ -1,27 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-  Briefcase,
-  User,
-  Users,
-  Building,
-  Calendar,
-  FileText,
-  AlertCircle,
-  CheckCircle2,
-  Sparkles,
-  ArrowRight,
-  Eye,
-  Edit3,
-  HelpCircle,
-  DollarSign,
-  ChevronDown
-} from 'lucide-react';
+import { Calendar, FileText, User, Users, Building, AlertCircle, ChevronDown } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import DocumentListField from './DocumentListField';
 import { buildInitialFormValues } from '../../lib/formulaEngine';
 import { validateFormulaForm, isFieldVisible, isFieldRequired } from '../../lib/fieldValidation';
 import { numberToArabicWords, formatCurrencyToArabic } from '../../lib/numberToArabicWords';
-import { EGYPTIAN_COURTS, searchCourts, getChambersForCourt } from '../../lib/courtsData';
+import { searchCourts, getChambersForCourt } from '../../lib/courtsData';
+import Select from '../common/Select';
+import CourtInput from '../common/CourtInput';
+import { formatEgyptPhone } from '../../lib/phone';
 
 const WEEKDAYS_AR = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 // date field -> the «يوم» field that should follow it automatically
@@ -31,6 +18,29 @@ const GROUP_ICONS = { 'بيانات الإعلان': Calendar, 'الطرف ال�
 function weekdayOf(isoDate) {
   const d = new Date(`${isoDate}T12:00:00`);
   return Number.isNaN(d.getTime()) ? '' : WEEKDAYS_AR[d.getDay()];
+}
+
+// Label row, control, hint and error message shared by every field type.
+function Field({ label, required, autoText, error, description, children }) {
+  return (
+    <div className="form-group ff-field">
+      <div className="ff-label-row">
+        <label className="ff-label">
+          <span>{label}</span>
+          {required && <span className="ff-required">*</span>}
+        </label>
+        {autoText && <span className="ff-auto">{autoText}</span>}
+      </div>
+      {children}
+      {description && <span className="hint">{description}</span>}
+      {error && (
+        <span className="ff-error" role="alert">
+          <AlertCircle size={14} />
+          {error}
+        </span>
+      )}
+    </div>
+  );
 }
 
 export default function DynamicFormulaForm({
@@ -102,7 +112,7 @@ export default function DynamicFormulaForm({
     const caseClient = clients.find(cl => cl.name && cl.name === chosenCase.plaintiff_name);
     if (caseClient) {
       (formula.fields || []).forEach(field => {
-        const map = { 'client.address': caseClient.address, 'client.national_id': caseClient.national_id, 'client.phone': caseClient.phone };
+        const map = { 'client.address': caseClient.address, 'client.national_id': caseClient.national_id, 'client.phone': caseClient.phone ? formatEgyptPhone(caseClient.phone) : caseClient.phone };
         const v = map[field.source];
         if (v) {
           updated[field.key] = v;
@@ -153,7 +163,7 @@ export default function DynamicFormulaForm({
       } else if (field.source === 'client.address' && chosenClient.address) {
         val = chosenClient.address;
       } else if (field.source === 'client.phone' && chosenClient.phone) {
-        val = chosenClient.phone;
+        val = formatEgyptPhone(chosenClient.phone);
       }
 
       if (val !== null && val !== undefined) {
@@ -283,582 +293,285 @@ export default function DynamicFormulaForm({
       key={field.key}
       data-field={field.key}
       data-group={groupTitle}
-      className={`ff-item${fieldErrors[field.key] ? ' ff-item-error' : ''}`}
-      style={{ gridColumn: ['textarea', 'document_list'].includes(field.type) ? '1 / -1' : undefined }}
+      className={`ff-item${fieldErrors[field.key] ? ' ff-item-error' : ''}${['textarea', 'document_list'].includes(field.type) ? ' ff-item-wide' : ''}`}
     >
       {node}
-      {field.hint && !fieldErrors[field.key] && (
-        <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>{field.hint}</span>
-      )}
+      {field.hint && !fieldErrors[field.key] && <span className="hint">{field.hint}</span>}
     </div>
   );
 
-  return (
-    <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-      {/* Header Card */}
-      <div style={{
-        background: 'var(--bg-card)',
-        padding: '1.25rem 1.5rem',
-        borderRadius: 'var(--radius-lg, 12px)',
-        border: '1px solid var(--border-color)',
-        marginBottom: '1.25rem',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
-              <span className="badge" style={{ background: 'var(--primary-100)', color: 'var(--primary-800)', fontWeight: '700' }}>
-                {formula?.category}
-              </span>
-              {formula?.legal_area && (
-                <span className="badge" style={{ background: 'rgba(13, 148, 136, 0.1)', color: '#0d9488' }}>
-                  فرع: {formula.legal_area}
-                </span>
-              )}
-              <span className="badge" style={{ background: 'var(--bg-card-subtle)', color: 'var(--text-muted)' }}>
-                {formula?.type === 'checklist' ? 'قائمة تجهيز وإرشادات' : 'صيغة قانونية'}
-              </span>
-              {formula?.jurisdiction && (
-                <span className="badge" style={{ background: 'rgba(37, 99, 235, 0.08)', color: '#2563eb' }}>
-                  الاختصاص: {formula.jurisdiction}
-                </span>
-              )}
-            </div>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-              إعداد: {formula?.title}
-            </h2>
-          </div>
+  const renderField = (field) => {
+    const errorMsg = fieldErrors[field.key];
+    const isRequired = isFieldRequired(field, formValues);
+    const val = formValues[field.key] !== undefined ? formValues[field.key] : '';
+    const isAutoFilled = autoFilledFields.has(field.key);
+    const autoText = isAutoFilled ? 'معبأ تلقائياً' : '';
+    const invalid = errorMsg ? ' is-invalid' : '';
+    const set = (v) => handleInputChange(field.key, v);
+    const common = { label: field.label, required: isRequired, error: errorMsg };
 
-          <button
-            type="button"
-            onClick={onCancel}
-            className="btn btn-secondary btn-sm"
-          >
-            ← العودة للصيغ
-          </button>
+    if (field.type === 'document_list') {
+      return (
+        <div>
+          <DocumentListField value={formValues[field.key]} onChange={set} label={field.label} />
+          {errorMsg && (
+            <span className="ff-error" role="alert"><AlertCircle size={14} />{errorMsg}</span>
+          )}
         </div>
+      );
+    }
 
-        {formula?.description && (
-          <p style={{ margin: '0.75rem 0 0 0', fontSize: '0.88rem', color: 'var(--text-muted)', lineHeight: '1.6' }}>
-            {formula.description}
-          </p>
+    if (field.type === 'textarea') {
+      return (
+        <Field {...common} autoText={autoText} description={field.description}>
+          <textarea
+            rows={3}
+            className={`form-textarea${invalid}`}
+            placeholder={field.placeholder || `أدخل ${field.label}`}
+            value={val}
+            onChange={(e) => set(e.target.value)}
+          />
+        </Field>
+      );
+    }
+
+    if (field.type === 'select') {
+      return (
+        <Field {...common}>
+          <Select className={`form-select${invalid}`} value={val} onChange={(e) => set(e.target.value)}>
+            <option value="">اختر {field.label}</option>
+            {(field.options || []).map((opt, idx) => {
+              const optValue = typeof opt === 'object' ? opt.value : opt;
+              const optLabel = typeof opt === 'object' ? opt.label : opt;
+              return <option key={idx} value={optValue}>{optLabel}</option>;
+            })}
+          </Select>
+        </Field>
+      );
+    }
+
+    if (field.type === 'radio') {
+      return (
+        <Field {...common}>
+          <div className="ff-radios">
+            {(field.options || []).map((opt, idx) => {
+              const optValue = typeof opt === 'object' ? opt.value : opt;
+              const optLabel = typeof opt === 'object' ? opt.label : opt;
+              return (
+                <label key={idx} className="ff-choice">
+                  <input
+                    type="radio"
+                    name={field.key}
+                    value={optValue}
+                    checked={String(val) === String(optValue)}
+                    onChange={() => set(optValue)}
+                  />
+                  <span>{optLabel}</span>
+                </label>
+              );
+            })}
+          </div>
+        </Field>
+      );
+    }
+
+    if (field.type === 'checkbox') {
+      return (
+        <div className="form-group ff-field">
+          <label className="ff-choice ff-choice-strong">
+            <input type="checkbox" checked={Boolean(val)} onChange={(e) => set(e.target.checked)} />
+            <span>{field.label}</span>
+            {isRequired && <span className="ff-required">*</span>}
+          </label>
+          {field.description && <span className="hint">{field.description}</span>}
+          {errorMsg && <span className="ff-error" role="alert"><AlertCircle size={14} />{errorMsg}</span>}
+        </div>
+      );
+    }
+
+    if (field.type === 'court' || field.key.includes('court') || field.label.includes('محكمة')) {
+      return (
+        <Field {...common} autoText={isAutoFilled ? 'معبأ من القضية' : ''}>
+          <CourtInput
+            className={`form-input${invalid}`}
+            placeholder={field.placeholder || 'ابحث في دليل المحاكم أو اكتب اسم المحكمة'}
+            value={val}
+            onChange={set}
+          />
+        </Field>
+      );
+    }
+
+    if (field.type === 'client') {
+      return (
+        <Field {...common} autoText={autoText}>
+          <input
+            type="text"
+            list={`client_list_${field.key}`}
+            className={`form-input${invalid}`}
+            placeholder={field.placeholder || 'اكتب اسم الموكل أو اختر من الدليل'}
+            value={val}
+            onChange={(e) => set(e.target.value)}
+          />
+          {clientNames.length > 0 && (
+            <datalist id={`client_list_${field.key}`}>
+              {clientNames.map((cn, i) => <option key={i} value={cn} />)}
+            </datalist>
+          )}
+        </Field>
+      );
+    }
+
+    if (field.type === 'opponent') {
+      return (
+        <Field {...common} autoText={isAutoFilled ? 'معبأ من القضية' : ''}>
+          <input
+            type="text"
+            list={`list_${field.key}`}
+            className={`form-input${invalid}`}
+            placeholder={field.placeholder || 'اكتب اسم الخصم أو اختر من القضايا السابقة'}
+            value={val}
+            onChange={(e) => set(e.target.value)}
+          />
+          {existingOpponents.length > 0 && (
+            <datalist id={`list_${field.key}`}>
+              {existingOpponents.map((op, i) => <option key={i} value={op} />)}
+            </datalist>
+          )}
+        </Field>
+      );
+    }
+
+    // text / date / number, with a live Arabic spelling of amounts
+    const isAmountField = field.type === 'number' ||
+      field.key.includes('amount') ||
+      field.key.includes('price') ||
+      field.key.includes('fee') ||
+      field.key.includes('rent') ||
+      field.label.includes('مبلغ') ||
+      field.label.includes('قيمة') ||
+      field.label.includes('أجرة');
+
+    let tafqeetText = '';
+    if (isAmountField && val && !isNaN(Number(val)) && Number(val) > 0) {
+      try {
+        tafqeetText = formatCurrencyToArabic(Number(val), 'جنيه مصري');
+      } catch (e) { /* the amount is shown without its spelling */ }
+    }
+
+    return (
+      <Field {...common} autoText={autoText} description={field.description}>
+        <input
+          type={field.type === 'date' ? 'date' : (field.type === 'number' ? 'number' : 'text')}
+          className={`form-input${invalid}`}
+          placeholder={field.placeholder || `أدخل ${field.label}`}
+          value={val}
+          onChange={(e) => set(e.target.value)}
+        />
+        {tafqeetText && (
+          <div className="ff-tafqeet"><strong>التفقيط:</strong> {tafqeetText}</div>
         )}
+      </Field>
+    );
+  };
+
+  const allRequiredDone = progress.reqFilled === progress.reqTotal;
+
+  return (
+    <div className="ff-page">
+      <div className="page-head">
+        <div>
+          <button type="button" onClick={onCancel} className="formula-back">← العودة للصيغ</button>
+          <h1>{formula?.title}</h1>
+          <p className="page-sub">
+            {[formula?.category, formula?.legal_area && `فرع ${formula.legal_area}`, formula?.jurisdiction && `الاختصاص: ${formula.jurisdiction}`,
+              formula?.type === 'checklist' ? 'قائمة تجهيز وإرشادات' : null].filter(Boolean).join(' · ')}
+          </p>
+          {formula?.description && <p className="ff-desc">{formula.description}</p>}
+        </div>
       </div>
 
-      {/* Auto-fill Notice Banner */}
-      {autofillNotice && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.6rem',
-          padding: '0.75rem 1rem',
-          borderRadius: '8px',
-          background: 'rgba(197, 160, 89, 0.15)',
-          border: '1px solid var(--accent-gold)',
-          color: 'var(--primary-800)',
-          marginBottom: '1.25rem',
-          fontSize: '0.88rem'
-        }}>
-          <Sparkles size={18} style={{ color: 'var(--accent-gold)', flexShrink: 0 }} />
-          <span>{autofillNotice}</span>
-        </div>
-      )}
+      {autofillNotice && <div className="inline-notice" role="status">{autofillNotice}</div>}
 
-      {/* Main Dynamic Form */}
       <form onSubmit={handleSubmit}>
-        <div style={{
-          background: 'var(--bg-card)',
-          padding: '1.5rem',
-          borderRadius: 'var(--radius-lg, 12px)',
-          border: '1px solid var(--border-color)',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-          marginBottom: '1.25rem'
-        }}>
-          {/* Quick Selectors for Existing Office Entities */}
+        <div className="card ff-card">
           {(hasCaseField || hasClientField) && (
-            <div style={{
-              background: 'var(--bg-card-subtle, #f9f9fa)',
-              padding: '1rem',
-              borderRadius: '8px',
-              border: '1px solid var(--border-color)',
-              marginBottom: '1.5rem',
-              display: 'grid',
-              gridTemplateColumns: hasCaseField && hasClientField ? 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))' : '1fr',
-              gap: '1rem'
-            }}>
-              {/* Optional Case Selector */}
+            <div className={`ff-pickers ${hasCaseField && hasClientField ? 'is-two' : ''}`}>
               {hasCaseField && (
-                <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '0.4rem' }}>
-                    <Briefcase size={16} style={{ color: 'var(--primary-700)' }} />
-                    <span>ربط بقضية مسجلة (اختياري - لملء المحكمة والخصوم ورقم القضية):</span>
-                  </label>
-                  <select
-                    className="form-control"
-                    value={selectedCaseId}
-                    onChange={(e) => handleCaseChange(e.target.value)}
-                    style={{ fontSize: '0.85rem' }}
-                  >
-                    <option value="">-- اختر من قضايا المكتب المسجلة --</option>
-                    {cases.map(c => (
+                <div className="form-group">
+                  <label className="form-label">ربط بقضية مسجلة (اختياري، لملء المحكمة والخصوم ورقم القضية)</label>
+                  <Select className="form-select" value={selectedCaseId} onChange={(e) => handleCaseChange(e.target.value)}>
+                    <option value="">اختر من قضايا المكتب</option>
+                    {cases.map((c) => (
                       <option key={c.id} value={c.id}>
                         قضية {c.case_number || 'بدون رقم'} لسنة {c.case_year || ''} - {c.court_name || ''} ({c.plaintiff_name || 'بدون موكل'})
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               )}
-
-              {/* Optional Client Selector */}
               {hasClientField && (
-                <div>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '0.4rem' }}>
-                    <User size={16} style={{ color: 'var(--primary-700)' }} />
-                    <span>اختيار الموكل من الدليل (اختياري - لملء الاسم والرقم القومي والعنوان):</span>
-                  </label>
-                  <select
-                    className="form-control"
-                    value={selectedClientId}
-                    onChange={(e) => handleClientChange(e.target.value)}
-                    style={{ fontSize: '0.85rem' }}
-                  >
-                    <option value="">-- اختر من قائمة موكلي المكتب --</option>
-                    {clients.map(cl => (
-                      <option key={cl.id} value={cl.id}>
-                        {cl.name} {cl.phone ? `(${cl.phone})` : ''}
-                      </option>
+                <div className="form-group">
+                  <label className="form-label">اختيار الموكل من الدليل (اختياري، لملء الاسم والرقم القومي والعنوان)</label>
+                  <Select className="form-select" value={selectedClientId} onChange={(e) => handleClientChange(e.target.value)}>
+                    <option value="">اختر من موكلي المكتب</option>
+                    {clients.map((cl) => (
+                      <option key={cl.id} value={cl.id}>{cl.name} {cl.phone ? `(${formatEgyptPhone(cl.phone)})` : ''}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               )}
             </div>
           )}
 
-          {/* Progress */}
-          <div style={{ marginBottom: '1.25rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+          <div className="ff-progress">
+            <div className="ff-progress-text">
               <span>تمت تعبئة {progress.filled} من {progress.total} بيانًا</span>
-              <span style={{ color: progress.reqFilled === progress.reqTotal ? 'var(--success, #16a34a)' : 'var(--danger, #dc2626)', fontWeight: 700 }}>
-                {progress.reqFilled === progress.reqTotal ? 'اكتملت البيانات الأساسية' : `البيانات الأساسية: ${progress.reqFilled} من ${progress.reqTotal}`}
-              </span>
+              <b className={allRequiredDone ? 'is-done' : 'is-todo'}>
+                {allRequiredDone ? 'اكتملت البيانات الأساسية' : `البيانات الأساسية: ${progress.reqFilled} من ${progress.reqTotal}`}
+              </b>
             </div>
-            <div style={{ height: '6px', borderRadius: '999px', background: 'var(--border-color)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${progress.total ? Math.round((progress.filled / progress.total) * 100) : 0}%`, background: 'var(--accent-gold, #c5a059)', transition: 'width .25s' }} />
+            <div className="ff-progress-bar">
+              <div style={{ width: `${progress.total ? Math.round((progress.filled / progress.total) * 100) : 0}%` }} />
             </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
-              البيانات التي لا تعرفها الآن يمكن تركها فارغة، وستظهر في المستند نقاطًا (……) لتعبئتها بخط اليد أو في المحرر.
-            </div>
+            <p className="hint">البيانات التي لا تعرفها الآن يمكن تركها فارغة، وستظهر في المستند نقاطًا (……) لتعبئتها بخط اليد أو في المحرر.</p>
           </div>
 
-          {/* Form Fields Rendered from Metadata, grouped in sections */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {groups.map(g => {
+          <div className="ff-groups">
+            {groups.map((g) => {
               const Icon = GROUP_ICONS[g.title] || FileText;
               const collapsed = !!collapsedGroups[g.title];
-              const errCount = g.fields.filter(f => fieldErrors[f.key]).length;
+              const errCount = g.fields.filter((f) => fieldErrors[f.key]).length;
               return (
-              <section key={g.title} className="ff-group">
-                <button
-                  type="button"
-                  className="ff-group-head"
-                  onClick={() => setCollapsedGroups(prev => ({ ...prev, [g.title]: !prev[g.title] }))}
-                  aria-expanded={!collapsed}
-                >
-                  <Icon size={16} style={{ color: 'var(--primary-700)' }} />
-                  <span style={{ fontWeight: 800 }}>{g.title}</span>
-                  {errCount > 0 && <span className="ff-badge-error">{errCount} ناقص</span>}
-                  <ChevronDown size={16} style={{ marginRight: 'auto', transform: collapsed ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }} />
-                </button>
-                {!collapsed && (
-                <div className="ff-grid">
-            {g.fields.map(field => wrapField(field, g.title, (() => {
-              const errorMsg = fieldErrors[field.key];
-              const isRequired = isFieldRequired(field, formValues);
-              const val = formValues[field.key] !== undefined ? formValues[field.key] : '';
-              const isAutoFilled = autoFilledFields.has(field.key);
-
-              // 1. Document list special repeating field
-              if (field.type === 'document_list') {
-                return (
-                  <div key={field.key}>
-                    <DocumentListField
-                      value={formValues[field.key]}
-                      onChange={(newVal) => handleInputChange(field.key, newVal)}
-                      label={field.label}
-                    />
-                    {errorMsg && (
-                      <span style={{ color: 'var(--danger)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.3rem' }}>
-                        <AlertCircle size={14} />
-                        {errorMsg}
-                      </span>
-                    )}
-                  </div>
-                );
-              }
-
-              // 2. Textarea
-              if (field.type === 'textarea') {
-                return (
-                  <div key={field.key} className="form-group" style={{ margin: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: '600', margin: 0, fontSize: '0.88rem' }}>
-                        <span>{field.label}</span>
-                        {isRequired && <span style={{ color: 'var(--danger)' }}>*</span>}
-                      </label>
-                      {isAutoFilled && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--primary-700)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                          <Sparkles size={12} /> معبأ تلقائياً
-                        </span>
-                      )}
-                    </div>
-                    <textarea
-                      rows={3}
-                      className={`form-control ${errorMsg ? 'is-invalid' : ''}`}
-                      placeholder={field.placeholder || `أدخل ${field.label}...`}
-                      value={val}
-                      onChange={(e) => handleInputChange(field.key, e.target.value)}
-                      style={{ fontSize: '0.9rem', lineHeight: '1.6' }}
-                    />
-                    {field.description && (
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>
-                        {field.description}
-                      </span>
-                    )}
-                    {errorMsg && (
-                      <span style={{ color: 'var(--danger)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
-                        <AlertCircle size={14} />
-                        {errorMsg}
-                      </span>
-                    )}
-                  </div>
-                );
-              }
-
-              // 3. Dropdown / Select Field
-              if (field.type === 'select') {
-                const options = field.options || [];
-                return (
-                  <div key={field.key} className="form-group" style={{ margin: 0 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: '600', marginBottom: '0.35rem', fontSize: '0.88rem' }}>
-                      <span>{field.label}</span>
-                      {isRequired && <span style={{ color: 'var(--danger)' }}>*</span>}
-                    </label>
-                    <select
-                      className={`form-control ${errorMsg ? 'is-invalid' : ''}`}
-                      value={val}
-                      onChange={(e) => handleInputChange(field.key, e.target.value)}
-                      style={{ fontSize: '0.9rem' }}
-                    >
-                      <option value="">-- اختر {field.label} --</option>
-                      {options.map((opt, idx) => {
-                        const optValue = typeof opt === 'object' ? opt.value : opt;
-                        const optLabel = typeof opt === 'object' ? opt.label : opt;
-                        return (
-                          <option key={idx} value={optValue}>
-                            {optLabel}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    {errorMsg && (
-                      <span style={{ color: 'var(--danger)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
-                        <AlertCircle size={14} />
-                        {errorMsg}
-                      </span>
-                    )}
-                  </div>
-                );
-              }
-
-              // 4. Radio Group
-              if (field.type === 'radio') {
-                const options = field.options || [];
-                return (
-                  <div key={field.key} className="form-group" style={{ margin: 0 }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: '600', marginBottom: '0.45rem', fontSize: '0.88rem' }}>
-                      <span>{field.label}</span>
-                      {isRequired && <span style={{ color: 'var(--danger)' }}>*</span>}
-                    </label>
-                    <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap' }}>
-                      {options.map((opt, idx) => {
-                        const optValue = typeof opt === 'object' ? opt.value : opt;
-                        const optLabel = typeof opt === 'object' ? opt.label : opt;
-                        const isChecked = String(val) === String(optValue);
-                        return (
-                          <label key={idx} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer', fontSize: '0.88rem' }}>
-                            <input
-                              type="radio"
-                              name={field.key}
-                              value={optValue}
-                              checked={isChecked}
-                              onChange={() => handleInputChange(field.key, optValue)}
-                            />
-                            <span>{optLabel}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                    {errorMsg && (
-                      <span style={{ color: 'var(--danger)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
-                        <AlertCircle size={14} />
-                        {errorMsg}
-                      </span>
-                    )}
-                  </div>
-                );
-              }
-
-              // 5. Checkbox Field
-              if (field.type === 'checkbox') {
-                return (
-                  <div key={field.key} className="form-group" style={{ margin: 0 }}>
-                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.9rem', fontWeight: '600' }}>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(val)}
-                        onChange={(e) => handleInputChange(field.key, e.target.checked)}
-                      />
-                      <span>{field.label}</span>
-                      {isRequired && <span style={{ color: 'var(--danger)' }}>*</span>}
-                    </label>
-                    {field.description && (
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginRight: '1.5rem' }}>
-                        {field.description}
-                      </div>
-                    )}
-                    {errorMsg && (
-                      <span style={{ color: 'var(--danger)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
-                        <AlertCircle size={14} />
-                        {errorMsg}
-                      </span>
-                    )}
-                  </div>
-                );
-              }
-
-              // 6. Court Field (Egyptian Court Autocomplete & Hierarchy)
-              if (field.type === 'court' || field.key.includes('court') || field.label.includes('محكمة')) {
-                return (
-                  <div key={field.key} className="form-group" style={{ margin: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: '600', margin: 0, fontSize: '0.88rem' }}>
-                        <Building size={15} style={{ color: 'var(--primary-700)' }} />
-                        <span>{field.label}</span>
-                        {isRequired && <span style={{ color: 'var(--danger)' }}>*</span>}
-                      </label>
-                      {isAutoFilled && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--primary-700)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                          <Sparkles size={12} /> معبأ من القضية
-                        </span>
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      list={`court_list_${field.key}`}
-                      className={`form-control ${errorMsg ? 'is-invalid' : ''}`}
-                      placeholder={field.placeholder || 'اختر من دليل المحاكم المصرية أو اكتب اسم المحكمة...'}
-                      value={val}
-                      onChange={(e) => handleInputChange(field.key, e.target.value)}
-                    />
-                    <datalist id={`court_list_${field.key}`}>
-                      {EGYPTIAN_COURTS.map(c => (
-                        <option key={c.id} value={c.name}>
-                          {c.governorate ? `[${c.governorate}] ` : ''}{c.city ? `(${c.city})` : ''}
-                        </option>
-                      ))}
-                    </datalist>
-                    {errorMsg && (
-                      <span style={{ color: 'var(--danger)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
-                        <AlertCircle size={14} />
-                        {errorMsg}
-                      </span>
-                    )}
-                  </div>
-                );
-              }
-
-              // 7. Client Field: allows selection from registered clients OR manual text
-              if (field.type === 'client') {
-                return (
-                  <div key={field.key} className="form-group" style={{ margin: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: '600', margin: 0, fontSize: '0.88rem' }}>
-                        <User size={15} style={{ color: 'var(--primary-700)' }} />
-                        <span>{field.label}</span>
-                        {isRequired && <span style={{ color: 'var(--danger)' }}>*</span>}
-                      </label>
-                      {isAutoFilled && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--primary-700)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                          <Sparkles size={12} /> معبأ تلقائياً
-                        </span>
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      list={`client_list_${field.key}`}
-                      className={`form-control ${errorMsg ? 'is-invalid' : ''}`}
-                      placeholder={field.placeholder || 'اكتب اسم الموكل أو اختر من دليل الموكلين...'}
-                      value={val}
-                      onChange={(e) => handleInputChange(field.key, e.target.value)}
-                    />
-                    {clientNames.length > 0 && (
-                      <datalist id={`client_list_${field.key}`}>
-                        {clientNames.map((cn, i) => (
-                          <option key={i} value={cn} />
-                        ))}
-                      </datalist>
-                    )}
-                    {errorMsg && (
-                      <span style={{ color: 'var(--danger)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
-                        <AlertCircle size={14} />
-                        {errorMsg}
-                      </span>
-                    )}
-                  </div>
-                );
-              }
-
-              // 8. Opponent Field: allows selection from existing opponents OR manual text
-              if (field.type === 'opponent') {
-                return (
-                  <div key={field.key} className="form-group" style={{ margin: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: '600', margin: 0, fontSize: '0.88rem' }}>
-                        <Users size={15} style={{ color: 'var(--primary-700)' }} />
-                        <span>{field.label}</span>
-                        {isRequired && <span style={{ color: 'var(--danger)' }}>*</span>}
-                      </label>
-                      {isAutoFilled && (
-                        <span style={{ fontSize: '0.75rem', color: 'var(--primary-700)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                          <Sparkles size={12} /> معبأ من القضية
-                        </span>
-                      )}
-                    </div>
-                    <input
-                      type="text"
-                      list={`list_${field.key}`}
-                      className={`form-control ${errorMsg ? 'is-invalid' : ''}`}
-                      placeholder={field.placeholder || 'اكتب اسم الخصم أو اختر من القضايا السابقة...'}
-                      value={val}
-                      onChange={(e) => handleInputChange(field.key, e.target.value)}
-                    />
-                    {existingOpponents.length > 0 && (
-                      <datalist id={`list_${field.key}`}>
-                        {existingOpponents.map((op, i) => (
-                          <option key={i} value={op} />
-                        ))}
-                      </datalist>
-                    )}
-                    {errorMsg && (
-                      <span style={{ color: 'var(--danger)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
-                        <AlertCircle size={14} />
-                        {errorMsg}
-                      </span>
-                    )}
-                  </div>
-                );
-              }
-
-              // 9. Numeric Field with live Arabic تفقيط preview
-              const isAmountField = field.type === 'number' ||
-                field.key.includes('amount') ||
-                field.key.includes('price') ||
-                field.key.includes('fee') ||
-                field.key.includes('rent') ||
-                field.label.includes('مبلغ') ||
-                field.label.includes('قيمة') ||
-                field.label.includes('أجرة');
-
-              let tafqeetText = '';
-              if (isAmountField && val && !isNaN(Number(val)) && Number(val) > 0) {
-                try {
-                  tafqeetText = formatCurrencyToArabic(Number(val), 'جنيه مصري');
-                } catch (e) {}
-              }
-
-              // Standard inputs (text, date, number, phone, email, etc.)
-              return (
-                <div key={field.key} className="form-group" style={{ margin: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: '600', margin: 0, fontSize: '0.88rem' }}>
-                      {field.type === 'date' && <Calendar size={15} style={{ color: 'var(--primary-700)' }} />}
-                      <span>{field.label}</span>
-                      {isRequired && <span style={{ color: 'var(--danger)' }}>*</span>}
-                    </label>
-                    {isAutoFilled && (
-                      <span style={{ fontSize: '0.75rem', color: 'var(--primary-700)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                        <Sparkles size={12} /> معبأ تلقائياً
-                      </span>
-                    )}
-                  </div>
-                  <input
-                    type={field.type === 'date' ? 'date' : (field.type === 'number' ? 'number' : 'text')}
-                    className={`form-control ${errorMsg ? 'is-invalid' : ''}`}
-                    placeholder={field.placeholder || `أدخل ${field.label}...`}
-                    value={val}
-                    onChange={(e) => handleInputChange(field.key, e.target.value)}
-                    style={{ fontSize: '0.9rem' }}
-                  />
-
-                  {/* Live Tafqeet for amounts */}
-                  {tafqeetText && (
-                    <div style={{
-                      marginTop: '0.35rem',
-                      padding: '0.35rem 0.65rem',
-                      borderRadius: '6px',
-                      background: 'rgba(197, 160, 89, 0.12)',
-                      border: '1px solid rgba(197, 160, 89, 0.3)',
-                      fontSize: '0.82rem',
-                      color: 'var(--primary-800)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.4rem'
-                    }}>
-                      <DollarSign size={14} style={{ color: 'var(--accent-gold)' }} />
-                      <span><strong>التفقيط المعتمد:</strong> {tafqeetText}</span>
+                <section key={g.title} className="ff-group">
+                  <button
+                    type="button"
+                    className="ff-group-head"
+                    onClick={() => setCollapsedGroups((prev) => ({ ...prev, [g.title]: !prev[g.title] }))}
+                    aria-expanded={!collapsed}
+                  >
+                    <Icon size={16} />
+                    <span className="ff-group-title">{g.title}</span>
+                    {errCount > 0 && <span className="ff-badge-error">{errCount} ناقص</span>}
+                    <ChevronDown size={16} className={`ff-chevron ${collapsed ? 'is-collapsed' : ''}`} />
+                  </button>
+                  {!collapsed && (
+                    <div className="ff-grid">
+                      {g.fields.map((field) => wrapField(field, g.title, renderField(field)))}
                     </div>
                   )}
-
-                  {field.description && (
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginTop: '0.2rem' }}>
-                      {field.description}
-                    </span>
-                  )}
-                  {errorMsg && (
-                    <span style={{ color: 'var(--danger)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.25rem' }}>
-                      <AlertCircle size={14} />
-                      {errorMsg}
-                    </span>
-                  )}
-                </div>
-              );
-            })()))}
-                </div>
-                )}
-              </section>
+                </section>
               );
             })}
           </div>
         </div>
 
-        {/* Validation Alert: lists exactly what is missing, each item jumps to its field */}
         {Object.keys(fieldErrors).length > 0 && (
-          <div role="alert" style={{
-            background: 'rgba(220, 38, 38, 0.08)',
-            border: '1px solid rgba(220, 38, 38, 0.35)',
-            color: 'var(--danger, #dc2626)',
-            padding: '0.85rem 1rem',
-            borderRadius: '8px',
-            marginBottom: '1.25rem',
-            fontSize: '0.88rem'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, marginBottom: '0.5rem' }}>
-              <AlertCircle size={18} />
-              <span>أكمل البيانات التالية للمتابعة (اضغط على أي بيان للانتقال إليه):</span>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-              {Object.keys(fieldErrors).map(k => {
-                const f = (formula?.fields || []).find(x => x.key === k);
+          <div role="alert" className="auth-alert is-error ff-summary">
+            <strong><AlertCircle size={16} /> أكمل البيانات التالية للمتابعة (اضغط على أي بيان للانتقال إليه):</strong>
+            <div className="ff-chips">
+              {Object.keys(fieldErrors).map((k) => {
+                const f = (formula?.fields || []).find((x) => x.key === k);
                 return (
                   <button key={k} type="button" className="ff-error-chip" onClick={() => scrollToField(k)}>
                     {f?.label || k}
@@ -869,42 +582,11 @@ export default function DynamicFormulaForm({
           </div>
         )}
 
-        {/* Action Buttons */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '0.75rem',
-          padding: '0.5rem 0'
-        }}>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="btn btn-secondary"
-          >
-            إلغاء
-          </button>
-
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <button
-              type="button"
-              onClick={handleTriggerPreview}
-              className="btn btn-secondary"
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-            >
-              <Eye size={16} />
-              <span>معاينة المستند</span>
-            </button>
-
-            <button
-              type="submit"
-              className="btn btn-gold"
-              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'bold' }}
-            >
-              <Edit3 size={16} />
-              <span>إنشاء المستند وفتح المحرر ←</span>
-            </button>
+        <div className="ff-actions">
+          <button type="button" onClick={onCancel} className="btn btn-secondary">إلغاء</button>
+          <div className="ff-actions-main">
+            <button type="button" onClick={handleTriggerPreview} className="btn btn-secondary">معاينة المستند</button>
+            <button type="submit" className="btn btn-primary">إنشاء المستند وفتح المحرر</button>
           </div>
         </div>
       </form>

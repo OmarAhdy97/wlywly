@@ -1,32 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Calendar as CalendarIcon,
-  Printer,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  Gavel,
-  Filter,
-  FileSpreadsheet,
-  Scale,
-  Briefcase
-} from 'lucide-react';
+import { Printer, Gavel, Scale, ChevronRight, ChevronLeft } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { CASE_TYPES, CASE_STATUSES, SESSION_DECISIONS, USER_ROLES } from '../lib/supabase';
+import { CASE_TYPES } from '../lib/supabase';
 import LawFirmPrintHeader from '../components/common/LawFirmPrintHeader';
 import { printWithTitle, DEFAULT_APP_TITLE } from '../lib/printUtils';
 
 import SessionDecisionModal from '../components/common/SessionDecisionModal';
+import Select from '../components/common/Select';
+import DateInput from '../components/common/DateInput';
+
+const todayIso = () => new Date().toISOString().split('T')[0];
 
 export default function AgendaPage() {
   const data = useData() || {};
   const { cases = [], clients = [], adminTasks = [], appeals = [], agendaEvents = [], officeProfile = {} } = data;
   const { user } = useAuth();
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(todayIso);
   const [courtFilter, setCourtFilter] = useState('ALL');
-  const [mobileViewMode, setMobileViewMode] = useState('card'); // 'card' | 'table'
-  const [expandedCaseId, setExpandedCaseId] = useState(null);
 
   // Available Courts from existing cases
   const availableCourts = React.useMemo(() => {
@@ -37,8 +28,13 @@ export default function AgendaPage() {
     return Array.from(set);
   }, [cases]);
 
-  // Decision Modal State
   const [decisionCase, setDecisionCase] = useState(null);
+
+  const shiftDay = (delta) => {
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const next = new Date(y, m - 1, d + delta);
+    setSelectedDate(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`);
+  };
 
   // Filter cases matching selected session date (Actual court sessions only)
   const filteredCases = (cases || []).filter(c => {
@@ -96,350 +92,157 @@ export default function AgendaPage() {
 
   return (
     <div className="page-wrapper">
-      {/* Top Header & Actions (Screen Only - Hidden in Print) */}
-      <div className="agenda-top-header no-print">
+      <div className="page-head no-print">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.2rem' }}>
-            <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#c59828', display: 'inline-block' }}></span>
-            <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#8a5d1b' }}>
-              رول الجلسات والمرافعة اليومية
-            </span>
-          </div>
-          <h1 style={{ fontSize: '1.65rem', fontWeight: '900', margin: 0, color: '#37040a', letterSpacing: '-0.3px' }}>
-            أجندة ورول الجلسات القضائية
-          </h1>
+          <h1>رول الجلسات</h1>
+          <p className="page-sub">{formattedSelectedDate}</p>
         </div>
-
-        {/* Header Actions */}
-        <div className="agenda-header-actions">
-          {/* Mobile View Toggle (Card vs Table) */}
-          {/* <div className="agenda-mobile-toggle-wrapper hide-desktop" style={{ display: 'none' }}>
-            <div style={{
-              display: 'flex',
-              background: 'var(--bg-card-subtle)',
-              padding: '0.2rem',
-              borderRadius: '8px',
-              border: '1px solid var(--border-color)'
-            }}>
-              <button
-                type="button"
-                style={{
-                  padding: '0.35rem 0.65rem',
-                  fontSize: '0.78rem',
-                  fontWeight: '700',
-                  borderRadius: '6px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: mobileViewMode === 'card' ? 'var(--accent)' : 'transparent',
-                  color: mobileViewMode === 'card' ? 'var(--on-accent)' : 'var(--text-muted)'
-                }}
-                onClick={() => setMobileViewMode('card')}
-              >
-                كروت
-              </button>
-              <button
-                type="button"
-                style={{
-                  padding: '0.35rem 0.65rem',
-                  fontSize: '0.78rem',
-                  fontWeight: '700',
-                  borderRadius: '6px',
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: mobileViewMode === 'table' ? 'var(--accent)' : 'transparent',
-                  color: mobileViewMode === 'table' ? 'var(--on-accent)' : 'var(--text-muted)'
-                }}
-                onClick={() => setMobileViewMode('table')}
-              >
-                جدول
-              </button>
-            </div>
-          </div> */}
-
-          {/* Print Court Roll Button */}
-          <button
-            type="button"
-            className="agenda-print-btn"
-            onClick={handlePrint}
-          >
-            <Printer size={16} color="#37040a" />
-            <span>طباعة رول الجلسة</span>
+        <div className="page-head-actions">
+          <button type="button" className="btn btn-secondary" onClick={handlePrint}>
+            <Printer size={16} /> طباعة الرول
           </button>
         </div>
       </div>
 
-      {/* Filter Bar Card (Screen Only - Hidden in Print) */}
-      <div className="agenda-filter-card no-print">
-        {/* Right Side (RTL Start): Date selection group */}
-        <div className="agenda-date-group">
-          <div className="agenda-date-label">
-            <CalendarIcon size={17} color="#37040a" />
-            <span>تاريخ الجلسة:</span>
-          </div>
-
-          <input
-            type="date"
-            className="agenda-date-input"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-          />
-
-          <button
-            type="button"
-            className="agenda-today-btn"
-            onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
-          >
-            اليوم
+      <div className="page-toolbar no-print">
+        <div className="date-stepper">
+          <button type="button" className="icon-btn" onClick={() => shiftDay(-1)} aria-label="اليوم السابق">
+            <ChevronRight size={18} />
           </button>
+          <DateInput className="form-input" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} aria-label="تاريخ الجلسة" />
+          <button type="button" className="icon-btn" onClick={() => shiftDay(1)} aria-label="اليوم التالي">
+            <ChevronLeft size={18} />
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => setSelectedDate(todayIso())}>اليوم</button>
         </div>
-
-        {/* Left Side (RTL End): Court filter group */}
-        <div className="agenda-court-group">
-          <Filter size={16} color="#6b4c51" style={{ flexShrink: 0 }} />
-          <select
-            className="agenda-court-select"
-            value={courtFilter}
-            onChange={(e) => setCourtFilter(e.target.value)}
-          >
-            <option value="ALL">جميع المحاكم والدوائر</option>
-            {availableCourts.map((courtName, idx) => (
-              <option key={idx} value={courtName}>{courtName}</option>
-            ))}
-          </select>
-        </div>
+        <Select className="form-select toolbar-select" value={courtFilter} onChange={(e) => setCourtFilter(e.target.value)} aria-label="المحكمة">
+          <option value="ALL">كل المحاكم والدوائر</option>
+          {availableCourts.map((courtName) => (
+            <option key={courtName} value={courtName}>{courtName}</option>
+          ))}
+        </Select>
       </div>
 
-      {/* Official Printable Court Document Container with Outer Border Frame */}
-      <div className="printable-document-frame">
-        {/* Unified Law Firm Letterhead */}
+      {/* On screen: the same row list as the cases page */}
+      <div className="no-print">
+        {filteredCases.length === 0 ? (
+          <div className="card empty-block">
+            <h3>لا توجد جلسات في هذا اليوم</h3>
+            <p>اختر تاريخاً آخر من الأعلى.</p>
+          </div>
+        ) : (
+          <div className="card row-list">
+            {filteredCases.map((c, index) => {
+              const client = clients.find((k) => k.id === c.client_id);
+              return (
+                <article key={c.id} className="list-row">
+                  <div className="list-row-main">
+                    <div className="list-row-body list-row-person">
+                      <span className="roll-no" aria-label={`رقم ${index + 1} في الرول`}>{index + 1}</span>
+                      <div className="list-row-person-text">
+                        <div className="list-row-top">
+                          <h3 className="row-title">
+                            <span className="row-key">{c.case_number}/{c.case_year}</span>
+                            <span className="row-title-text" title={c.case_title || ''}>{c.case_title || CASE_TYPES[c.case_type] || 'قضية'}</span>
+                          </h3>
+                        </div>
+                        <p className="list-row-sub">
+                          {[CASE_TYPES[c.case_type] || c.case_type, c.court_name, c.court_room && `دائرة ${c.court_room}`].filter(Boolean).join(' · ')}
+                        </p>
+                        <p className="row-parties">
+                          <span className="row-party"><small>المدعي</small>{c.plaintiff_name || '—'}</span>
+                          <span className="row-vs">ضد</span>
+                          <span className="row-party"><small>المدعى عليه</small>{c.defendant_name || '—'}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <dl className="list-row-facts">
+                      <div>
+                        <dt>الموقف السابق</dt>
+                        <dd className="roll-prev" title={c.notes || ''}>{c.notes || <span className="cell-sub">—</span>}</dd>
+                      </div>
+                      <div>
+                        <dt>الموكل</dt>
+                        <dd className="row-owner">
+                          {client ? (<>{client.name}</>) : <span className="cell-sub">غير مرتبط</span>}
+                        </dd>
+                      </div>
+                    </dl>
+
+                    <div className="list-row-actions">
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => setDecisionCase(c)}>
+                        <Gavel size={14} /> تسجيل القرار
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* The official court roll: shown only when printing */}
+      <div className="printable-document-frame only-print">
         <LawFirmPrintHeader />
 
-        {/* Court Roll Document Header & Metadata */}
-        <div className="court-roll-doc-header" style={{
-          textAlign: 'center',
-          padding: '0.9rem 1.25rem',
-          borderBottom: '2.5px solid #37040a',
-          marginBottom: '1rem',
-          background: 'transparent',
-        }}>
-          <h2 style={{ fontSize: '1.45rem', fontWeight: '900', color: '#37040a', margin: '0 0 0.35rem 0', fontFamily: "'Alexandria', 'Cairo', sans-serif" }}>
-            رول الجلسات اليومية
-          </h2>
-          <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#6d0f1b' }}>
-            جلسات يوم: {formattedSelectedDate}
-          </div>
-          <div style={{ fontSize: '0.82rem', color: '#6b4c51', marginTop: '0.25rem', fontWeight: '700' }}>
+        <div className="court-roll-doc-header">
+          <h2>رول الجلسات اليومية</h2>
+          <div className="roll-date">جلسات يوم: {formattedSelectedDate}</div>
+          <div className="roll-court">
             {courtFilter !== 'ALL' ? `الدائرة القضائية: ${courtFilter}` : 'كافة الدوائر والمحاكم القضائية'}
             {officeProfile?.office_name ? ` | ${officeProfile.office_name}` : ''}
           </div>
-
-          {/* Roll Metadata Line */}
-          <div className="court-roll-metadata-row" style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            gap: '2.5rem',
-            marginTop: '0.75rem',
-            paddingTop: '0.55rem',
-            borderTop: '1px dashed #e5c4c8',
-            fontSize: '0.84rem',
-            color: '#4f0810',
-            flexWrap: 'wrap',
-          }}>
-            <span>إجمالي الجلسات: <strong style={{ color: 'var(--text-main)', background: 'var(--bg-card)', padding: '0.15rem 0.5rem' }}>{filteredCases.length} قضية</strong></span>
-            <span>المحامي الحاضر: <strong style={{ color: '#37040a' }}>{officeProfile?.lawyer_name ? `أ/ ${officeProfile.lawyer_name}` : '.....................'}</strong></span>
-            <span>القاعة / الرول: <strong style={{ color: '#37040a' }}>.....................</strong></span>
+          <div className="court-roll-metadata-row">
+            <span>إجمالي الجلسات: <strong>{filteredCases.length} قضية</strong></span>
+            <span>المحامي الحاضر: <strong>{officeProfile?.lawyer_name ? `أ/ ${officeProfile.lawyer_name}` : '.....................'}</strong></span>
+            <span>القاعة / الرول: <strong>.....................</strong></span>
           </div>
         </div>
 
-        {/* Empty State */}
-        {filteredCases.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: 'var(--text-muted)' }}>
-            <CalendarIcon size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.4rem' }}>لا توجد جلسات مجدولة لهذا اليوم</h3>
-            <p style={{ fontSize: '0.9rem' }}>يمكنك اختيار تاريخ آخر من الأعلى أو إضافة جلسة جديدة لهذا التاريخ.</p>
+        <div className="card printable-card roll-table-wrap">
+          <div className="table-container">
+            <table className="data-table print-table roll-table">
+              <thead>
+                <tr>
+                  <th className="rc-no">م</th>
+                  <th className="rc-case">رقم الدعوى والسنة</th>
+                  <th className="rc-court">المحكمة والقاعة</th>
+                  <th className="rc-party">المدعي</th>
+                  <th className="rc-party">المدعى عليه</th>
+                  <th className="rc-subject">موضوع الدعوى</th>
+                  <th className="rc-prev">الموقف السابق</th>
+                  <th className="print-decision-col rc-act">قرار الجلسة والتأجيل (يدون باليد)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCases.map((c, index) => (
+                  <tr key={c.id}>
+                    <td className="rc-center rc-muted">{index + 1}</td>
+                    <td className="rc-center">
+                      <strong>{c.case_number}</strong> / <span>{c.case_year}</span>
+                      <div className="rc-small">{CASE_TYPES[c.case_type] || c.case_type}</div>
+                    </td>
+                    <td>
+                      <div className="rc-strong">{c.court_name}</div>
+                      {c.court_room && <div className="rc-small">دائرة {c.court_room}</div>}
+                    </td>
+                    <td><div className="rc-strong">{c.plaintiff_name}</div></td>
+                    <td><div className="rc-strong">{c.defendant_name}</div></td>
+                    <td className="rc-wrap">{c.case_title || '—'}</td>
+                    <td className="rc-center rc-muted">{c.notes || '—'}</td>
+                    <td className="print-decision-col">
+                      <div className="print-handwritten-space"></div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ) : (
-          <>
-            {/* MOBILE ONLY (< 640px): Compact Cards View for Court Sessions */}
-            <div className={`agenda-mobile-cards-view no-print ${mobileViewMode === 'table' ? 'agenda-force-hide' : ''}`}>
-              {filteredCases.map((c, index) => {
-                const isExpanded = expandedCaseId === c.id;
-                return (
-                  <div
-                    key={c.id}
-                    className="card"
-                    style={{
-                      padding: '1rem',
-                      borderRadius: '14px',
-                      border: '1.5px solid var(--border-color)',
-                      boxShadow: 'var(--shadow-sm)',
-                      background: 'var(--bg-card)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.75rem'
-                    }}
-                  >
-                    {/* Top Row: Case Number & Type */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span style={{
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          background: 'var(--primary-100)',
-                          color: 'var(--primary-800)',
-                          fontSize: '0.75rem',
-                          fontWeight: '800',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0
-                        }}>
-                          {index + 1}
-                        </span>
-                        <div>
-                          <strong style={{ fontSize: '1.05rem', color: 'var(--primary-800)' }}>
-                            {c.case_number}
-                          </strong>
-                          <span style={{ color: 'var(--text-muted)', fontWeight: '700' }}> / {c.case_year}</span>
-                        </div>
-                      </div>
-                      <span className="badge" style={{ background: 'var(--bg-card-subtle)', color: 'var(--primary-700)', border: '1px solid var(--border-color)' }}>
-                        {CASE_TYPES[c.case_type] || c.case_type}
-                      </span>
-                    </div>
+        </div>
 
-                    {/* Court & Room */}
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <span style={{ fontWeight: '700' }}>🏛️ {c.court_name}</span>
-                      {c.court_room && <span style={{ color: 'var(--text-muted)' }}>— دائرة / قاعة: {c.court_room}</span>}
-                    </div>
-
-                    {/* Parties (Client & Opponent) */}
-                    <div style={{
-                      padding: '0.65rem 0.75rem',
-                      background: 'var(--bg-card-subtle)',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border-subtle)',
-                      fontSize: '0.84rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.3rem'
-                    }}>
-                      <div><strong style={{ color: 'var(--primary-700)' }}>المدعي:</strong> {c.plaintiff_name}</div>
-                      <div><strong style={{ color: 'var(--text-muted)' }}>المدعى عليه:</strong> {c.defendant_name}</div>
-                    </div>
-
-                    {/* Subject & Previous Status */}
-                    <div style={{ fontSize: '0.82rem', color: 'var(--text-main)', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                      <strong>موضوع الدعوى:</strong> {c.case_title || '—'}
-                    </div>
-
-                    {c.notes && (
-                      <div style={{ fontSize: '0.8rem', color: 'var(--status-adjourned)', background: 'var(--status-adjourned-bg)', padding: '0.35rem 0.65rem', borderRadius: '6px' }}>
-                        <strong>الموقف السابق:</strong> {c.notes}
-                      </div>
-                    )}
-
-                    {/* Primary Touch-Friendly Decision Button */}
-                    <button
-                      type="button"
-                      className="btn btn-primary"
-                      style={{
-                        width: '100%',
-                        minHeight: '44px',
-                        fontSize: '0.88rem',
-                        fontWeight: '700',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '0.5rem',
-                        marginTop: '0.2rem'
-                      }}
-                      onClick={() => setDecisionCase(c)}
-                    >
-                      <Clock size={16} />
-                      <span>تسجيل قرار الجلسة / التأجيل</span>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* DESKTOP & TABLET TABLE (Also shown on mobile if Table View toggled, and ALWAYS in print) */}
-            <div className={`card printable-card agenda-desktop-table-view ${mobileViewMode === 'card' ? 'agenda-hide-on-mobile-screen' : ''}`} style={{ padding: '0', overflow: 'hidden', border: 'none', background: 'transparent' }}>
-              <div className="table-container" style={{ border: 'none' }}>
-                <table className="data-table print-table" style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', direction: 'rtl' }}>
-                  <thead>
-                    <tr style={{ background: '#37040a', color: '#ffffff' }}>
-                      <th style={{ width: '4%', textAlign: 'center', backgroundColor: '#37040a', color: '#ffffff', padding: '0.65rem 0.2rem' }}>م</th>
-                      <th style={{ width: '13%', textAlign: 'center', backgroundColor: '#37040a', color: '#ffffff', padding: '0.65rem 0.3rem' }}>رقم الدعوى والسنة</th>
-                      <th style={{ width: '14%', textAlign: 'center', backgroundColor: '#37040a', color: '#ffffff', padding: '0.65rem 0.3rem' }}>المحكمة والقاعة</th>
-                      <th style={{ width: '14%', textAlign: 'center', backgroundColor: '#37040a', color: '#ffffff', padding: '0.65rem 0.3rem' }}>المدعي (الموكل/الخصم)</th>
-                      <th style={{ width: '14%', textAlign: 'center', backgroundColor: '#37040a', color: '#ffffff', padding: '0.65rem 0.3rem' }}>المدعى عليه</th>
-                      <th style={{ width: '15%', textAlign: 'center', backgroundColor: '#37040a', color: '#ffffff', padding: '0.65rem 0.3rem' }}>موضوع الدعوى</th>
-                      <th style={{ width: '10%', textAlign: 'center', backgroundColor: '#37040a', color: '#ffffff', padding: '0.65rem 0.3rem' }}>الموقف السابق</th>
-                      <th className="no-print" style={{ textAlign: 'center', width: '16%', backgroundColor: '#37040a', color: '#ffffff', padding: '0.65rem 0.3rem' }}>تسجيل القرار</th>
-                      <th className="only-print print-decision-col" style={{ width: '16%', textAlign: 'center', backgroundColor: '#37040a', color: '#ffffff', padding: '0.65rem 0.3rem' }}>قرار الجلسة والتأجيل (يدون باليد)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredCases.map((c, index) => {
-                      return (
-                        <tr key={c.id} style={{ background: index % 2 === 1 ? '#f8fafc' : '#ffffff', borderBottom: '1px solid #e2e8f0' }}>
-                          <td style={{ textAlign: 'center', fontWeight: '700', color: '#475569', fontSize: '0.82rem' }}>
-                            {index + 1}
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <strong style={{ fontSize: '0.95rem', color: '#37040a' }}>{c.case_number}</strong> / <span style={{ fontWeight: '700' }}>{c.case_year}</span>
-                            <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.1rem', fontWeight: '600' }}>{CASE_TYPES[c.case_type] || c.case_type}</div>
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '0.84rem' }}>{c.court_name}</div>
-                            {c.court_room && <div style={{ fontSize: '0.74rem', color: '#64748b', marginTop: '0.1rem' }}>قاعة / دائرة: {c.court_room}</div>}
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '0.84rem' }}>{c.plaintiff_name}</div>
-                          </td>
-                          <td style={{ textAlign: 'right' }}>
-                            <div style={{ fontWeight: '700', color: '#0f172a', fontSize: '0.84rem' }}>{c.defendant_name}</div>
-                          </td>
-                          <td style={{ textAlign: 'right', whiteSpace: 'normal', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                            <div style={{ fontSize: '0.82rem', color: '#334155', lineHeight: 1.35, wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{c.case_title || '—'}</div>
-                          </td>
-                          <td style={{ textAlign: 'center' }}>
-                            <div style={{ fontWeight: '600', color: '#475569', fontSize: '0.8rem' }}>
-                              {c.notes || '—'}
-                            </div>
-                          </td>
-                          {/* Screen Action Button */}
-                          <td className="no-print" style={{ textAlign: 'center' }}>
-                            <button
-                              className="btn btn-secondary"
-                              style={{ padding: '0.45rem 0.9rem', fontSize: '0.82rem', minHeight: '36px' }}
-                              onClick={() => setDecisionCase(c)}
-                            >
-                              تسجيل القرار
-                            </button>
-                          </td>
-                          {/* Print Only Space for Handwritten Notes */}
-                          <td className="only-print print-decision-col" style={{ verticalAlign: 'top', height: '42px', padding: '3px' }}>
-                            <div className="print-handwritten-space"></div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </>
-        )}
-
-        {/* Printable Court Official Footer — Unified with ClientsPage */}
         <div className="printable-court-footer">
-          {/* Signature Section */}
           <div className="court-signatures-row">
             <div className="court-signature-col">
               <div className="court-signature-title">المحامي الحاضر بالجلسة</div>
@@ -464,76 +267,43 @@ export default function AgendaPage() {
             </div>
           </div>
 
-          {/* Bottom divider: معًا نحو تحقيق العدالة */}
           <div className="court-footer-divider">
             <span className="court-footer-divider-line"></span>
             <span className="court-footer-divider-text">معًا نحو تحقيق العدالة</span>
-            <Scale size={15} color="#37040a" />
+            <Scale size={15} color="#111827" />
             <span className="court-footer-divider-line"></span>
           </div>
         </div>
       </div>
 
-      {/* Companion Section: Follow-ups for Today (Appeals & Admin Tasks) - Hidden in Print */}
       {(dayAppeals.length > 0 || dayAdminTasks.length > 0) && (
-        <div className="card no-print" style={{ marginTop: '1.25rem', padding: '1rem 1.25rem', borderRadius: '12px', border: '1px solid #cbd5e1' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-            <span style={{ fontSize: '1.1rem' }}>📌</span>
-            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: '800', color: '#1e293b' }}>
-              متابعات وأعمال أخرى في هذا اليوم ({selectedDate})
-            </h4>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '0.75rem' }}>
-            {/* Appeal Follow-ups */}
+        <div className="card no-print day-extra">
+          <h3>متابعات وأعمال أخرى في هذا اليوم</h3>
+          <ul className="mini-list">
             {dayAppeals.map((app) => {
-              const relCase = cases.find(c => c.id === app.case_id);
+              const relCase = cases.find((c) => c.id === app.case_id);
               return (
-                <div key={app.id} style={{
-                  padding: '0.75rem 0.9rem',
-                  borderRadius: '10px',
-                  background: 'rgba(37, 99, 235, 0.06)',
-                  border: '1px solid rgba(37, 99, 235, 0.25)',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '0.5rem'
-                }}>
-                  <Scale size={18} color="#1d4ed8" style={{ marginTop: '2px', flexShrink: 0 }} />
+                <li key={app.id}>
                   <div>
-                    <div style={{ fontWeight: '800', color: '#1e40af', fontSize: '0.88rem' }}>
-                      متابعة استئناف — دعوى {relCase ? `${relCase.case_number}/${relCase.case_year}` : 'محددة'}
-                    </div>
-                    <div style={{ fontSize: '0.78rem', color: '#334155', marginTop: '0.2rem' }}>
-                      {app.judgment_text ? `منطوق الحكم: ${app.judgment_text.slice(0, 60)}...` : 'ميعاد متابعة قيد الاستئناف'}
-                    </div>
+                    <strong>متابعة استئناف — دعوى {relCase ? `${relCase.case_number}/${relCase.case_year}` : 'محددة'}</strong>
+                    <span className="cell-sub">
+                      {app.judgment_text ? `منطوق الحكم: ${app.judgment_text.slice(0, 80)}${app.judgment_text.length > 80 ? '…' : ''}` : 'ميعاد متابعة قيد الاستئناف'}
+                    </span>
                   </div>
-                </div>
+                  <span className="badge">استئناف</span>
+                </li>
               );
             })}
-
-            {/* Admin Tasks */}
             {dayAdminTasks.map((tsk) => (
-              <div key={tsk.id} style={{
-                padding: '0.75rem 0.9rem',
-                borderRadius: '10px',
-                background: '#fffbeb',
-                border: '1px solid #fde68a',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '0.5rem'
-              }}>
-                <Briefcase size={18} color="#b45309" style={{ marginTop: '2px', flexShrink: 0 }} />
+              <li key={tsk.id}>
                 <div>
-                  <div style={{ fontWeight: '800', color: '#92400e', fontSize: '0.88rem' }}>
-                    {tsk.title}
-                  </div>
-                  <div style={{ fontSize: '0.78rem', color: '#451a03', marginTop: '0.2rem' }}>
-                    {tsk.requirements || tsk.notes || tsk.location || 'إجراء إداري مطلوب اليوم'}
-                  </div>
+                  <strong>{tsk.title}</strong>
+                  <span className="cell-sub">{tsk.requirements || tsk.notes || tsk.location || 'إجراء إداري مطلوب'}</span>
                 </div>
-              </div>
+                <span className="badge">إداري</span>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       )}
 

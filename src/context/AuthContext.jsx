@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { notify } from '../lib/dialog';
 
 const AuthContext = createContext(null);
 
@@ -15,7 +16,7 @@ export function AuthProvider({ children }) {
     if (timerRef.current) clearTimeout(timerRef.current);
     if (user) {
       timerRef.current = setTimeout(() => {
-        alert('تم قفل الجلسة تلقائياً نظراً لعدم وجود نشاط للحفاظ على سرية ملفات القضايا.');
+        notify('تم قفل الجلسة تلقائياً نظراً لعدم وجود نشاط للحفاظ على سرية ملفات القضايا.', 'info');
         signOut();
       }, INACTIVITY_TIMEOUT_MS);
     }

@@ -8,6 +8,7 @@ import {
   buildCitation,
   OUTCOMES,
 } from '../lib/sccLibrary';
+import Select from '../components/common/Select';
 
 const PAGE = 30;
 
@@ -104,7 +105,6 @@ export default function LibraryPage() {
     <div className="page-wrapper">
       <div className="page-head">
         <div>
-          <div className="page-eyebrow"><span className="page-dot" />المكتبة القانونية</div>
           <h1>أحكام المحكمة الدستورية العليا</h1>
         </div>
         <div className="page-head-actions">
@@ -142,25 +142,25 @@ export default function LibraryPage() {
             ))}
           </div>
           <div className="lib-selects">
-            <select className="form-select" value={type} onChange={(e) => setType(e.target.value)} aria-label="نوع الدعوى">
+            <Select className="form-select" value={type} onChange={(e) => setType(e.target.value)} aria-label="نوع الدعوى">
               <option value="all">كل أنواع الدعاوى</option>
               <option value="دستورية">دستورية</option>
               <option value="تنازع">تنازع</option>
               <option value="تفسير">تفسير تشريعي</option>
-            </select>
-            <select className="form-select" value={court} onChange={(e) => setCourt(e.target.value)} aria-label="المحكمة">
+            </Select>
+            <Select className="form-select" value={court} onChange={(e) => setCourt(e.target.value)} aria-label="المحكمة">
               <option value="all">كل المحاكم</option>
               <option value="scc">المحكمة الدستورية العليا</option>
               <option value="high">المحكمة العليا (1970–1979)</option>
-            </select>
-            <select className="form-select" value={yearFrom} onChange={(e) => setYearFrom(e.target.value)} aria-label="من سنة">
+            </Select>
+            <Select className="form-select" value={yearFrom} onChange={(e) => setYearFrom(e.target.value)} aria-label="من سنة">
               <option value="">من سنة</option>
               {years.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-            <select className="form-select" value={yearTo} onChange={(e) => setYearTo(e.target.value)} aria-label="إلى سنة">
+            </Select>
+            <Select className="form-select" value={yearTo} onChange={(e) => setYearTo(e.target.value)} aria-label="إلى سنة">
               <option value="">إلى سنة</option>
               {years.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
+            </Select>
             {hasFilters && (
               <button type="button" className="btn btn-secondary" onClick={reset}><X size={14} /> مسح</button>
             )}

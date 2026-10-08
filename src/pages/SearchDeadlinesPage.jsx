@@ -1,26 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  Search, 
-  Clock, 
-  AlertTriangle, 
-  Calculator, 
-  Calendar, 
-  ArrowLeft, 
-  ShieldAlert, 
-  Coins, 
-  Receipt, 
-  Scale, 
-  FileText, 
-  CheckCircle2, 
-  Info, 
-  Printer, 
-  Copy, 
-  Check,
-  Building2,
-  HelpCircle
-} from 'lucide-react';
+import { Search, Copy, Check } from 'lucide-react';
 import { useData } from '../context/DataContext';
-import { CASE_TYPES, CASE_STATUSES } from '../lib/supabase';
+import { CASE_TYPES } from '../lib/supabase';
+import { setFocusTarget } from '../lib/focusTarget';
+import Select from '../components/common/Select';
+import DateInput from '../components/common/DateInput';
+import { formatEgyptPhone } from '../lib/phone';
 
 export default function SearchDeadlinesPage({ searchTerm, setSearchTerm, setActiveTab }) {
   const { cases, clients } = useData();
@@ -390,7 +375,7 @@ export default function SearchDeadlinesPage({ searchTerm, setSearchTerm, setActi
     const amountFormatted = isMonetary ? `${Number(claimAmount || 0).toLocaleString('en-US')} ج.م` : 'غير مقدرة القيمة (رسم ثابت)';
 
     let text = `
-بيان تقديري للرسوم القضائية — أجندة المحاماة القضائية:
+بيان تقديري للرسوم القضائية — الديوان:
 - نوع الإجراء: ${categoryNameArabic}
 - الاختصاص القضائي: ${calculatedFees.jurisdiction}
 - المبلغ المطالب به: ${amountFormatted}
@@ -449,420 +434,237 @@ export default function SearchDeadlinesPage({ searchTerm, setSearchTerm, setActi
     );
   });
 
-  return (
-    <div className="page-wrapper" style={{ maxWidth: '1400px' }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '1.25rem',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        borderBottom: '1px solid var(--border-subtle)',
-        paddingBottom: '1rem'
-      }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-gold)' }}></span>
-            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
-              الحاسبة القضائية ومحرك البحث
-            </span>
-          </div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-            الأدوات القضائية والبحث والحسابات
-          </h1>
-        </div>
+  const money = (n) => `${(Number(n) || 0).toLocaleString('en-US')} ج.م`;
+  const f = calculatedFees;
 
-        <div className="search-tools-nav seg-tabs">
-          <button 
-            type="button"
-            className={`seg-tab ${activeTabSub === 'fees' ? 'is-active' : ''}`}
-            onClick={() => setActiveTabSub('fees')}
-          >
-            <Coins size={15} />
-            <span>حاسبة الرسوم القضائية</span>
-          </button>
-          <button 
-            type="button"
-            className={`seg-tab ${activeTabSub === 'deadlines' ? 'is-active' : ''}`}
-            onClick={() => setActiveTabSub('deadlines')}
-          >
-            <Clock size={15} />
-            <span>حاسبة المواعيد والطعون</span>
-          </button>
-          <button 
-            type="button"
-            className={`seg-tab ${activeTabSub === 'search' ? 'is-active' : ''}`}
-            onClick={() => setActiveTabSub('search')}
-          >
-            <Search size={15} />
-            <span>البحث الشامل</span>
-          </button>
+  const openCase = (c) => {
+    setActiveTab(c.is_archived ? 'archive' : 'cases');
+    setFocusTarget({ type: 'case', id: c.id });
+  };
+  const openClient = (c) => {
+    setActiveTab('clients');
+    setFocusTarget({ type: 'client', id: c.id, name: c.name });
+  };
+
+  const feeRows = [
+    [
+      <>الرسم النسبي{f.filingBaseAmount ? <small> (على وعاء {f.filingBaseAmount.toLocaleString('en-US')} ج، مادة 9)</small> : null}</>,
+      f.filingProportionalFee || f.basicFee,
+    ],
+    ['صندوق الخدمات (50%)', f.judicialServicesFee],
+    ['صندوق أبنية المحاكم', f.courtBuildings],
+    ['أتعاب المحاماة', f.lawyerFees],
+    ['دمغة الشهيد', f.martyrStamp],
+    f.familyFundStamp ? ['طابع دعم ورعاية الأسرة', f.familyFundStamp] : null,
+  ].filter(Boolean);
+
+  const TABS = [
+    ['fees', 'الرسوم القضائية'],
+    ['deadlines', 'المواعيد والطعون'],
+    ['search', 'البحث الشامل'],
+  ];
+
+  return (
+    <div className="page-wrapper">
+      <div className="page-head">
+        <div>
+          <h1>الحاسبة</h1>
+          <p className="page-sub">الرسوم القضائية ومواعيد الطعن والبحث في الملفات</p>
+        </div>
+        <div className="seg-tabs" role="tablist">
+          {TABS.map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={activeTabSub === id}
+              className={`seg-tab ${activeTabSub === id ? 'is-active' : ''}`}
+              onClick={() => setActiveTabSub(id)}
+            >
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* 1. JUDICIAL FEES CALCULATOR TAB                                          */}
-      {/* ========================================================================= */}
       {activeTabSub === 'fees' && (
         <div className="fees-calculator-grid">
-          {/* Form Card */}
-          <div className="card" style={{ borderRadius: '14px' }}>
-            <div className="card-header" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
-              <Calculator size={20} color="var(--primary-700)" />
-              <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '800' }}>
-                بيانات الدعوى وتحديد الرسوم القضائية
-              </h3>
-            </div>
+          <div className="card">
+            <h3 className="card-heading">بيانات الدعوى</h3>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-              {/* Category */}
+            <div className="stack">
               <div className="form-group">
-                <label className="form-label" style={{ fontWeight: '700' }}>نوع الدعوى / التصنيف الإجرائي *</label>
-                <select 
-                  className="form-select"
-                  value={feeCategory}
-                  onChange={(e) => setFeeCategory(e.target.value)}
-                >
+                <label className="form-label">نوع الدعوى *</label>
+                <Select className="form-select" value={feeCategory} onChange={(e) => setFeeCategory(e.target.value)}>
                   {Object.entries(FEE_CATEGORY_LABELS).map(([k, label]) => (
                     <option key={k} value={k}>{label}</option>
                   ))}
-                </select>
+                </Select>
               </div>
 
-              {/* Claim Amount (if monetary) */}
               {(feeCategory === 'civil_monetary' || feeCategory === 'payment_order' || feeCategory === 'appeal_civil') && (
                 <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: '700', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>المبلغ المراد / المطالب به (جنيه مصري) *</span>
-                    <span style={{ color: 'var(--primary-700)', fontWeight: '800' }}>
-                      {Number(claimAmount || 0).toLocaleString('en-US')} ج.م
-                    </span>
+                  <label className="form-label label-split">
+                    <span>المبلغ المطالب به (ج.م) *</span>
+                    <b>{money(claimAmount)}</b>
                   </label>
-                  <input 
-                    type="number" 
+                  <input
+                    type="number"
                     min="0"
                     step="500"
-                    className="form-input"
+                    className="form-input input-ltr"
                     value={claimAmount}
                     onChange={(e) => setClaimAmount(e.target.value)}
-                    placeholder="مثال: 50000"
-                    style={{ fontSize: '1.05rem', fontWeight: '700', direction: 'ltr', textAlign: 'left' }}
+                    placeholder="50000"
                   />
-                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.35rem', display: 'block' }}>
-                    * يتم احتساب الرسم الابتدائي المؤقت عند الرفع على أساس الشريحة المؤقتة (مادة 9)، وتسوية باقي الرسم بقائمة الرسوم بعد الحكم.
-                  </span>
+                  <span className="hint">يحسب الرسم المبدئي عند الرفع على الشريحة المؤقتة (مادة 9)، ويُسوّى الباقي بقائمة الرسوم بعد الحكم.</span>
                 </div>
               )}
 
-              {/* Unspecified Court Level Selector */}
               {(feeCategory === 'civil_unspecified' || feeCategory === 'urgent_action') && (
                 <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: '700' }}>المحكمة المرفوع أمامها النزاع (مادة 1 ومادة 3) *</label>
-                  <select 
-                    className="form-select"
-                    value={unspecifiedCourtType}
-                    onChange={(e) => setUnspecifiedCourtType(e.target.value)}
-                  >
-                    <option value="partial">محكمة جزئية (رسم ثابت 5 جنيهات)</option>
-                    <option value="urgent">قضاء مستعجل (رسم ثابت 10 جنيهات)</option>
-                    <option value="first_instance">محكمة ابتدائية / كلية (رسم ثابت 15 جنيهاً)</option>
-                    <option value="bankruptcy">شهر إفلاس أو صلح واقٍ (رسم ثابت 50 جنيهاً)</option>
-                    <option value="appeal_partial">استئناف أحكام جزئية أمام الابتدائية (رسم ثابت 10 جنيهات)</option>
-                    <option value="appeal_urgent">استئناف قضاء مستعجل (رسم ثابت 15 جنيهاً)</option>
-                    <option value="appeal_high">استئناف عالي أمام محاكم الاستئناف (رسم ثابت 30 جنيهاً)</option>
-                  </select>
+                  <label className="form-label">المحكمة المرفوع أمامها النزاع (مادة 1 و3) *</label>
+                  <Select className="form-select" value={unspecifiedCourtType} onChange={(e) => setUnspecifiedCourtType(e.target.value)}>
+                    <option value="partial">محكمة جزئية (5 جنيهات)</option>
+                    <option value="urgent">قضاء مستعجل (10 جنيهات)</option>
+                    <option value="first_instance">محكمة ابتدائية / كلية (15 جنيهاً)</option>
+                    <option value="bankruptcy">شهر إفلاس أو صلح واقٍ (50 جنيهاً)</option>
+                    <option value="appeal_partial">استئناف أحكام جزئية أمام الابتدائية (10 جنيهات)</option>
+                    <option value="appeal_urgent">استئناف قضاء مستعجل (15 جنيهاً)</option>
+                    <option value="appeal_high">استئناف عالي أمام محاكم الاستئناف (30 جنيهاً)</option>
+                  </Select>
                 </div>
               )}
 
-              {/* Number of Defendants */}
               <div className="form-group">
-                <label className="form-label" style={{ fontWeight: '700' }}>عدد الخصوم المعلن إليهم في صحيفة الدعوى *</label>
-                <input 
-                  type="number" 
-                  min="1"
-                  max="50"
-                  className="form-input"
-                  value={defendantsCount}
-                  onChange={(e) => setDefendantsCount(e.target.value)}
-                />
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '0.25rem', display: 'block' }}>
-                  * لحساب مصاريف انتقال المحضرين والإعلانات القضائية بدقة (25 ج لكل خصم).
-                </span>
+                <label className="form-label">عدد الخصوم المعلن إليهم *</label>
+                <input type="number" min="1" max="50" className="form-input" value={defendantsCount} onChange={(e) => setDefendantsCount(e.target.value)} />
+                <span className="hint">لحساب مصاريف الإعلان (25 ج لكل خصم).</span>
               </div>
 
-              {/* Urgent Request Checkbox */}
               {feeCategory !== 'urgent_action' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.75rem', background: 'var(--bg-card-subtle)', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                  <input 
+                <label className="check-row" htmlFor="urgentRequestCheck">
+                  <input
                     type="checkbox"
                     id="urgentRequestCheck"
                     checked={hasUrgentRequest}
                     onChange={(e) => setHasUrgentRequest(e.target.checked)}
-                    style={{ width: '18px', height: '18px', accentColor: 'var(--primary-800)', cursor: 'pointer' }}
                   />
-                  <label htmlFor="urgentRequestCheck" style={{ fontSize: '0.86rem', fontWeight: '700', cursor: 'pointer', margin: 0 }}>
-                    تتضمن الصحيفة طلباً مستعجلاً (وقف تنفيذ مؤقت أو شق مستعجل)
-                  </label>
-                </div>
+                  <span>تتضمن الصحيفة طلباً مستعجلاً (وقف تنفيذ مؤقت أو شق مستعجل)</span>
+                </label>
               )}
 
-              {/* Jurisdiction Banner */}
-              <div style={{ 
-                padding: '0.85rem 1rem', 
-                background: 'rgba(2, 132, 199, 0.08)', 
-                border: '1px solid rgba(2, 132, 199, 0.25)', 
-                borderRadius: '10px', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '0.6rem' 
-              }}>
-                <Building2 size={20} style={{ color: '#0284c7', flexShrink: 0 }} />
+              <dl className="facts facts-flat">
                 <div>
-                  <div style={{ fontSize: '0.75rem', fontWeight: '700', color: '#0369a1' }}>الاختصاص القضائي المقرر قانوناً:</div>
-                  <strong style={{ fontSize: '0.92rem', color: '#0c4a6e' }}>{calculatedFees.jurisdiction}</strong>
+                  <dt>الاختصاص</dt>
+                  <dd>{f.jurisdiction}</dd>
                 </div>
-              </div>
-
-              {/* Legal Reference Note Box */}
-              <div style={{ padding: '0.85rem 1rem', background: 'var(--bg-card-subtle)', borderRadius: '10px', border: '1px solid var(--border-color)', fontSize: '0.82rem', color: 'var(--text-secondary)', display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
-                <Info size={18} color="var(--primary-700)" style={{ flexShrink: 0, marginTop: '2px' }} />
                 <div>
-                  <strong>السند القانوني:</strong> {calculatedFees.notes || calculatedFees.exemptReason}
+                  <dt>السند القانوني</dt>
+                  <dd>{f.notes || f.exemptReason}</dd>
                 </div>
-              </div>
+              </dl>
             </div>
           </div>
 
-          {/* Results & Breakdown Card */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-            
-            {/* Total Filing Fee Highlight Box */}
-            <div style={{
-              padding: '1.35rem 1.5rem',
-              borderRadius: '14px',
-              background: calculatedFees.isExempt ? 'var(--status-active-bg)' : 'var(--bg-card-subtle)',
-              color: calculatedFees.isExempt ? 'var(--status-active)' : 'var(--text-main)',
-              border: calculatedFees.isExempt ? '1px solid transparent' : '1px solid var(--border-color)',
-              position: 'relative'
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <span style={{ fontSize: '0.9rem', fontWeight: '700', opacity: 0.9 }}>
-                  {calculatedFees.isExempt ? 'حالة الإعفاء من الرسوم' : 'إجمالي المدفوع عند قيد الدعوى (بالخزينة)'}
-                </span>
-                <span style={{
-                  padding: '0.2rem 0.65rem',
-                  borderRadius: '20px',
-                  background: calculatedFees.isExempt ? 'var(--bg-card)' : 'var(--accent-gold-bg)',
-                  fontSize: '0.78rem',
-                  fontWeight: '700'
-                }}>
-                  {calculatedFees.isExempt ? 'معفاة بقوة القانون' : 'سداد فوري عند القيد'}
-                </span>
+          <div className="stack">
+            <div className={`fee-total ${f.isExempt ? 'is-exempt' : ''}`}>
+              <span className="fee-total-label">
+                {f.isExempt ? 'الإعفاء من الرسوم' : 'إجمالي المدفوع عند قيد الدعوى'}
+              </span>
+              <div className="fee-total-amount">
+                {f.isExempt ? 'معفاة تماماً' : money(f.totalAtFiling)}
               </div>
-
-              <div style={{ fontSize: calculatedFees.isExempt ? '1.4rem' : '2.3rem', fontWeight: '900', letterSpacing: '-0.5px' }}>
-                {calculatedFees.isExempt ? '0.00 ج.م (معفاة تماماً)' : `${calculatedFees.totalAtFiling.toLocaleString('en-US')} ج.م`}
-              </div>
-
-              {calculatedFees.isExempt ? (
-                <p style={{ fontSize: '0.85rem', marginTop: '0.5rem', lineHeight: '1.5' }}>
-                  {calculatedFees.exemptReason}
-                </p>
-              ) : (
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.65rem', fontSize: '0.8rem', opacity: 0.9, flexWrap: 'wrap' }}>
-                  <span>✓ شاملة الرسم الابتدائي والخدمات</span>
-                  <span>✓ شاملة أتعاب المحاماة والدمغات</span>
-                  <span>✓ شاملة الضرائب ومصاريف الإعلان</span>
-                </div>
-              )}
+              {f.isExempt && <p>{f.exemptReason}</p>}
             </div>
 
-            {/* Detailed Fee Breakdown Table (Matching Egyptian Calculator App Breakdown) */}
-            {!calculatedFees.isExempt && (
-              <div className="card" style={{ padding: '1.2rem', borderRadius: '14px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.9rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.6rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '800', fontSize: '1rem', color: 'var(--text-main)' }}>
-                    <Receipt size={18} color="var(--primary-700)" />
-                    <span>تفصيل بنود الرسوم والمصروفات المسددة</span>
-                  </div>
-                  <button 
-                    type="button"
-                    className="btn btn-secondary"
-                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-                    onClick={handleCopyFeeReport}
-                  >
-                    {copiedFees ? <Check size={14} color="#16a34a" /> : <Copy size={14} />}
-                    <span>{copiedFees ? 'تم النسخ!' : 'نسخ التقرير'}</span>
+            {!f.isExempt && (
+              <div className="card">
+                <div className="card-title-row">
+                  <h3 className="card-heading">تفصيل الرسوم والمصروفات</h3>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={handleCopyFeeReport}>
+                    {copiedFees ? <Check size={14} /> : <Copy size={14} />}
+                    <span>{copiedFees ? 'تم النسخ' : 'نسخ التقرير'}</span>
                   </button>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', fontSize: '0.88rem' }}>
-                  {/* نسبي */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed var(--border-subtle)' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>
-                      • نسبي (الرسم النسبي الابتدائي المسدد):
-                      {calculatedFees.filingBaseAmount && (
-                        <small style={{ color: 'var(--text-muted)', marginRight: '0.3rem' }}>(على وعاء {calculatedFees.filingBaseAmount.toLocaleString('en-US')} ج مادة 9)</small>
-                      )}
-                    </span>
-                    <strong style={{ color: 'var(--text-main)' }}>{(calculatedFees.filingProportionalFee || calculatedFees.basicFee || 0).toLocaleString('en-US')} ج.م</strong>
-                  </div>
-
-                  {/* خدمات */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed var(--border-subtle)' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>• خدمات (رسم صندوق الخدمات 50%):</span>
-                    <strong style={{ color: 'var(--text-main)' }}>{(calculatedFees.judicialServicesFee || 0).toLocaleString('en-US')} ج.م</strong>
-                  </div>
-
-                  {/* ص أبنية المحاكم */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed var(--border-subtle)' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>• ص أبنية المحاكم:</span>
-                    <strong style={{ color: 'var(--text-main)' }}>{(calculatedFees.courtBuildings || 0).toLocaleString('en-US')} ج.م</strong>
-                  </div>
-
-                  {/* أتعاب المحاماة */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed var(--border-subtle)' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>• أتعاب المحاماة:</span>
-                    <strong style={{ color: 'var(--text-main)' }}>{(calculatedFees.lawyerFees || 0).toLocaleString('en-US')} ج.م</strong>
-                  </div>
-
-                  {/* دمغة الشهيد */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed var(--border-subtle)' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>• دمغة الشهيد:</span>
-                    <strong style={{ color: 'var(--text-main)' }}>{(calculatedFees.martyrStamp || 0).toLocaleString('en-US')} ج.م</strong>
-                  </div>
-
-                  {/* صندوق الأسرة (إن وجد) */}
-                  {calculatedFees.familyFundStamp && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed var(--border-subtle)' }}>
-                      <span style={{ color: 'var(--text-secondary)' }}>• طابع دعم ورعاية الأسرة:</span>
-                      <strong style={{ color: 'var(--text-main)' }}>{calculatedFees.familyFundStamp.toLocaleString('en-US')} ج.م</strong>
+                <div className="fee-rows">
+                  {feeRows.map(([label, value], i) => (
+                    <div className="fee-row" key={i}>
+                      <span>{label}</span>
+                      <b>{money(value)}</b>
                     </div>
-                  )}
-
-                  {/* الإجمالي قبل الضرائب */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0.6rem', background: 'var(--bg-card-subtle)', borderRadius: '6px', fontWeight: '800', marginTop: '0.2rem' }}>
-                    <span>الإجمالي (الرسوم والملحقات):</span>
-                    <span style={{ color: 'var(--primary-700)' }}>{(calculatedFees.subtotalBeforeTax || 0).toLocaleString('en-US')} ج.م</span>
+                  ))}
+                  <div className="fee-row is-sum">
+                    <span>إجمالي الرسوم والملحقات</span>
+                    <b>{money(f.subtotalBeforeTax)}</b>
                   </div>
-
-                  {/* ضريبة المهن */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed var(--border-subtle)' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>• ضريبة المهن الحرة:</span>
-                    <strong style={{ color: 'var(--text-main)' }}>{(calculatedFees.professionalTax || 0).toLocaleString('en-US')} ج.م</strong>
+                  <div className="fee-row">
+                    <span>ضريبة المهن الحرة</span>
+                    <b>{money(f.professionalTax)}</b>
                   </div>
-
-                  {/* ض القيمة المضافة */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed var(--border-subtle)' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>• ضريبة القيمة المضافة (ض.ق.م):</span>
-                    <strong style={{ color: 'var(--text-main)' }}>{(calculatedFees.vatTax || 0).toLocaleString('en-US')} ج.م</strong>
+                  <div className="fee-row">
+                    <span>ضريبة القيمة المضافة</span>
+                    <b>{money(f.vatTax)}</b>
                   </div>
-
-                  {/* إجمالي الضريبة */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.6rem', background: 'rgba(234, 179, 8, 0.1)', borderRadius: '6px', fontWeight: '700', color: '#854d0e' }}>
-                    <span>إجمالي الضريبة:</span>
-                    <span>{(calculatedFees.totalTax || 0).toLocaleString('en-US')} ج.م</span>
+                  <div className="fee-row is-sum">
+                    <span>إجمالي الضرائب</span>
+                    <b>{money(f.totalTax)}</b>
                   </div>
-
-                  {/* مصاريف الإعلان */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.35rem 0', borderBottom: '1px dashed var(--border-subtle)' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>• مصاريف إعلان الصحيفة ({defendantsCount} خصم):</span>
-                    <strong style={{ color: 'var(--text-main)' }}>{(calculatedFees.bailiffFee || 0).toLocaleString('en-US')} ج.م</strong>
+                  <div className="fee-row">
+                    <span>مصاريف إعلان الصحيفة ({defendantsCount} خصم)</span>
+                    <b>{money(f.bailiffFee)}</b>
                   </div>
-
-                  {calculatedFees.depositSecurity > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.4rem 0.6rem', background: 'var(--primary-50)', borderRadius: '6px' }}>
-                      <span style={{ color: 'var(--primary-900)', fontWeight: '700' }}>• كفالة الطعن (تسترد عند قبول الطعن):</span>
-                      <strong style={{ color: 'var(--primary-800)' }}>{calculatedFees.depositSecurity.toLocaleString('en-US')} ج.م</strong>
+                  {f.depositSecurity > 0 && (
+                    <div className="fee-row is-sum">
+                      <span>كفالة الطعن (تسترد عند قبول الطعن)</span>
+                      <b>{money(f.depositSecurity)}</b>
                     </div>
                   )}
                 </div>
               </div>
             )}
 
-            {/* Post-Judgment Fee Bill (قيمة قوائم الرسوم - أمر التقدير بعد الحكم) */}
-            {calculatedFees.totalPostJudgment > 0 && (
-              <div className="card" style={{ padding: '1.2rem', borderRadius: '14px', border: '1.5px solid #fca5a5', background: 'var(--bg-card-subtle)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: '800', color: '#b91c1c', marginBottom: '0.6rem', fontSize: '1rem' }}>
-                  <Scale size={18} color="#dc2626" />
-                  <span>قيمة قوائم الرسوم (أمر التقدير بعد صدور الحكم)</span>
+            {f.totalPostJudgment > 0 && (
+              <div className="card">
+                <h3 className="card-heading">قائمة الرسوم بعد الحكم (أمر التقدير)</h3>
+                <p className="hint">يصدر بها أمر تقدير من قلم الكتاب بعد الفصل في الدعوى، ويلزم بها الخصم المحكوم عليه بالمصروفات.</p>
+                <div className="money-strip two">
+                  <div><span>نسبي متبقي</span><b>{money(f.remainingProportional)}</b></div>
+                  <div><span>خدمات متبقي</span><b>{money(f.remainingServices)}</b></div>
                 </div>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 0.8rem 0' }}>
-                  يصدر بها أمر تقدير رسوم من قلم الكتاب بعد الفصل في الدعوى بحكم نهائي، ويلزم بها الخصم المحكوم عليه بالمصروفات:
-                </p>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem', marginBottom: '0.75rem' }}>
-                  <div style={{ padding: '0.75rem', background: 'var(--bg-main)', borderRadius: '8px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>نسبي متبقي</span>
-                    <strong style={{ fontSize: '1.2rem', color: '#dc2626' }}>{calculatedFees.remainingProportional.toLocaleString('en-US')}</strong>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginRight: '0.2rem' }}>ج.م</span>
-                  </div>
-
-                  <div style={{ padding: '0.75rem', background: 'var(--bg-main)', borderRadius: '8px', border: '1px solid var(--border-color)', textAlign: 'center' }}>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' }}>خدمات متبقي</span>
-                    <strong style={{ fontSize: '1.2rem', color: '#dc2626' }}>{calculatedFees.remainingServices.toLocaleString('en-US')}</strong>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginRight: '0.2rem' }}>ج.م</span>
-                  </div>
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.6rem 0.8rem', background: 'rgba(239, 68, 68, 0.08)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                  <span style={{ fontSize: '0.86rem', fontWeight: '700', color: '#991b1b' }}>إجمالي أمر التقدير المتوقع:</span>
-                  <strong style={{ fontSize: '1.25rem', color: '#b91c1c', fontWeight: '900' }}>
-                    {calculatedFees.totalPostJudgment.toLocaleString('en-US')} ج.م
-                  </strong>
+                <div className="fee-row is-sum">
+                  <span>إجمالي أمر التقدير المتوقع</span>
+                  <b>{money(f.totalPostJudgment)}</b>
                 </div>
               </div>
             )}
 
-            {/* Detailed Brackets Breakdown Table (جدول الشرائح القانونية للتوضيح) */}
-            {calculatedFees.fullFeeBrackets && (
-              <div className="card" style={{ padding: '1rem', borderRadius: '12px', fontSize: '0.82rem' }}>
-                <div style={{ fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <HelpCircle size={15} color="var(--primary-700)" />
-                  <span>طريقة حساب الشرائح التصاعدية للرسم النسبي الكلي (المادة 1):</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', color: 'var(--text-secondary)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-subtle)', paddingBottom: '0.2rem' }}>
-                    <span>• الـ 250 جنيهاً الأولى (2%):</span>
-                    <strong>{calculatedFees.fullFeeBrackets.b1.toFixed(2)} ج.م</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-subtle)', paddingBottom: '0.2rem' }}>
-                    <span>• من 250 إلى 2,000 جنيه (3% على 1,750 ج):</span>
-                    <strong>{calculatedFees.fullFeeBrackets.b2.toFixed(2)} ج.م</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-subtle)', paddingBottom: '0.2rem' }}>
-                    <span>• من 2,000 إلى 4,000 جنيه (4% على 2,000 ج):</span>
-                    <strong>{calculatedFees.fullFeeBrackets.b3.toFixed(2)} ج.م</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px dashed var(--border-subtle)', paddingBottom: '0.2rem' }}>
-                    <span>• ما زاد عن 4,000 جنيه (5%):</span>
-                    <strong>{calculatedFees.fullFeeBrackets.b4.toFixed(2)} ج.م</strong>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: '800', paddingTop: '0.2rem', color: 'var(--primary-700)' }}>
-                    <span>مجموع الرسم النسبي النهائي الكامل:</span>
-                    <span>{calculatedFees.fullProportionalFee.toLocaleString('en-US')} ج.م</span>
-                  </div>
+            {f.fullFeeBrackets && (
+              <div className="card">
+                <h3 className="card-heading">شرائح الرسم النسبي (مادة 1)</h3>
+                <div className="fee-rows">
+                  <div className="fee-row"><span>أول 250 جنيهاً (2%)</span><b>{f.fullFeeBrackets.b1.toFixed(2)} ج.م</b></div>
+                  <div className="fee-row"><span>من 250 إلى 2,000 (3%)</span><b>{f.fullFeeBrackets.b2.toFixed(2)} ج.م</b></div>
+                  <div className="fee-row"><span>من 2,000 إلى 4,000 (4%)</span><b>{f.fullFeeBrackets.b3.toFixed(2)} ج.م</b></div>
+                  <div className="fee-row"><span>ما زاد عن 4,000 (5%)</span><b>{f.fullFeeBrackets.b4.toFixed(2)} ج.م</b></div>
+                  <div className="fee-row is-sum"><span>مجموع الرسم النسبي الكامل</span><b>{money(f.fullProportionalFee)}</b></div>
                 </div>
               </div>
             )}
-
           </div>
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 2. GENERAL SEARCH TAB                                                    */}
-      {/* ========================================================================= */}
       {activeTabSub === 'search' && (
         <>
-          {/* Search Input Bar */}
-          <div className="card" style={{ marginBottom: '1.5rem', padding: '1.2rem 1.5rem' }}>
-            <div className="header-search" style={{ width: '100%' }}>
-              <Search size={20} style={{ color: 'var(--text-subtle)' }} />
-              <input 
-                type="text" 
-                placeholder="ابحث بأي كلمة: رقم قضية، اسم موكل، اسم خصم، محكمة، تاريخ، أو منطوق حكم..." 
+          <div className="page-toolbar">
+            <div className="page-search">
+              <Search size={16} />
+              <input
+                type="text"
+                className="form-input"
+                placeholder="رقم قضية، اسم موكل أو خصم، محكمة، منطوق حكم"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 autoFocus
@@ -870,145 +672,92 @@ export default function SearchDeadlinesPage({ searchTerm, setSearchTerm, setActi
             </div>
           </div>
 
-          {/* Results Grid */}
           <div className="search-results-grid">
-            
-            {/* Cases Results */}
             <div className="card">
-              <div className="card-header">
-                <div className="card-title">
-                  <span>نتائج القضايا والدعاوى ({matchingCases.length})</span>
-                </div>
-              </div>
-
+              <h3 className="card-heading">القضايا ({matchingCases.length})</h3>
               {matchingCases.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem 0' }}>لا توجد قضايا مطابقة للبحث</p>
+                <p className="empty-line">لا توجد قضايا مطابقة.</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                  {matchingCases.map(c => (
-                    <div key={c.id} style={{ padding: '0.9rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.3rem' }}>
-                        <strong style={{ fontSize: '1rem', color: 'var(--brand-accent)' }}>
-                          دعوى رقم {c.case_number}/{c.case_year} — {c.case_title || c.plaintiff_name}
-                        </strong>
-                        <span className="badge" style={{ background: 'var(--primary-100)', color: 'var(--brand-accent)' }}>
-                          {CASE_TYPES[c.case_type] || c.case_type}
+                <ul className="mini-list result-list">
+                  {matchingCases.map((c) => (
+                    <li key={c.id}>
+                      <button type="button" className="result-item" onClick={() => openCase(c)}>
+                        <strong>{c.case_number}/{c.case_year} — {c.case_title || c.plaintiff_name}</strong>
+                        <span className="cell-sub">
+                          {[CASE_TYPES[c.case_type] || c.case_type, c.court_name, c.defendant_name && `ضد ${c.defendant_name}`,
+                            c.next_session_date && `الجلسة ${new Date(c.next_session_date).toLocaleDateString('ar-EG')}`].filter(Boolean).join(' · ')}
                         </span>
-                      </div>
-                      <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'flex', gap: '1.2rem' }}>
-                        <span><strong>المحكمة:</strong> {c.court_name}</span>
-                        <span><strong>الخصم:</strong> {c.defendant_name}</span>
-                        {c.next_session_date && (
-                          <span><strong>الجلسة:</strong> {new Date(c.next_session_date).toLocaleDateString('ar-EG')}</span>
-                        )}
-                      </div>
-                    </div>
+                      </button>
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
             </div>
 
-            {/* Clients Results */}
             <div className="card">
-              <div className="card-header">
-                <div className="card-title">
-                  <span>الموكلين المطابقين ({matchingClients.length})</span>
-                </div>
-              </div>
-
+              <h3 className="card-heading">الموكلون ({matchingClients.length})</h3>
               {matchingClients.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2rem 0' }}>لا يوجد موكلين مطابقين</p>
+                <p className="empty-line">لا يوجد موكلون مطابقون.</p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                  {matchingClients.map(c => (
-                    <div key={c.id} style={{ padding: '0.8rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                      <strong style={{ fontSize: '0.95rem', color: 'var(--brand-accent)' }}>{c.name}</strong>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                        {c.phone ? `هاتف: ${c.phone}` : 'بدون هاتف'} | {c.power_of_attorney_number ? `توكيل: ${c.power_of_attorney_number}` : ''}
-                      </div>
-                    </div>
+                <ul className="mini-list result-list">
+                  {matchingClients.map((c) => (
+                    <li key={c.id}>
+                      <button type="button" className="result-item" onClick={() => openClient(c)}>
+                        <strong>{c.name}</strong>
+                        <span className="cell-sub">
+                          {[c.phone ? formatEgyptPhone(c.phone) : 'بدون هاتف', c.power_of_attorney_number && `توكيل ${c.power_of_attorney_number}`].filter(Boolean).join(' · ')}
+                        </span>
+                      </button>
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
             </div>
-
           </div>
         </>
       )}
 
-      {/* ========================================================================= */}
-      {/* 3. DEADLINE & APPEALS CALCULATOR TAB                                     */}
-      {/* ========================================================================= */}
       {activeTabSub === 'deadlines' && (
         <div className="deadlines-calculator-grid">
-          {/* Calculator Card */}
           <div className="card">
-            <div className="card-header">
-              <div className="card-title">
-                <Calculator size={20} color="var(--primary-600)" />
-                <span>حاسبة ميعاد الطعن القانوني والعد التنازلي</span>
-              </div>
-            </div>
+            <h3 className="card-heading">حاسبة ميعاد الطعن</h3>
 
             <div className="form-group">
-              <label className="form-label">نوع الطعن / الإجراء القانوني *</label>
-              <select 
-                className="form-select" 
-                value={appealType} 
-                onChange={(e) => setAppealType(e.target.value)}
-              >
+              <label className="form-label">نوع الطعن أو الإجراء *</label>
+              <Select className="form-select" value={appealType} onChange={(e) => setAppealType(e.target.value)}>
                 {Object.entries(DEADLINE_PRESETS).map(([k, v]) => (
                   <option key={k} value={k}>{v.title} ({v.days} يوماً)</option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div className="form-group">
               <label className="form-label">تاريخ صدور الحكم أو الإعلان *</label>
-              <input 
-                type="date" 
-                className="form-input" 
-                value={rulingDate} 
-                onChange={(e) => setRulingDate(e.target.value)} 
-              />
+              <DateInput className="form-input" value={rulingDate} onChange={(e) => setRulingDate(e.target.value)} />
             </div>
 
-            {/* Calculated Result Box */}
             <div className="deadline-result-box">
-              <div className="deadline-badge-title">
-                آخر ميعاد قانوني لإيداع التقرير بالطعن:
-              </div>
+              <div className="deadline-badge-title">آخر ميعاد قانوني للطعن</div>
               <h2 className="deadline-date-title">
                 {deadlineDate ? deadlineDate.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : '—'}
               </h2>
-              <p className="deadline-law-ref">
-                السند القانوني: {DEADLINE_PRESETS[appealType]?.law}
-              </p>
+              <p className="deadline-law-ref">السند القانوني: {DEADLINE_PRESETS[appealType]?.law}</p>
             </div>
           </div>
 
-          {/* Legal Rules Reference */}
           <div className="card">
-            <div className="card-header">
-              <div className="card-title">
-                <ShieldAlert size={20} color="var(--accent-gold)" />
-                <span>دليل المدد الإجرائية ومواعيد السقوط</span>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem', fontSize: '0.85rem' }}>
+            <h3 className="card-heading">دليل المدد الإجرائية</h3>
+            <ul className="mini-list">
               {Object.entries(DEADLINE_PRESETS).map(([k, v]) => (
-                <div key={k} style={{ padding: '0.8rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.2rem' }}>
-                    <strong style={{ color: 'var(--brand-accent)' }}>{v.title}</strong>
-                    <span className="badge" style={{ background: 'var(--primary-100)', color: 'var(--brand-accent)' }}>
-                      {v.days} يوم
-                    </span>
+                <li key={k}>
+                  <div>
+                    <strong>{v.title}</strong>
+                    <span className="cell-sub">{v.law}</span>
                   </div>
-                  <div style={{ color: 'var(--text-muted)' }}>{v.law}</div>
-                </div>
+                  <span className="badge">{v.days} يوم</span>
+                </li>
               ))}
-            </div>
+            </ul>
           </div>
         </div>
       )}

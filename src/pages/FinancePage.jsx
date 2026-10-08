@@ -7,6 +7,7 @@ import { formatArabicDate } from '../lib/dateRules';
 import ClientFinancialManager from '../components/financial/ClientFinancialManager';
 import AddTransactionModal from '../components/financial/AddTransactionModal';
 import RowAction, { RowActions } from '../components/common/RowAction';
+import { formatEgyptPhone } from '../lib/phone';
 
 const FILTERS = [
   { id: 'all', label: 'الكل' },
@@ -65,7 +66,6 @@ export default function FinancePage() {
     <div className="page-wrapper">
       <div className="page-head">
         <div>
-          <div className="page-eyebrow"><span className="page-dot" />إدارة الحسابات والتحصيل</div>
           <h1>الشؤون المالية</h1>
         </div>
       </div>
@@ -104,54 +104,42 @@ export default function FinancePage() {
         {rows.length === 0 ? (
           <div className="fin-empty">لا توجد حسابات مطابقة.</div>
         ) : (
-          <div className="table-container" style={{ border: 'none' }}>
-            <table className="data-table fin-clients-table">
-              <thead>
-                <tr>
-                  <th>الموكل</th>
-                  <th className="cell-center">القضايا</th>
-                  <th className="cell-num">إجمالي المقيّد</th>
-                  <th className="cell-num">المسدد</th>
-                  <th className="cell-num">الرصيد</th>
-                  <th className="cell-center">آخر دفعة</th>
-                  <th className="cell-actions">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(r => (
-                  <tr key={r.client.id}>
-                    <td>
-                      <div className="cell-stack">
-                        <b>{r.client.name}</b>
-                        {r.client.phone && <span className="cell-sub" dir="ltr">{r.client.phone}</span>}
+          <div className="row-list is-flush">
+            {rows.map(r => (
+              <article key={r.client.id} className="list-row">
+                <div className="list-row-main">
+                  <div className="list-row-body list-row-person is-clickable" onClick={() => setStatementClient(r.client)}>
+                    <div className="list-row-person-text">
+                      <div className="list-row-top">
+                        <h3 className="row-title"><span className="row-title-text">{r.client.name}</span></h3>
                       </div>
-                    </td>
-                    <td className="cell-center"><div className="cell-stack">{r.casesCount}</div></td>
-                    <td className="cell-num"><div className="cell-stack">{formatMoney(r.charges)}</div></td>
-                    <td className="cell-num"><div className="cell-stack">{formatMoney(r.paid)}</div></td>
-                    <td className="cell-num">
-                      <div className="cell-stack">
-                        <span className={`fin-bal ${toneOf(r.balance)}`}>
-                          {Math.abs(r.balance) < 0.01 ? 'خالص' : formatMoney(Math.abs(r.balance))}
-                        </span>
-                        {Math.abs(r.balance) >= 0.01 && <span className="cell-sub">{r.balance > 0 ? 'مستحق على الموكل' : 'رصيد دائن'}</span>}
-                      </div>
-                    </td>
-                    <td className="cell-center">
-                      <div className="cell-stack">
-                        <span className={r.lastPaymentDate ? '' : 'cell-sub'}>{r.lastPaymentDate ? formatArabicDate(r.lastPaymentDate, false) : 'لا توجد'}</span>
-                      </div>
-                    </td>
-                    <td className="cell-actions">
-                      <RowActions>
-                        <RowAction icon={HandCoins} label="تحصيل دفعة" tone="primary" onClick={() => setPaymentClient(r.client)} />
-                        <RowAction icon={FileText} label="كشف الحساب" onClick={() => setStatementClient(r.client)} />
-                      </RowActions>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      <p className="list-row-sub">
+                        {[r.client.phone && formatEgyptPhone(r.client.phone), `${r.casesCount} ${r.casesCount === 1 ? 'قضية' : 'قضايا'}`,
+                          `آخر دفعة: ${r.lastPaymentDate ? formatArabicDate(r.lastPaymentDate, false) : 'لا توجد'}`].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <dl className="list-row-facts is-three">
+                    <div><dt>المقيّد</dt><dd>{formatMoney(r.charges)}</dd></div>
+                    <div><dt>المسدد</dt><dd>{formatMoney(r.paid)}</dd></div>
+                    <div>
+                      <dt>{Math.abs(r.balance) < 0.01 ? 'الرصيد' : r.balance > 0 ? 'مستحق عليه' : 'رصيد دائن'}</dt>
+                      <dd><span className={`fin-bal ${toneOf(r.balance)}`}>{Math.abs(r.balance) < 0.01 ? 'خالص' : formatMoney(Math.abs(r.balance))}</span></dd>
+                    </div>
+                  </dl>
+
+                  <div className="list-row-actions">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setPaymentClient(r.client)}>
+                      <HandCoins size={14} /> تحصيل
+                    </button>
+                    <RowActions>
+                      <RowAction icon={FileText} label="كشف الحساب" onClick={() => setStatementClient(r.client)} />
+                    </RowActions>
+                  </div>
+                </div>
+              </article>
+            ))}
           </div>
         )}
       </div>

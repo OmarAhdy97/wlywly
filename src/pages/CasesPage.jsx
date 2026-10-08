@@ -1,83 +1,81 @@
-import React, { useState } from 'react';
-import {
-  Briefcase,
-  Search,
-  Filter,
-  Eye,
-  Edit3,
-  Trash2,
-  Archive,
-  Calendar,
-  User,
-  UserCheck,
-  FileText,
-  X,
-  Check,
-  Clock,
-  Gavel,
-  AlertCircle,
-  Plus,
-  Printer,
-  Phone,
-  Scale,
-  Building2
-} from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Search, Edit3, Trash2, Archive, Gavel, X, History } from 'lucide-react';
 import { useData } from '../context/DataContext';
-import { CASE_TYPES, COURT_LEVELS, CASE_STATUSES, SESSION_DECISIONS, USER_ROLES } from '../lib/supabase';
+import { CASE_TYPES, COURT_LEVELS, CASE_STATUSES, USER_ROLES } from '../lib/supabase';
+import { formatMoney, getTransactionMeta, isDebitTransaction } from '../lib/financialCalculations';
+import { takeFocusTarget, onFocusTarget } from '../lib/focusTarget';
 import SessionDecisionModal from '../components/common/SessionDecisionModal';
 import RowAction, { RowActions } from '../components/common/RowAction';
+import { confirmDialog, notify } from '../lib/dialog';
+import Select from '../components/common/Select';
+import CourtInput from '../components/common/CourtInput';
+import { buildTimeline, CaseTimeline, fmtDate } from '../components/history/CaseTimeline';
+import DateInput from '../components/common/DateInput';
 
 export default function CasesPage() {
-  const { cases, clients, sessions, team, adminTasks, adminTaskUpdates, appeals, updateCase, deleteCase } = useData();
+  const {
+    cases, clients, sessions, team, adminTasks, adminTaskUpdates, appeals, transactions, updateCase, deleteCase,
+  } = useData();
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
-
-  // Selected Case for Details Modal
   const [selectedCase, setSelectedCase] = useState(null);
   const [editingCase, setEditingCase] = useState(null);
-
-  // Decision Modal State
   const [decisionCase, setDecisionCase] = useState(null);
-
-  // Active (non-archived) cases
-  const activeCases = cases.filter(c => !c.is_archived);
-
-  // Filtered List
-  const filteredCases = activeCases.filter(c => {
-    const matchesSearch =
-      (c.case_number && c.case_number.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (c.case_title && c.case_title.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (c.plaintiff_name && c.plaintiff_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (c.defendant_name && c.defendant_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (c.court_name && c.court_name.toLowerCase().includes(searchTerm.toLowerCase()));
-
-    const matchesType =
-      typeFilter === 'ALL' ||
-      c.case_type === typeFilter ||
-      (CASE_TYPES[typeFilter] && (c.case_type === CASE_TYPES[typeFilter] || c.case_type?.includes(CASE_TYPES[typeFilter]))) ||
-      (c.case_type && CASE_TYPES[c.case_type] === CASE_TYPES[typeFilter]);
-    const matchesStatus = statusFilter === 'ALL' || c.status === statusFilter;
-
-    return matchesSearch && matchesType && matchesStatus;
+  const [tab, setTab] = useState('log');
+  const [openHistory, setOpenHistory] = useState(() => new Set());
+  const toggleHistory = (id) => setOpenHistory((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
   });
 
+  const activeCases = cases.filter((c) => !c.is_archived);
+
+  // opened from the global search
+  useEffect(() => {
+    const open = (t) => {
+      const found = cases.find((c) => c.id === t.id);
+      if (found) {
+        setTab('log');
+        setSelectedCase(found);
+      }
+    };
+    const pending = takeFocusTarget('case');
+    if (pending) open(pending);
+    return onFocusTarget('case', open);
+  }, [cases]);
+
+  const filteredCases = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return activeCases.filter((c) => {
+      const matchesSearch =
+        !q ||
+        [c.case_number, c.case_title, c.plaintiff_name, c.defendant_name, c.court_name].some(
+          (v) => v && String(v).toLowerCase().includes(q)
+        );
+      const matchesType =
+        typeFilter === 'ALL' ||
+        c.case_type === typeFilter ||
+        (CASE_TYPES[typeFilter] && (c.case_type === CASE_TYPES[typeFilter] || c.case_type?.includes(CASE_TYPES[typeFilter]))) ||
+        (c.case_type && CASE_TYPES[c.case_type] === CASE_TYPES[typeFilter]);
+      const matchesStatus = statusFilter === 'ALL' || c.status === statusFilter;
+      return matchesSearch && matchesType && matchesStatus;
+    });
+  }, [activeCases, searchTerm, typeFilter, statusFilter]);
+
   const handleArchiveCase = async (id) => {
-    if (window.confirm('هل أنت متأكد من رغبتك في نقل هذه القضية إلى الأرشيف؟')) {
+    if (await confirmDialog('هل تريد نقل هذه القضية إلى الأرشيف؟')) {
       await updateCase(id, { is_archived: true, archive_date: new Date().toISOString() });
       if (selectedCase?.id === id) setSelectedCase(null);
     }
   };
 
   const handleDeleteCase = async (id) => {
-    if (window.confirm('تحذير: سيتم حذف القضية وجميع بياناتها نهائياً! هل تريد المتابعة؟')) {
+    if (await confirmDialog('تحذير: سيتم حذف القضية وجميع بياناتها نهائياً. هل تريد المتابعة؟', { danger: true, confirmLabel: 'حذف' })) {
       await deleteCase(id);
       if (selectedCase?.id === id) setSelectedCase(null);
     }
-  };
-
-  const handleOpenDecision = (c) => {
-    setDecisionCase(c);
   };
 
   const handleSaveEdit = async (e) => {
@@ -101,644 +99,291 @@ export default function CasesPage() {
       });
       setEditingCase(null);
     } catch (err) {
-      alert('خطأ أثناء تعديل القضية: ' + err.message);
+      notify('خطأ أثناء تعديل القضية: ' + err.message);
     }
   };
 
-  return (
-    <div className="page-wrapper" style={{ maxWidth: '1400px' }}>
-      {/* Page Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '1.25rem',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        borderBottom: '1px solid var(--border-subtle)',
-        paddingBottom: '1rem'
-      }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-gold)' }}></span>
-            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
-              السجل القضائي وملفات الدعاوى
-            </span>
-          </div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-            إدارة القضايا والدعاوى المتداولة
-          </h1>
-        </div>
+  const setEdit = (field) => (e) => setEditingCase({ ...editingCase, [field]: e.target.value });
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span className="badge" style={{ background: 'var(--primary-100)', color: 'var(--primary-800)', fontWeight: '700', padding: '0.4rem 0.85rem', fontSize: '0.82rem' }}>
-            {filteredCases.length} قضية نشطة
-          </span>
-        </div>
-      </div>
+  const renderDetails = () => {
+    const current = cases.find((c) => c.id === selectedCase.id) || selectedCase;
+    const st = CASE_STATUSES[current.status] || CASE_STATUSES.active;
+    const { items, caseTasks } = buildTimeline({ current, sessions, appeals, adminTasks, adminTaskUpdates });
+    const assigned = team.find(
+      (m) => m.id === current.next_steps || m.id === (current.next_steps || '').replace('assigned:', '')
+    );
+    const client = clients.find((c) => c.id === current.client_id);
+    const caseTx = (transactions || []).filter((t) => String(t.case_id) === String(current.id));
+    const billed = caseTx.filter((t) => isDebitTransaction(t.type)).reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+    const paid = caseTx.filter((t) => !isDebitTransaction(t.type)).reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
 
-      {/* Filters & Search Toolbar */}
-      <div className="card" style={{ marginBottom: '1.25rem', padding: '0.9rem 1.15rem', borderRadius: '14px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '0.85rem', alignItems: 'center' }}>
+    const facts = [
+      ['نوع الدعوى', CASE_TYPES[current.case_type] || current.case_type],
+      ['درجة التقاضي', COURT_LEVELS[current.court_level] || current.court_level],
+      ['المحكمة', [current.court_name, current.court_room && `دائرة ${current.court_room}`].filter(Boolean).join(' — ')],
+      ['المدعي', current.plaintiff_name],
+      ['المدعى عليه', current.defendant_name],
+      ['الموكل', client?.name],
+      ['المحامي المكلف', assigned ? `الأستاذ / ${assigned.name}` : ''],
+      ['الجلسة القادمة', current.next_session_date ? fmtDate(current.next_session_date) : ''],
+    ];
 
-          <div className="header-search" style={{ width: '100%', minHeight: '40px', borderRadius: '10px' }}>
-            <Search size={17} style={{ color: 'var(--text-subtle)' }} />
-            <input
-              type="text"
-              placeholder="بحث برقم القضية، الموكل، أو الخصم..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{ fontSize: '0.88rem' }}
-            />
+    return (
+      <div className="modal-backdrop" onClick={() => setSelectedCase(null)}>
+        <div className="modal-dialog case-dialog" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <div className="case-dialog-title">
+              <h3>قضية {current.case_number} / {current.case_year}</h3>
+              <span className="status-chip" style={{ '--dot': st.color }}>{st.label}</span>
+            </div>
+            <button type="button" className="icon-btn" onClick={() => setSelectedCase(null)} aria-label="إغلاق">
+              <X size={18} />
+            </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.84rem', fontWeight: '600', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>النوع:</span>
-            <select className="form-select" style={{ fontSize: '0.86rem', minHeight: '40px', borderRadius: '10px', padding: '0.45rem 0.75rem' }} value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-              <option value="ALL">جميع الأنواع</option>
-              {Object.entries(CASE_TYPES).map(([k, v]) => (
-                <option key={k} value={k}>{v}</option>
-              ))}
-            </select>
-          </div>
+          <div className="modal-body case-dialog-body">
+            {current.case_title && <p className="case-subject">{current.case_title}</p>}
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '0.84rem', fontWeight: '600', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>الحالة:</span>
-            <select className="form-select" style={{ fontSize: '0.86rem', minHeight: '40px', borderRadius: '10px', padding: '0.45rem 0.75rem' }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="ALL">جميع الحالات</option>
-              {Object.entries(CASE_STATUSES).map(([k, v]) => (
-                <option key={k} value={k}>{v.label}</option>
-              ))}
-            </select>
-          </div>
-
-        </div>
-      </div>
-
-      {/* Cases Table */}
-      <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
-        {filteredCases.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: 'var(--text-muted)' }}>
-            <Briefcase size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.4rem' }}>لم يتم العثور على قضايا مطابقة</h3>
-            <p style={{ fontSize: '0.9rem' }}>جرب تعديل خيارات البحث أو قم بإضافة قضية جديدة.</p>
-          </div>
-        ) : (
-          <div className="table-container" style={{ border: 'none' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>رقم الدعوى والسنة</th>
-                  <th className="cell-wide">موضوع الدعوى</th>
-                  <th>المحكمة / الدائرة</th>
-                  <th>المدعي والمدعى عليه</th>
-                  <th className="cell-center">الجلسة القادمة</th>
-                  <th className="cell-center">الحالة</th>
-                  <th className="cell-actions">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCases.map((c) => {
-                  const st = CASE_STATUSES[c.status] || CASE_STATUSES.active;
-                  return (
-                    <tr key={c.id}>
-                      <td>
-                        <div className="cell-stack">
-                          <span className="case-no"><strong>{c.case_number}</strong> / {c.case_year}</span>
-                          <span className="cell-sub">{CASE_TYPES[c.case_type] || c.case_type}</span>
-                        </div>
-                      </td>
-                      <td className="cell-wide">
-                        <div className="cell-stack">
-                          <div className="case-title-cell" title={c.case_title || ''}>{c.case_title || '—'}</div>
-                          <span className="cell-sub">{COURT_LEVELS[c.court_level] || c.court_level}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <div className="cell-stack">
-                          <span>{c.court_name}</span>
-                          {c.court_room && <span className="cell-sub">الدائرة: {c.court_room}</span>}
-                        </div>
-                      </td>
-                      <td>
-                        <div className="cell-stack">
-                          <span><b>المدعي:</b> {c.plaintiff_name}</span>
-                          <span className="cell-sub"><b>المدعى عليه:</b> {c.defendant_name}</span>
-                        </div>
-                      </td>
-                      <td className="cell-center">
-                        <div className="cell-stack">
-                          {c.next_session_date ? (
-                            <span className="cell-date">
-                              {new Date(c.next_session_date).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}
-                            </span>
-                          ) : (
-                            <span className="cell-sub">غير محدد</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="cell-center">
-                        <div className="cell-stack">
-                          <span className="badge" style={{ background: st.bg, color: st.color }}>{st.label}</span>
-                        </div>
-                      </td>
-                      <td className="cell-actions">
-                        <RowActions>
-                          <RowAction icon={Eye} label="عرض التفاصيل وتاريخ القضية" onClick={() => setSelectedCase(c)} />
-                          <RowAction icon={Gavel} label="تسجيل قرار / تأجيل" tone="primary" onClick={() => handleOpenDecision(c)} />
-                          <RowAction icon={Edit3} label="تعديل القضية" onClick={() => setEditingCase({ ...c })} />
-                          <RowAction icon={Archive} label="نقل للأرشيف" onClick={() => handleArchiveCase(c.id)} />
-                          <RowAction icon={Trash2} label="حذف" tone="danger" onClick={() => handleDeleteCase(c.id)} />
-                        </RowActions>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Case Details Modal */}
-      {selectedCase && (() => {
-        const current = cases.find(c => c.id === selectedCase.id) || selectedCase;
-        const currentStatus = CASE_STATUSES[current.status] || CASE_STATUSES.active;
-
-        // Build comprehensive chronological timeline (Sessions, Appeals, Admin Tasks)
-        const caseSessions = (sessions || []).filter(s => s.case_id === current.id);
-        const caseAppeals = (appeals || []).filter(a => a.case_id === current.id);
-        const caseTasks = (adminTasks || []).filter(t => t.case_id === current.id);
-        const caseTaskUpdates = (adminTaskUpdates || []).filter(u => {
-          if (u.case_id === current.id) return true;
-          return caseTasks.some(t => t.id === u.admin_task_id);
-        });
-
-        // Extract significant milestones (postponements, completions, reassignments)
-        const taskMilestones = caseTaskUpdates
-          .filter(u => ['postponed', 'completed', 'reassigned', 'cancelled'].includes(u.action_type))
-          .map(u => {
-            const relTask = caseTasks.find(t => t.id === u.admin_task_id);
-            const taskTitle = relTask ? relTask.title : 'عمل إداري';
-            let titleText = `متابعة إدارية: ${taskTitle}`;
-            if (u.action_type === 'postponed') titleText = `تأجيل متابعة إدارية: ${taskTitle}`;
-            else if (u.action_type === 'completed') titleText = `إتمام عمل إداري: ${taskTitle}`;
-            else if (u.action_type === 'reassigned') titleText = `إعادة إسناد عمل إداري: ${taskTitle}`;
-            else if (u.action_type === 'cancelled') titleText = `إلغاء عمل إداري: ${taskTitle}`;
-
-            return {
-              type: 'admin_task_milestone',
-              id: u.id,
-              date: u.created_at,
-              created_at: u.created_at,
-              status: u.action_type,
-              title: titleText,
-              notes: u.update_text,
-              new_due_date: u.new_due_date,
-              previous_due_date: u.previous_due_date,
-            };
-          });
-
-        const timelineItems = [
-          ...caseSessions.map(s => ({
-            type: 'session',
-            id: s.id,
-            date: s.session_date || s.created_at,
-            created_at: s.created_at,
-            status: s.status,
-            adjournment_reason: s.adjournment_reason,
-            ruling_text: s.ruling_text,
-            notes: s.notes,
-          })),
-          ...caseAppeals.map(a => ({
-            type: 'appeal',
-            id: a.id,
-            date: a.judgment_date || a.created_at,
-            created_at: a.created_at,
-            status: 'appeal',
-            judgment_text: a.judgment_text,
-            follow_up_date: a.follow_up_date,
-            notes: a.notes,
-          })),
-          ...caseTasks.map(t => ({
-            type: 'admin_task',
-            id: t.id,
-            date: t.execution_date || t.created_at,
-            created_at: t.created_at,
-            status: t.status,
-            title: t.title,
-            requirements: t.requirements,
-            notes: t.notes,
-            location: t.location,
-          })),
-          ...taskMilestones,
-        ].sort((a, b) => new Date(b.date || b.created_at) - new Date(a.date || a.created_at));
-
-        const assigned = team.find(m => m.id === current.next_steps || m.id === (current.next_steps || '').replace('assigned:', ''));
-
-        return (
-          <div className="modal-backdrop" onClick={() => setSelectedCase(null)}>
-            <div className="modal-dialog" style={{ maxWidth: '780px', maxHeight: '92vh', display: 'flex', flexDirection: 'column', borderRadius: '16px', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
-              {/* Modal Header */}
-              <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-accent)', flexShrink: 0 }}>
-                    <Scale size={20} />
-                  </div>
-                  <h3 style={{ fontSize: '1.25rem', fontWeight: '900', margin: 0, color: 'var(--text-main)' }}>
-                    تفاصيل وسجل الدعوى رقم {current.case_number}/{current.case_year}
-                  </h3>
+            <dl className="facts">
+              {facts.filter(([, v]) => v).map(([k, v]) => (
+                <div key={k}>
+                  <dt>{k}</dt>
+                  <dd>{v}</dd>
                 </div>
+              ))}
+            </dl>
+
+            <div className="case-dialog-actions">
+              <button type="button" className="btn btn-primary" onClick={() => setDecisionCase(current)}>
+                <Gavel size={16} /> تسجيل قرار / تأجيل
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => { setEditingCase({ ...current }); }}>
+                <Edit3 size={16} /> تعديل
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => handleArchiveCase(current.id)}>
+                <Archive size={16} /> أرشفة
+              </button>
+            </div>
+
+            <div className="seg-tabs" role="tablist">
+              {[
+                ['log', `السجل (${items.length})`],
+                ['tasks', `المهام (${caseTasks.length})`],
+                ['money', 'الحسابات'],
+              ].map(([id, label]) => (
                 <button
-                  className="btn btn-secondary btn-icon"
-                  style={{ borderRadius: '8px', width: '36px', height: '36px', padding: 0 }}
-                  onClick={() => setSelectedCase(null)}
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === id}
+                  className={`seg-tab ${tab === id ? 'is-active' : ''}`}
+                  onClick={() => setTab(id)}
                 >
-                  <X size={18} />
+                  {label}
                 </button>
-              </div>
+              ))}
+            </div>
 
-              <div className="modal-body" style={{ overflowY: 'auto', padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                {/* Case Info Top Card */}
-                <div className="case-modal-top-card">
-                  {/* Title & Status Badge */}
-                  <div className="case-modal-header-row">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      <FileText size={20} color="var(--primary-800)" style={{ flexShrink: 0 }} />
-                      <h4 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, color: 'var(--text-main)', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                        {current.case_title || `دعوى ${CASE_TYPES[current.case_type] || current.case_type || 'مدني'} رقم ${current.case_number}`}
-                      </h4>
-                    </div>
+            {tab === 'log' && (
+              items.length === 0 ? (
+                <p className="empty-line">لا توجد جلسات أو قرارات مسجلة بعد. عند تسجيل قرار الجلسة يظهر هنا تلقائياً.</p>
+              ) : (
+                <CaseTimeline items={items} />
+              )
+            )}
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: '#fdf2f2', color: 'var(--primary-800)', padding: '0.35rem 0.85rem', borderRadius: 'var(--radius-full)', fontSize: '0.88rem', fontWeight: '700', border: '1px solid rgba(109, 15, 27, 0.15)', whiteSpace: 'nowrap' }}>
-                      <Check size={15} strokeWidth={2.5} style={{ flexShrink: 0 }} />
-                      <span>الحالة: {currentStatus.label}</span>
-                    </div>
+            {tab === 'tasks' && (
+              caseTasks.length === 0 ? (
+                <p className="empty-line">لا توجد مهام إدارية مرتبطة بهذه القضية.</p>
+              ) : (
+                <ul className="mini-list">
+                  {caseTasks.map((t) => (
+                    <li key={t.id}>
+                      <div>
+                        <strong>{t.title}</strong>
+                        <span className="cell-sub">{t.execution_date ? fmtDate(t.execution_date) : 'بدون موعد'}{t.location ? ` · ${t.location}` : ''}</span>
+                      </div>
+                      <span className={`badge ${t.status === 'completed' ? 'is-done' : ''}`}>
+                        {t.status === 'completed' ? 'تم' : t.status === 'waiting' ? 'متوقف' : 'قيد الانتظار'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )
+            )}
+
+            {tab === 'money' && (
+              caseTx.length === 0 ? (
+                <p className="empty-line">لا توجد معاملات مالية مسجلة على هذه القضية{client ? '' : '، ولم يتم ربطها بموكل'}.</p>
+              ) : (
+                <>
+                  <div className="money-strip">
+                    <div><span>مطلوب من الموكل</span><b>{formatMoney(billed)}</b></div>
+                    <div><span>المسدد</span><b>{formatMoney(paid)}</b></div>
+                    <div><span>المتبقي</span><b>{formatMoney(billed - paid)}</b></div>
                   </div>
+                  <ul className="mini-list">
+                    {caseTx.map((t) => {
+                      const meta = getTransactionMeta(t.type);
+                      return (
+                        <li key={t.id}>
+                          <div>
+                            <strong>{meta.label}</strong>
+                            <span className="cell-sub">{fmtDate(t.date, { day: 'numeric', month: 'short', year: 'numeric' })}{t.description ? ` · ${t.description}` : ''}</span>
+                          </div>
+                          <b>{formatMoney(t.amount)}</b>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              )
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
-                  {/* Row 1: 4 Column Metric Grid */}
-                  <div className="case-modal-metrics-4">
-                    {/* نوع الدعوى */}
-                    <div className="case-metric-item">
-                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>نوع الدعوى</span>
-                      <div className="case-metric-val">
-                        <Gavel size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                        <span>{CASE_TYPES[current.case_type] || current.case_type || 'مدني'}</span>
-                      </div>
+  return (
+    <div className="page-wrapper">
+      <div className="page-head">
+        <div>
+          <h1>القضايا</h1>
+          <p className="page-sub">{activeCases.length} قضية جارية</p>
+        </div>
+      </div>
+
+      <div className="page-toolbar">
+        <div className="page-search">
+          <Search size={16} />
+          <input
+            type="text"
+            className="form-input"
+            placeholder="رقم القضية، الموضوع، الخصم، المحكمة"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <Select className="form-select toolbar-select" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} aria-label="نوع القضية">
+          <option value="ALL">كل الأنواع</option>
+          {Object.entries(CASE_TYPES).map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </Select>
+        <Select className="form-select toolbar-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="حالة القضية">
+          <option value="ALL">كل الحالات</option>
+          {Object.entries(CASE_STATUSES).map(([k, v]) => (
+            <option key={k} value={k}>{v.label}</option>
+          ))}
+        </Select>
+      </div>
+
+      {filteredCases.length === 0 ? (
+        <div className="card empty-block">
+          <h3>لا توجد قضايا مطابقة</h3>
+          <p>غيّر البحث أو الفلاتر، أو أضف قضية من زر «إضافة» في الأعلى.</p>
+        </div>
+      ) : (
+        <div className="card row-list">
+          {filteredCases.map((c) => {
+            const st = CASE_STATUSES[c.status] || CASE_STATUSES.active;
+            const isOpen = openHistory.has(c.id);
+            const history = isOpen ? buildTimeline({ current: c, sessions, appeals, adminTasks, adminTaskUpdates }).items : [];
+            const client = clients.find((k) => k.id === c.client_id);
+            return (
+              <article key={c.id} className={`list-row ${isOpen ? 'is-open' : ''}`}>
+                <div className="list-row-main">
+                  <div className="list-row-body is-clickable" onClick={() => { setTab('log'); setSelectedCase(c); }}>
+                    <div className="list-row-top">
+                      <button type="button" className="row-title row-title-link">
+                        <span className="row-key">{c.case_number}/{c.case_year}</span>
+                        <span className="row-title-text" title={c.case_title || ''}>{c.case_title || CASE_TYPES[c.case_type] || 'قضية'}</span>
+                      </button>
+                      <span className="status-chip" style={{ '--dot': st.color }}>{st.label}</span>
                     </div>
-
-                    {/* درجة التقاضي */}
-                    <div className="case-metric-item has-border" style={{ borderRight: '1px solid var(--border-subtle)', paddingRight: '0.5rem' }}>
-                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>درجة التقاضي</span>
-                      <div className="case-metric-val">
-                        <Building2 size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                        <span>{COURT_LEVELS[current.court_level] || current.court_level || 'ابتدائي'}</span>
-                      </div>
-                    </div>
-
-                    {/* المدعى عليه */}
-                    <div className="case-metric-item has-border" style={{ borderRight: '1px solid var(--border-subtle)', paddingRight: '0.5rem' }}>
-                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المدعى عليه</span>
-                      <div className="case-metric-val">
-                        <User size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                        <span>{current.defendant_name || '—'}</span>
-                      </div>
-                    </div>
-
-                    {/* المحامي / المدعي */}
-                    <div className="case-metric-item has-border" style={{ borderRight: '1px solid var(--border-subtle)', paddingRight: '0.5rem' }}>
-                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المحامي</span>
-                      <div className="case-metric-val">
-                        <User size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                        <span>{current.plaintiff_name || 'والي'}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Horizontal Divider */}
-                  <div style={{ height: '1px', background: 'var(--border-subtle)', margin: '1rem 0' }} />
-
-                  {/* Row 2: 3 Column Metric Grid (المحكمة + المحامي المكلف + تاريخ الجلسة القادمة) */}
-                  <div className="case-modal-metrics-3">
-                    {/* المحكمة */}
-                    <div className="case-metric-item">
-                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المحكمة</span>
-                      <div className="case-metric-val">
-                        <Building2 size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                        <span>{current.court_name || 'محكمة دمياط الابتدائية'}</span>
-                      </div>
-                    </div>
-
-                    {/* المحامي المكلف */}
-                    <div className="case-metric-item has-border" style={{ borderRight: '1px solid var(--border-subtle)', paddingRight: '0.5rem' }}>
-                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المحامي المكلف</span>
-                      <div className="case-metric-val">
-                        <Briefcase size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                        <span>{assigned ? `الأستاذ / ${assigned.name}` : 'غير مسند'}</span>
-                      </div>
-                    </div>
-
-                    {/* تاريخ الجلسة القادمة */}
-                    <div className="case-metric-item has-border" style={{ borderRight: '1px solid var(--border-subtle)', paddingRight: '0.5rem' }}>
-                      <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>تاريخ الجلسة القادمة</span>
-                      <div className="case-metric-val" style={{ color: current.next_session_date ? 'var(--primary-700)' : 'var(--text-main)' }}>
-                        <Calendar size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                        <span>{current.next_session_date ? new Date(current.next_session_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }) : 'لا توجد جلسة محددة'}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Section Header: سجل وقائع ودورة حياة الدعوى */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '0.4rem 0', flexWrap: 'wrap', gap: '0.75rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', border: '1.5px solid var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <Clock size={16} color="var(--text-main)" />
-                    </div>
-                    <h4 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-                      سجل الجلسات ودورة حياة الدعوى
-                    </h4>
-                    <span style={{ background: '#fdf2f2', color: 'var(--primary-800)', padding: '0.2rem 0.65rem', borderRadius: '12px', fontSize: '0.8rem', fontWeight: '700', border: '1px solid rgba(109, 15, 27, 0.1)', whiteSpace: 'nowrap' }}>
-                      {timelineItems.length} أحداث
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    style={{ background: 'var(--accent)', color: 'var(--on-accent)', borderRadius: '8px', padding: '0.45rem 1rem', fontSize: '0.88rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
-                    onClick={() => handleOpenDecision(current)}
-                  >
-                    <Plus size={16} />
-                    <span>تسجيل قرار / تأجيل</span>
-                  </button>
-                </div>
-
-                {/* Vertical Timeline */}
-                {timelineItems.length === 0 ? (
-                  <div style={{ padding: '1.75rem', textAlign: 'center', background: 'var(--bg-card-subtle)', borderRadius: '12px', border: '1px dashed var(--border-color)', color: 'var(--text-muted)' }}>
-                    <Calendar size={32} style={{ margin: '0 auto 0.5rem', opacity: 0.4 }} />
-                    <p style={{ fontSize: '0.92rem', fontWeight: '600' }}>لا يوجد سجل جلسات أو قرارات مسجلة لهذه القضية حتى الآن</p>
-                    <p style={{ fontSize: '0.82rem', color: 'var(--text-subtle)', marginTop: '0.2rem' }}>
-                      عند تسجيل قرار الجلسة (تأجيل، حكم نهائي، أو حكم تمهيدي)، سيتم حفظه تلقائيًا في هذا السجل الزمني.
+                    <p className="list-row-sub">
+                      {[CASE_TYPES[c.case_type] || c.case_type, COURT_LEVELS[c.court_level] || c.court_level, c.court_name, c.court_room && `دائرة ${c.court_room}`].filter(Boolean).join(' · ')}
+                    </p>
+                    <p className="row-parties">
+                      <span className="row-party"><small>المدعي</small>{c.plaintiff_name || '—'}</span>
+                      <span className="row-vs">ضد</span>
+                      <span className="row-party"><small>المدعى عليه</small>{c.defendant_name || '—'}</span>
                     </p>
                   </div>
-                ) : (
-                  <div style={{ position: 'relative', paddingRight: '26px' }}>
-                    {/* Continuous vertical dashed line */}
-                    <div style={{ position: 'absolute', right: '9px', top: '16px', bottom: '16px', width: '2px', background: 'var(--border-color)', borderRight: '2px dashed var(--border-color)' }} />
 
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
-                      {timelineItems.map((item, idx) => {
-                        const isJudgment = item.status === 'finalJudgment' || item.status === 'preliminaryJudgment';
-                        const isAppeal = item.type === 'appeal';
-                        const isAdminTask = item.type === 'admin_task';
-                        const isAdminTaskMilestone = item.type === 'admin_task_milestone';
-
-                        // colours come from the project status tokens so the timeline follows the theme
-                        const TONES = {
-                          adjourned: ['--status-adjourned', '--status-adjourned-bg'],
-                          final: ['--status-judgment', '--status-judgment-bg'],
-                          prelim: ['--status-prelim', '--status-prelim-bg'],
-                          appeal: ['--status-reserved', '--status-reserved-bg'],
-                          admin: ['--accent-gold', '--accent-gold-bg'],
-                          done: ['--status-active', '--status-active-bg'],
-                          cancelled: ['--status-dismissed', '--status-dismissed-bg'],
-                          scheduled: ['--status-settled', '--status-settled-bg'],
-                        };
-                        let statusBadgeText = 'مؤجلة';
-                        let tone = 'adjourned';
-
-                        if (item.status === 'finalJudgment') {
-                          statusBadgeText = 'حكم نهائي';
-                          tone = 'final';
-                        } else if (item.status === 'preliminaryJudgment') {
-                          statusBadgeText = 'حكم تمهيدي';
-                          tone = 'prelim';
-                        } else if (isAppeal) {
-                          statusBadgeText = 'متابعة استئناف';
-                          tone = 'appeal';
-                        } else if (isAdminTask) {
-                          statusBadgeText = 'عمل إداري';
-                          tone = 'admin';
-                        } else if (isAdminTaskMilestone) {
-                          if (item.status === 'completed') {
-                            statusBadgeText = 'إتمام عمل إداري';
-                            tone = 'done';
-                          } else if (item.status === 'postponed') {
-                            statusBadgeText = 'تأجيل عمل إداري';
-                            tone = 'adjourned';
-                          } else if (item.status === 'cancelled') {
-                            statusBadgeText = 'إلغاء عمل إداري';
-                            tone = 'cancelled';
-                          } else {
-                            statusBadgeText = 'متابعة إدارية';
-                            tone = 'prelim';
-                          }
-                        } else if (item.status === 'scheduled') {
-                          statusBadgeText = 'جلسة قادمة';
-                          tone = 'scheduled';
-                        }
-                        const statusBadgeColor = `var(${TONES[tone][0]})`;
-                        const statusBadgeBg = `var(${TONES[tone][1]})`;
-                        const statusBadgeBorder = 'transparent';
-                        const nodeColor = statusBadgeColor;
-
-                        const itemDateStr = item.date
-                          ? new Date(item.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })
-                          : '—';
-
-                        const recordTimeStr = item.created_at
-                          ? new Date(item.created_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })
-                          : itemDateStr;
-
-                        const lawyerName = assigned ? assigned.name : 'مسؤول الدعوى';
-
-                        return (
-                          <div key={item.id || idx} style={{ position: 'relative' }}>
-                            {/* Timeline Node Dot */}
-                            <div style={{
-                              position: 'absolute',
-                              right: '-26px',
-                              top: '20px',
-                              width: '20px',
-                              height: '20px',
-                              borderRadius: '50%',
-                              background: nodeColor,
-                              color: 'var(--bg-card)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              border: '2px solid var(--bg-card)',
-                              boxShadow: `0 0 0 2px ${nodeColor}`,
-                              zIndex: 2
-                            }}>
-                              {(isJudgment || isAppeal || item.status === 'completed') && <Check size={12} strokeWidth={3} />}
-                            </div>
-
-                            {/* Event Card */}
-                            <div className="case-modal-session-card">
-                              {/* Right: Date & Content */}
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', minWidth: 0, flex: 1 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                  <Calendar size={18} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                                  <strong style={{ fontSize: '1.02rem', color: 'var(--text-main)', fontWeight: '800' }}>
-                                    {isAdminTask ? `عمل إداري: ${item.title}` : (isAdminTaskMilestone ? item.title : (isAppeal ? `ميعاد استئناف: ${itemDateStr}` : `جلسة: ${itemDateStr}`))}
-                                  </strong>
-                                </div>
-
-                                {/* Adjournment Reason */}
-                                {item.adjournment_reason && (
-                                  <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', marginTop: '0.15rem', wordBreak: 'break-word' }}>
-                                    سبب التأجيل: <span style={{ color: 'var(--text-muted)' }}>{item.adjournment_reason}</span>
-                                  </div>
-                                )}
-
-                                {/* Ruling Text */}
-                                {(item.ruling_text || item.judgment_text) && (
-                                  <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', marginTop: '0.15rem', wordBreak: 'break-word' }}>
-                                    منطوق الحكم: <span style={{ color: 'var(--text-muted)', fontWeight: '600' }}>{item.ruling_text || item.judgment_text}</span>
-                                  </div>
-                                )}
-
-                                {/* Admin Task Title & Requirements */}
-                                {isAdminTask && (
-                                  <div style={{ fontSize: '0.9rem', color: 'var(--text-main)', marginTop: '0.15rem', wordBreak: 'break-word' }}>
-                                    {item.requirements ? <span>المطلوب: {item.requirements}</span> : null}
-                                    {item.location ? <span style={{ marginRight: '0.5rem', color: 'var(--text-muted)' }}>— المكان: {item.location}</span> : null}
-                                  </div>
-                                )}
-
-                                {/* Admin Task Milestone Postponement Details */}
-                                {isAdminTaskMilestone && item.new_due_date && (
-                                  <div style={{ fontSize: '0.86rem', color: '#c2410c', fontWeight: '700' }}>
-                                    موعد المتابعة الجديد: {new Date(item.new_due_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                    {item.previous_due_date ? <span style={{ color: 'var(--text-muted)', fontWeight: 'normal', marginRight: '0.4rem' }}>(سابقاً: {new Date(item.previous_due_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })})</span> : ''}
-                                  </div>
-                                )}
-
-                                {/* Appeal Follow-up date */}
-                                {isAppeal && item.follow_up_date && (
-                                  <div style={{ fontSize: '0.86rem', color: '#1d4ed8', fontWeight: '700' }}>
-                                    تاريخ متابعة الاستئناف بالأجندة: {new Date(item.follow_up_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })}
-                                  </div>
-                                )}
-
-                                {/* Extra notes */}
-                                {item.notes && item.notes !== item.adjournment_reason && (
-                                  <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
-                                    ملاحظات / التفاصيل: {item.notes}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Left: Badge & Registered by */}
-                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.45rem', flexShrink: 0 }}>
-                                <span style={{
-                                  background: statusBadgeBg,
-                                  color: statusBadgeColor,
-                                  border: `1px solid ${statusBadgeBorder}`,
-                                  fontWeight: '700',
-                                  fontSize: '0.82rem',
-                                  padding: '0.25rem 0.85rem',
-                                  borderRadius: '8px',
-                                  whiteSpace: 'nowrap'
-                                }}>
-                                  {statusBadgeText}
-                                </span>
-
-                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', direction: 'rtl', textAlign: 'left', whiteSpace: 'nowrap' }}>
-                                  التاريخ: {recordTimeStr}
-                                </div>
-
-                                <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                                  <User size={14} style={{ flexShrink: 0 }} />
-                                  <span>بواسطة: {lawyerName}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                  <dl className="list-row-facts">
+                    <div>
+                      <dt>الجلسة القادمة</dt>
+                      <dd>{c.next_session_date ? fmtDate(c.next_session_date, { day: 'numeric', month: 'short', year: 'numeric' }) : <span className="cell-sub">غير محددة</span>}</dd>
                     </div>
+                    <div>
+                      <dt>الموكل</dt>
+                      <dd className="row-owner">
+                        {client ? (<>{client.name}</>) : <span className="cell-sub">غير مرتبط</span>}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div className="list-row-actions">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setDecisionCase(c)}>
+                      <Gavel size={14} /> قرار الجلسة
+                    </button>
+                    <RowActions>
+                      <RowAction icon={History} label={isOpen ? 'إخفاء السجل' : 'سجل القضية'} onClick={() => toggleHistory(c.id)} />
+                      <RowAction icon={Edit3} label="تعديل" onClick={() => setEditingCase({ ...c })} />
+                      <RowAction icon={Archive} label="نقل للأرشيف" onClick={() => handleArchiveCase(c.id)} />
+                      <RowAction icon={Trash2} label="حذف" tone="danger" onClick={() => handleDeleteCase(c.id)} />
+                    </RowActions>
+                  </div>
+                </div>
+
+                {isOpen && (
+                  <div className="list-row-extra">
+                    {history.length === 0
+                      ? <p className="empty-line">لا توجد جلسات أو قرارات مسجلة بعد.</p>
+                      : <CaseTimeline items={history} />}
                   </div>
                 )}
-              </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
 
-              {/* Modal Footer */}
-              {/* <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderTop: '1px solid var(--border-color)' }}>
-                <button 
-                  className="btn btn-secondary" 
-                  style={{ borderRadius: '8px', padding: '0.55rem 1.5rem', fontWeight: '700' }} 
-                  onClick={() => setSelectedCase(null)}
-                >
-                  إغلاق
-                </button>
+      {selectedCase && renderDetails()}
 
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  style={{ background: 'var(--accent)', color: 'var(--on-accent)', borderRadius: '8px', padding: '0.55rem 1.35rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                  onClick={() => handleOpenDecision(current)}
-                >
-                  <Clock size={16} />
-                  <span>تسجيل قرار / تأجيل جديد</span>
-                </button>
-              </div> */}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Edit Case Modal */}
       {editingCase && (
         <div className="modal-backdrop" onClick={() => setEditingCase(null)}>
           <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: 0, flex: 1 }}>
-                <Edit3 size={18} color="var(--primary-600)" style={{ flexShrink: 0 }} />
-                <h3 style={{ fontSize: '1.05rem', fontWeight: '800', margin: 0, wordBreak: 'break-word' }}>
-                  تعديل بيانات القضية رقم {editingCase.case_number}/{editingCase.case_year}
-                </h3>
-              </div>
-              <button className="btn btn-secondary btn-icon" style={{ flexShrink: 0 }} onClick={() => setEditingCase(null)}>
+            <div className="modal-header">
+              <h3>تعديل قضية {editingCase.case_number} / {editingCase.case_year}</h3>
+              <button type="button" className="icon-btn" onClick={() => setEditingCase(null)} aria-label="إغلاق">
                 <X size={18} />
               </button>
             </div>
             <form onSubmit={handleSaveEdit}>
               <div className="modal-body">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                <div className="form-grid">
                   <div className="form-group">
                     <label className="form-label">رقم الدعوى *</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      required
-                      value={editingCase.case_number}
-                      onChange={(e) => setEditingCase({ ...editingCase, case_number: e.target.value })}
-                    />
+                    <input type="text" className="form-input" required value={editingCase.case_number} onChange={setEdit('case_number')} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">السنة القضائية *</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      required
-                      value={editingCase.case_year}
-                      onChange={(e) => setEditingCase({ ...editingCase, case_year: e.target.value })}
-                    />
+                    <input type="number" className="form-input" required value={editingCase.case_year} onChange={setEdit('case_year')} />
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                <div className="form-grid">
                   <div className="form-group">
                     <label className="form-label">نوع القضية</label>
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="مثال: مدني، جنائي، أسرة..."
+                      placeholder="مدني، جنائي، أسرة…"
                       value={CASE_TYPES[editingCase.case_type] || editingCase.case_type || ''}
-                      onChange={(e) => setEditingCase({ ...editingCase, case_type: e.target.value })}
+                      onChange={setEdit('case_type')}
                     />
                   </div>
                   <div className="form-group">
@@ -746,114 +391,77 @@ export default function CasesPage() {
                     <input
                       type="text"
                       className="form-input"
-                      placeholder="مثال: ابتدائي، استئناف، نقض..."
+                      placeholder="ابتدائي، استئناف، نقض…"
                       value={COURT_LEVELS[editingCase.court_level] || editingCase.court_level || ''}
-                      onChange={(e) => setEditingCase({ ...editingCase, court_level: e.target.value })}
+                      onChange={setEdit('court_level')}
                     />
                   </div>
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">موضوع الدعوى</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    value={editingCase.case_title || ''}
-                    onChange={(e) => setEditingCase({ ...editingCase, case_title: e.target.value })}
-                  />
+                  <input type="text" className="form-input" value={editingCase.case_title || ''} onChange={setEdit('case_title')} />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                <div className="form-grid">
                   <div className="form-group">
                     <label className="form-label">المحكمة</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editingCase.court_name || ''}
-                      onChange={(e) => setEditingCase({ ...editingCase, court_name: e.target.value })}
-                    />
+                    <CourtInput value={editingCase.court_name || ''} onChange={(v) => setEditingCase((c) => ({ ...c, court_name: v }))} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">الدائرة</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="مثال: الدائرة 3 مدني / قاعة 2"
-                      value={editingCase.court_room || ''}
-                      onChange={(e) => setEditingCase({ ...editingCase, court_room: e.target.value })}
-                    />
+                    <input type="text" className="form-input" placeholder="الدائرة 3 مدني / قاعة 2" value={editingCase.court_room || ''} onChange={setEdit('court_room')} />
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                <div className="form-grid">
                   <div className="form-group">
                     <label className="form-label">حالة الدعوى</label>
-                    <select
-                      className="form-select"
-                      value={editingCase.status}
-                      onChange={(e) => setEditingCase({ ...editingCase, status: e.target.value })}
-                    >
+                    <Select className="form-select" value={editingCase.status} onChange={setEdit('status')}>
                       {Object.entries(CASE_STATUSES).map(([k, v]) => (
                         <option key={k} value={k}>{v.label}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
-
                   <div className="form-group">
-                    <label className="form-label">المحامي المكلف من الفريق</label>
-                    <select
+                    <label className="form-label">المحامي المكلف</label>
+                    <Select
                       className="form-select"
                       value={editingCase.next_steps || ''}
                       onChange={(e) => setEditingCase({ ...editingCase, next_steps: e.target.value || null })}
                     >
-                      <option value="">-- بدون إسناد / غير مسندة --</option>
+                      <option value="">غير مسندة</option>
                       {team.map((m) => (
                         <option key={m.id} value={m.id}>
                           الأستاذ / {m.name} ({USER_ROLES[m.role] || m.role})
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
+                <div className="form-grid">
                   <div className="form-group">
                     <label className="form-label">المدعي</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editingCase.plaintiff_name}
-                      onChange={(e) => setEditingCase({ ...editingCase, plaintiff_name: e.target.value })}
-                    />
+                    <input type="text" className="form-input" value={editingCase.plaintiff_name} onChange={setEdit('plaintiff_name')} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">المدعى عليه</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editingCase.defendant_name}
-                      onChange={(e) => setEditingCase({ ...editingCase, defendant_name: e.target.value })}
-                    />
+                    <input type="text" className="form-input" value={editingCase.defendant_name} onChange={setEdit('defendant_name')} />
                   </div>
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">تاريخ الجلسة القادمة</label>
-                  <input
-                    type="date"
+                  <DateInput
                     className="form-input"
                     value={editingCase.next_session_date ? editingCase.next_session_date.split('T')[0] : ''}
-                    onChange={(e) => setEditingCase({ ...editingCase, next_session_date: e.target.value })}
-                  />
+                    onChange={setEdit('next_session_date')} />
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">ملاحظات وقرارات</label>
-                  <textarea
-                    className="form-textarea"
-                    value={editingCase.notes || ''}
-                    onChange={(e) => setEditingCase({ ...editingCase, notes: e.target.value })}
-                  />
+                  <label className="form-label">ملاحظات</label>
+                  <textarea className="form-textarea" value={editingCase.notes || ''} onChange={setEdit('notes')} />
                 </div>
               </div>
               <div className="modal-footer">
@@ -865,7 +473,6 @@ export default function CasesPage() {
         </div>
       )}
 
-      {/* Unified Session Decision Modal for CasesPage */}
       <SessionDecisionModal
         isOpen={!!decisionCase}
         caseItem={decisionCase}
@@ -873,7 +480,7 @@ export default function CasesPage() {
         onClose={() => setDecisionCase(null)}
         onSuccess={(updates) => {
           if (selectedCase && selectedCase.id === decisionCase?.id) {
-            setSelectedCase(prev => ({ ...prev, ...updates }));
+            setSelectedCase((prev) => ({ ...prev, ...updates }));
           }
         }}
       />

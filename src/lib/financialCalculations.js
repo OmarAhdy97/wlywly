@@ -37,8 +37,8 @@ export const TRANSACTION_TYPES = {
     desc: 'أتعاب قضايا أو استشارات قانونية',
     isDebit: true, // Increases client debt
     category: 'charges',
-    badgeColor: '#9e2f5e',
-    badgeBg: 'rgba(158, 47, 94, 0.08)'
+    badgeColor: 'var(--accent)',
+    badgeBg: 'var(--accent-soft)'
   },
   client_expense: {
     id: 'client_expense',
@@ -46,8 +46,8 @@ export const TRANSACTION_TYPES = {
     desc: 'رسوم قضائية، أمانات خبراء، مأموريات',
     isDebit: true, // Increases client debt
     category: 'charges',
-    badgeColor: '#ea580c',
-    badgeBg: 'rgba(234, 88, 12, 0.08)'
+    badgeColor: 'var(--status-adjourned)',
+    badgeBg: 'var(--status-adjourned-bg)'
   },
   expense: { // Legacy fallback: treated as client expense / charge
     id: 'expense',
@@ -55,8 +55,8 @@ export const TRANSACTION_TYPES = {
     desc: 'مصروفات أو أتعاب محتسبة على الموكل',
     isDebit: true,
     category: 'charges',
-    badgeColor: '#ea580c',
-    badgeBg: 'rgba(234, 88, 12, 0.08)'
+    badgeColor: 'var(--status-adjourned)',
+    badgeBg: 'var(--status-adjourned-bg)'
   },
   payment: {
     id: 'payment',
@@ -64,8 +64,8 @@ export const TRANSACTION_TYPES = {
     desc: 'سداد نقدي أو بنكي من الموكل',
     isDebit: false, // Decreases client debt
     category: 'payments',
-    badgeColor: '#16a34a',
-    badgeBg: 'rgba(22, 163, 74, 0.08)'
+    badgeColor: 'var(--success)',
+    badgeBg: 'var(--success-bg)'
   },
   advance: {
     id: 'advance',
@@ -73,8 +73,8 @@ export const TRANSACTION_TYPES = {
     desc: 'مقدم أتعاب أو أمانة تحت الحساب',
     isDebit: false, // Decreases client debt
     category: 'payments',
-    badgeColor: '#0d9488',
-    badgeBg: 'rgba(13, 148, 136, 0.08)'
+    badgeColor: 'var(--success)',
+    badgeBg: 'var(--success-bg)'
   },
   settlement: {
     id: 'settlement',
@@ -82,8 +82,8 @@ export const TRANSACTION_TYPES = {
     desc: 'تسوية حسابية معتمدة',
     isDebit: false,
     category: 'payments',
-    badgeColor: '#2563eb',
-    badgeBg: 'rgba(37, 99, 235, 0.08)'
+    badgeColor: 'var(--success)',
+    badgeBg: 'var(--success-bg)'
   },
   refund: {
     id: 'refund',
@@ -91,8 +91,8 @@ export const TRANSACTION_TYPES = {
     desc: 'استرداد مبالغ أو أمانات للموكل',
     isDebit: true, // Increases client outstanding balance (reversal of payment)
     category: 'refunds',
-    badgeColor: '#dc2626',
-    badgeBg: 'rgba(220, 38, 38, 0.08)'
+    badgeColor: 'var(--status-dismissed)',
+    badgeBg: 'var(--status-dismissed-bg)'
   },
   adjustment: {
     id: 'adjustment',
@@ -100,8 +100,8 @@ export const TRANSACTION_TYPES = {
     desc: 'تسوية فروق أو تعديل رصيد',
     isDebit: true,
     category: 'adjustments',
-    badgeColor: '#64748b',
-    badgeBg: 'rgba(100, 116, 139, 0.08)'
+    badgeColor: 'var(--status-settled)',
+    badgeBg: 'var(--status-settled-bg)'
   }
 };
 
@@ -155,8 +155,8 @@ export function getTransactionMeta(type) {
     desc: '',
     isDebit: isDebitTransaction(type),
     category: isDebitTransaction(type) ? 'charges' : 'payments',
-    badgeColor: isDebitTransaction(type) ? '#ea580c' : '#16a34a',
-    badgeBg: isDebitTransaction(type) ? 'rgba(234, 88, 12, 0.08)' : 'rgba(22, 163, 74, 0.08)'
+    badgeColor: isDebitTransaction(type) ? 'var(--status-adjourned)' : 'var(--success)',
+    badgeBg: isDebitTransaction(type) ? 'var(--status-adjourned-bg)' : 'var(--success-bg)'
   };
 }
 

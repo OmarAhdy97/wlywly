@@ -21,6 +21,8 @@ import {
 import { printWithTitle, DEFAULT_APP_TITLE } from '../../lib/printUtils';
 import { exportDocumentModelToDocx } from '../../lib/docxGenerator';
 import { useData } from '../../context/DataContext';
+import { notify } from '../../lib/dialog';
+import { formatEgyptPhone } from '../../lib/phone';
 
 /**
  * ClientAccountStatement
@@ -252,7 +254,7 @@ export default function ClientAccountStatement({
 
       await exportDocumentModelToDocx(docModel, `كشف_حساب_${client.name}`);
     } catch (err) {
-      alert('حدث خطأ أثناء إنشاء ملف Word: ' + err.message);
+      notify('حدث خطأ أثناء إنشاء ملف Word: ' + err.message);
     } finally {
       setIsExportingDocx(false);
     }
@@ -291,7 +293,7 @@ export default function ClientAccountStatement({
             margin: 0,
             fontSize: '1.55rem',
             fontWeight: '900',
-            color: '#37040a',
+            color: '#111827',
             letterSpacing: '-0.3px'
           }}>
             كشف حساب موكل ومطالبة مالية
@@ -299,7 +301,7 @@ export default function ClientAccountStatement({
           <div style={{
             fontSize: '0.86rem',
             fontWeight: '700',
-            color: '#6d0f1b',
+            color: '#111827',
             marginTop: '0.35rem',
             display: 'flex',
             alignItems: 'center',
@@ -319,7 +321,7 @@ export default function ClientAccountStatement({
           borderRadius: '8px',
           padding: '0.85rem 1.25rem',
           marginBottom: '1.5rem',
-          backgroundColor: '#fafbfc'
+          backgroundColor: '#f3f4f6'
         }}>
           <div style={{
             display: 'grid',
@@ -329,7 +331,7 @@ export default function ClientAccountStatement({
           }}>
             <div>
               <span style={{ color: '#64748b', fontWeight: '600' }}>اسم الموكل: </span>
-              <strong style={{ color: '#37040a', fontSize: '0.98rem' }}>{client.name}</strong>
+              <strong style={{ color: '#111827', fontSize: '0.98rem' }}>{client.name}</strong>
             </div>
 
             <div>
@@ -353,7 +355,7 @@ export default function ClientAccountStatement({
               <div>
                 <span style={{ color: '#64748b', fontWeight: '600' }}>رقم الهاتف: </span>
                 <span dir="ltr" style={{ fontWeight: '700', color: '#0f172a' }}>
-                  {client.phone}
+                  {formatEgyptPhone(client.phone, { isolate: false })}
                 </span>
               </div>
             )}
@@ -404,7 +406,7 @@ export default function ClientAccountStatement({
             <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: '700', marginBottom: '0.35rem' }}>
               إجمالي المسدد
             </div>
-            <div style={{ fontSize: '1.2rem', fontWeight: '900', color: '#15803d' }}>
+            <div style={{ fontSize: '1.2rem', fontWeight: '900', color: '#111827' }}>
               {formatMoney(summary.periodPayments)}
             </div>
             <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.2rem' }}>دفعات وتحصيلات معتمدة</div>
@@ -421,7 +423,7 @@ export default function ClientAccountStatement({
             <div style={{ fontSize: '0.78rem', color: '#64748b', fontWeight: '700', marginBottom: '0.35rem' }}>
               المصروفات المحتسبة
             </div>
-            <div style={{ fontSize: '1.2rem', fontWeight: '900', color: '#c2410c' }}>
+            <div style={{ fontSize: '1.2rem', fontWeight: '900', color: '#111827' }}>
               {formatMoney(summary.periodClientExpenses)}
             </div>
             <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '0.2rem' }}>رسوم قضائية وخزينة</div>
@@ -429,15 +431,15 @@ export default function ClientAccountStatement({
 
           {/* 4. Hero Outstanding Balance */}
           <div style={{
-            border: '2px solid #37040a',
+            border: '2px solid #111827',
             borderRadius: '8px',
             padding: '0.85rem 0.9rem',
-            backgroundColor: summary.isDebtor ? '#fef2f2' : (summary.isCreditor ? '#f0fdf4' : '#fbf7f8'),
+            backgroundColor: summary.isDebtor ? '#f3f4f6' : (summary.isCreditor ? '#f3f4f6' : '#f8fafc'),
             textAlign: 'center'
           }}>
             <div style={{
               fontSize: '0.8rem',
-              color: summary.isDebtor ? '#991b1b' : (summary.isCreditor ? '#166534' : '#37040a'),
+              color: summary.isDebtor ? '#111827' : (summary.isCreditor ? '#111827' : '#111827'),
               fontWeight: '800',
               marginBottom: '0.35rem'
             }}>
@@ -446,13 +448,13 @@ export default function ClientAccountStatement({
             <div style={{
               fontSize: '1.28rem',
               fontWeight: '900',
-              color: summary.isDebtor ? '#991b1b' : (summary.isCreditor ? '#15803d' : '#37040a')
+              color: summary.isDebtor ? '#111827' : (summary.isCreditor ? '#111827' : '#111827')
             }}>
               {formatMoney(summary.outstandingBalance)}
             </div>
             <div style={{
               fontSize: '0.7rem',
-              color: summary.isDebtor ? '#991b1b' : (summary.isCreditor ? '#15803d' : '#64748b'),
+              color: summary.isDebtor ? '#111827' : (summary.isCreditor ? '#111827' : '#64748b'),
               fontWeight: '700',
               marginTop: '0.2rem'
             }}>
@@ -468,10 +470,10 @@ export default function ClientAccountStatement({
             alignItems: 'center',
             justifyContent: 'space-between',
             marginBottom: '0.5rem',
-            borderBottom: '1px solid #37040a',
+            borderBottom: '1px solid #111827',
             paddingBottom: '0.35rem'
           }}>
-            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '900', color: '#37040a' }}>
+            <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '900', color: '#111827' }}>
               حركات الحساب المالية التفصيلية
             </h3>
             <span style={{ fontSize: '0.76rem', color: '#64748b' }}>
@@ -539,7 +541,7 @@ export default function ClientAccountStatement({
                       key={tx.id || idx}
                       style={{
                         borderBottom: '1px solid #f1f5f9',
-                        backgroundColor: idx % 2 === 0 ? '#ffffff' : '#fafbfc'
+                        backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f3f4f6'
                       }}
                     >
                       <td style={{ padding: '0.55rem 0.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.78rem' }}>
@@ -554,10 +556,10 @@ export default function ClientAccountStatement({
                       <td style={{ padding: '0.55rem 0.5rem', color: '#475569', fontSize: '0.78rem' }}>
                         {tx.caseNumber}
                       </td>
-                      <td style={{ padding: '0.55rem 0.5rem', textAlign: 'left', color: '#dc2626', fontWeight: '700' }} dir="ltr">
+                      <td style={{ padding: '0.55rem 0.5rem', textAlign: 'left', color: '#111827', fontWeight: '700' }} dir="ltr">
                         {tx.isDebit ? formatMoney(tx.amountNum, false) : '—'}
                       </td>
-                      <td style={{ padding: '0.55rem 0.5rem', textAlign: 'left', color: '#16a34a', fontWeight: '700' }} dir="ltr">
+                      <td style={{ padding: '0.55rem 0.5rem', textAlign: 'left', color: '#111827', fontWeight: '700' }} dir="ltr">
                         {!tx.isDebit ? formatMoney(tx.amountNum, false) : '—'}
                       </td>
                       <td style={{ padding: '0.55rem 0.5rem', textAlign: 'left', fontWeight: '800', color: '#0f172a' }} dir="ltr">
@@ -575,16 +577,16 @@ export default function ClientAccountStatement({
                 fontWeight: '900',
                 fontSize: '0.85rem'
               }}>
-                <td colSpan={4} style={{ padding: '0.65rem 0.75rem', color: '#37040a' }}>
+                <td colSpan={4} style={{ padding: '0.65rem 0.75rem', color: '#111827' }}>
                   إجمالي الفترة المنتهية في {summary.effectiveEndDate}
                 </td>
-                <td style={{ padding: '0.65rem 0.5rem', textAlign: 'left', color: '#dc2626' }} dir="ltr">
+                <td style={{ padding: '0.65rem 0.5rem', textAlign: 'left', color: '#111827' }} dir="ltr">
                   {formatMoney(summary.periodCharges, false)}
                 </td>
-                <td style={{ padding: '0.65rem 0.5rem', textAlign: 'left', color: '#16a34a' }} dir="ltr">
+                <td style={{ padding: '0.65rem 0.5rem', textAlign: 'left', color: '#111827' }} dir="ltr">
                   {formatMoney(summary.periodPayments, false)}
                 </td>
-                <td style={{ padding: '0.65rem 0.5rem', textAlign: 'left', color: '#37040a' }} dir="ltr">
+                <td style={{ padding: '0.65rem 0.5rem', textAlign: 'left', color: '#111827' }} dir="ltr">
                   {formatMoney(summary.closingBalance, false)}
                 </td>
               </tr>
@@ -630,7 +632,7 @@ export default function ClientAccountStatement({
           </div>
 
           <div style={{ textAlign: 'center', width: '220px' }}>
-            <div style={{ fontSize: '0.84rem', fontWeight: '800', color: '#37040a', marginBottom: '2.5rem' }}>
+            <div style={{ fontSize: '0.84rem', fontWeight: '800', color: '#111827', marginBottom: '2.5rem' }}>
               توقيع وختم الإدارة المالية للمكتب:
             </div>
             <div style={{ borderBottom: '1px dotted #94a3b8', width: '100%', margin: '0 auto' }}></div>
@@ -654,7 +656,7 @@ export default function ClientAccountStatement({
           <span style={{ height: '1px', background: '#e2e8f0', flex: 1 }}></span>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45rem', flexShrink: 0 }}>
             {/* <span>معًا نحو تحقيق العدالة وإرساء سيادة القانون</span> */}
-            <Scale size={14} color="#37040a" />
+            <Scale size={14} color="#111827" />
           </div>
           <span style={{ height: '1px', background: '#e2e8f0', flex: 1 }}></span>
         </div>

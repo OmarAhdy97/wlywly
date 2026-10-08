@@ -1,30 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  Printer,
-  Download,
-  Copy,
-  Check,
-  Save,
-  RotateCcw,
-  ArrowRight,
-  Bold,
-  Italic,
-  Underline,
-  AlignRight,
-  AlignCenter,
-  AlignLeft,
-  AlignJustify,
-  FileText,
-  Building,
-  CheckCircle2,
-  AlertTriangle
-} from 'lucide-react';
+import { Printer, Download, Copy, Check, Save, RotateCcw, ArrowRight, Bold, Underline, AlignRight, AlignCenter, AlignJustify, AlertTriangle } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import LawFirmPrintHeader from '../common/LawFirmPrintHeader';
 import { printWithTitle } from '../../lib/printUtils';
 import { exportTextToDocx, exportDocumentToDocx, exportDocumentToTxt } from '../../lib/documentExport';
 import { saveDocument } from '../../lib/documentStorage';
+import { confirmDialog, notify } from '../../lib/dialog';
+import Select from '../common/Select';
 
 export default function LegalDocumentEditor({
   formula,
@@ -128,12 +111,12 @@ export default function LegalDocumentEditor({
       setSavedNotice('تم حفظ المستند في السحابة وأرشيف المستندات بنجاح!');
       setTimeout(() => setSavedNotice(''), 4000);
     } catch (err) {
-      alert(err.message);
+      notify(err.message);
     }
   };
 
-  const handleReset = () => {
-    if (window.confirm('هل تريد إعادة النص إلى صيغته المولدة الأولى وإلغاء أي تعديلات؟')) {
+  const handleReset = async () => {
+    if (await confirmDialog('هل تريد إعادة النص إلى صيغته المولدة الأولى وإلغاء أي تعديلات؟')) {
       setDocumentContent(initialContent || '');
       setHasUnsavedChanges(false);
     }
@@ -147,419 +130,153 @@ export default function LegalDocumentEditor({
     }
   };
 
-  return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
-      {/* Top Action Bar */}
-      <div style={{
-        background: 'var(--bg-card)',
-        padding: '0.85rem 1.25rem',
-        borderRadius: 'var(--radius-lg, 12px)',
-        border: '1px solid var(--border-color)',
-        marginBottom: '1rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '0.75rem',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-      }} className="no-print">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <button
-            type="button"
-            onClick={handleBackRequest}
-            className="btn btn-secondary btn-sm"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <ArrowRight size={16} />
-            <span>رجوع للبيانات</span>
-          </button>
+  const tool = (active, onClick, title, Icon) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`icon-btn ${active ? 'is-active' : ''}`}
+      title={title}
+      aria-label={title}
+      aria-pressed={active}
+    >
+      <Icon size={15} />
+    </button>
+  );
 
-          <div>
-            <div style={{ fontWeight: 'bold', fontSize: '0.95rem' }}>
-              {formula?.title}
-            </div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-              {hasUnsavedChanges ? 'توجد تعديلات قيد التحرير' : 'تم توليد المستند جاهزاً'}
-            </div>
-          </div>
+  const hasMissing = documentContent.includes('⚠️ بيان مطلوب') || documentContent.includes('{{');
+  const textStyle = {
+    fontSize,
+    lineHeight,
+    textAlign,
+    fontWeight: isBold ? 'bold' : 'normal',
+    textDecoration: isUnderline ? 'underline' : 'none',
+  };
+
+  return (
+    <div className="editor-page">
+      <div className="no-print fp-bar">
+        <div className="fp-title">
+          <button type="button" onClick={handleBackRequest} className="formula-back">
+            <ArrowRight size={14} /> رجوع للبيانات
+          </button>
+          <h2>{formula?.title}</h2>
+          <span className="cell-sub">{hasUnsavedChanges ? 'توجد تعديلات لم تُحفظ' : 'المستند جاهز'}</span>
         </div>
 
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={handleCopyText}
-            className="btn btn-secondary btn-sm"
-            title="نسخ النص للحافظة"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            {copied ? <Check size={16} style={{ color: 'var(--success)' }} /> : <Copy size={16} />}
+        <div className="fp-actions">
+          <button type="button" onClick={handleCopyText} className="btn btn-secondary btn-sm" title="نسخ النص">
+            {copied ? <Check size={15} /> : <Copy size={15} />}
             <span>{copied ? 'تم النسخ' : 'نسخ'}</span>
           </button>
-
-          <button
-            type="button"
-            onClick={handleSave}
-            className="btn btn-secondary btn-sm"
-            title="حفظ محلياً"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <Save size={16} />
+          <button type="button" onClick={handleSave} className="btn btn-secondary btn-sm">
+            <Save size={15} />
             <span>حفظ</span>
           </button>
-
-          <button
-            type="button"
-            onClick={handleDownloadRealDocx}
-            disabled={isExportingDocx}
-            className="btn btn-secondary btn-sm"
-            title="تنزيل ملف وورد حقيقي DOCX"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#1d4ed8', fontWeight: 'bold' }}
-          >
-            <Download size={16} />
-            <span>{isExportingDocx ? 'جاري التصدير...' : 'تصدير Word (.docx)'}</span>
+          <button type="button" onClick={handleDownloadRealDocx} disabled={isExportingDocx} className="btn btn-secondary btn-sm" title="ملف Word (.docx)">
+            <Download size={15} />
+            <span>{isExportingDocx ? 'جارٍ التصدير…' : 'Word'}</span>
           </button>
-
-          <button
-            type="button"
-            onClick={handleDownloadWord}
-            className="btn btn-secondary btn-sm"
-            title="تنزيل بصيغة Word البديلة القديمة (.doc)"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem' }}
-          >
-            <span>Word (.doc)</span>
+          <button type="button" onClick={handleDownloadWord} className="btn btn-secondary btn-sm" title="صيغة Word القديمة (.doc)">
+            <span>.doc</span>
           </button>
-
-          <button
-            type="button"
-            onClick={handleDownloadTxt}
-            className="btn btn-secondary btn-sm"
-            title="تنزيل ملف نصي"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            <FileText size={16} />
-            <span>ملف نصي</span>
+          <button type="button" onClick={handleDownloadTxt} className="btn btn-secondary btn-sm" title="ملف نصي">
+            <span>نص</span>
           </button>
-
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="btn btn-gold btn-sm"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 'bold' }}
-          >
-            <Printer size={16} />
-            <span>طباعة المستند A4</span>
+          <button type="button" onClick={handlePrint} className="btn btn-primary btn-sm">
+            <Printer size={15} />
+            <span>طباعة A4</span>
           </button>
         </div>
       </div>
 
-      {/* Unresolved Placeholders Warning */}
-      {(documentContent.includes('⚠️ بيان مطلوب') || documentContent.includes('{{')) && (
-        <div style={{
-          background: 'rgba(234, 88, 12, 0.1)',
-          border: '1px solid rgba(234, 88, 12, 0.4)',
-          color: '#c2410c',
-          padding: '0.65rem 1rem',
-          borderRadius: '8px',
-          marginBottom: '1rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          fontSize: '0.88rem'
-        }} className="no-print">
-          <AlertTriangle size={18} style={{ flexShrink: 0 }} />
-          <span>تنبيه مهني: توجد بيانات ناقصة بالمستند مسبوقة بـ (⚠️). يرجى استبدالها بالبيانات الصحيحة قبل الطباعة أو التصدير.</span>
+      {hasMissing && (
+        <div className="no-print auth-alert is-warn fp-warning" role="alert">
+          <AlertTriangle size={18} />
+          <span>توجد بيانات ناقصة في المستند مسبوقة بالرمز ⚠️. استبدلها بالبيانات الصحيحة قبل الطباعة أو التصدير.</span>
         </div>
       )}
 
-      {/* Saved Notice */}
-      {savedNotice && (
-        <div style={{
-          background: 'var(--status-won-bg, rgba(34, 197, 94, 0.1))',
-          color: 'var(--success, #16a34a)',
-          padding: '0.65rem 1rem',
-          borderRadius: '8px',
-          marginBottom: '1rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          fontSize: '0.88rem'
-        }} className="no-print">
-          <CheckCircle2 size={16} />
-          <span>{savedNotice}</span>
-        </div>
-      )}
+      {savedNotice && <div className="no-print inline-notice" role="status">{savedNotice}</div>}
 
-      {/* Word-like Editor Formatting Toolbar */}
-      <div style={{
-        background: 'var(--bg-card)',
-        padding: '0.5rem 1rem',
-        borderRadius: 'var(--radius-md, 8px) var(--radius-md, 8px) 0 0',
-        border: '1px solid var(--border-color)',
-        borderBottom: 'none',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '0.5rem'
-      }} className="no-print">
-        {/* Left Toolbar Items (Formatting) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-          {/* Bold */}
-          <button
-            type="button"
-            onClick={() => setIsBold(!isBold)}
-            className={`btn btn-secondary btn-icon ${isBold ? 'active' : ''}`}
-            style={{ width: '32px', height: '32px', padding: 0, fontWeight: 'bold' }}
-            title="خط عريض"
-          >
-            <Bold size={15} />
-          </button>
-
-          {/* Underline */}
-          <button
-            type="button"
-            onClick={() => setIsUnderline(!isUnderline)}
-            className={`btn btn-secondary btn-icon ${isUnderline ? 'active' : ''}`}
-            style={{ width: '32px', height: '32px', padding: 0 }}
-            title="تحته خط"
-          >
-            <Underline size={15} />
-          </button>
-
-          <span style={{ width: '1px', height: '20px', background: 'var(--border-color)', margin: '0 0.2rem' }}></span>
-
-          {/* Align Right */}
-          <button
-            type="button"
-            onClick={() => setTextAlign('right')}
-            className={`btn btn-secondary btn-icon ${textAlign === 'right' ? 'active' : ''}`}
-            style={{ width: '32px', height: '32px', padding: 0 }}
-            title="محاذاة لليمين"
-          >
-            <AlignRight size={15} />
-          </button>
-
-          {/* Align Center */}
-          <button
-            type="button"
-            onClick={() => setTextAlign('center')}
-            className={`btn btn-secondary btn-icon ${textAlign === 'center' ? 'active' : ''}`}
-            style={{ width: '32px', height: '32px', padding: 0 }}
-            title="توسيط"
-          >
-            <AlignCenter size={15} />
-          </button>
-
-          {/* Align Justify */}
-          <button
-            type="button"
-            onClick={() => setTextAlign('justify')}
-            className={`btn btn-secondary btn-icon ${textAlign === 'justify' ? 'active' : ''}`}
-            style={{ width: '32px', height: '32px', padding: 0 }}
-            title="ضبط النص (Justify)"
-          >
-            <AlignJustify size={15} />
-          </button>
-
-          <span style={{ width: '1px', height: '20px', background: 'var(--border-color)', margin: '0 0.2rem' }}></span>
-
-          {/* Font Size Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.82rem' }}>
-            <span>حجم الخط:</span>
-            <select
-              value={fontSize}
-              onChange={(e) => setFontSize(e.target.value)}
-              style={{
-                padding: '0.25rem 0.5rem',
-                borderRadius: '4px',
-                border: '1px solid var(--border-color)',
-                fontSize: '0.82rem',
-                background: 'var(--bg-card)'
-              }}
-            >
+      <div className="no-print editor-toolbar">
+        <div className="editor-tools">
+          {tool(isBold, () => setIsBold(!isBold), 'خط عريض', Bold)}
+          {tool(isUnderline, () => setIsUnderline(!isUnderline), 'تحته خط', Underline)}
+          <span className="editor-sep" />
+          {tool(textAlign === 'right', () => setTextAlign('right'), 'محاذاة لليمين', AlignRight)}
+          {tool(textAlign === 'center', () => setTextAlign('center'), 'توسيط', AlignCenter)}
+          {tool(textAlign === 'justify', () => setTextAlign('justify'), 'ضبط النص', AlignJustify)}
+          <span className="editor-sep" />
+          <label className="editor-select">
+            <span>الخط</span>
+            <Select value={fontSize} onChange={(e) => setFontSize(e.target.value)} className="form-select">
               <option value="14px">صغير (14)</option>
               <option value="16px">افتراضي (16)</option>
               <option value="18px">متوسط (18)</option>
               <option value="20px">كبير (20)</option>
               <option value="22px">عريض (22)</option>
-            </select>
-          </div>
-
-          {/* Line Height Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.82rem' }}>
-            <span>التباعد:</span>
-            <select
-              value={lineHeight}
-              onChange={(e) => setLineHeight(e.target.value)}
-              style={{
-                padding: '0.25rem 0.5rem',
-                borderRadius: '4px',
-                border: '1px solid var(--border-color)',
-                fontSize: '0.82rem',
-                background: 'var(--bg-card)'
-              }}
-            >
+            </Select>
+          </label>
+          <label className="editor-select">
+            <span>التباعد</span>
+            <Select value={lineHeight} onChange={(e) => setLineHeight(e.target.value)} className="form-select">
               <option value="1.5">1.5</option>
               <option value="1.8">1.8 (رسمي)</option>
               <option value="2.0">2.0 (متباعد)</option>
-            </select>
-          </div>
+            </Select>
+          </label>
         </div>
 
-        {/* Right Toolbar Items (Header toggle & Reset) */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.85rem' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={includeOfficialHeader}
-              onChange={(e) => setIncludeOfficialHeader(e.target.checked)}
-            />
-            <span>إظهار ترويسة المكتب الرسمية</span>
+        <div className="editor-tools">
+          <label className="editor-check">
+            <input type="checkbox" checked={includeOfficialHeader} onChange={(e) => setIncludeOfficialHeader(e.target.checked)} />
+            <span>ترويسة المكتب</span>
           </label>
-
-          <button
-            type="button"
-            onClick={handleReset}
-            className="btn btn-secondary btn-sm"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
-            title="إعادة النص للأصل"
-          >
+          <button type="button" onClick={handleReset} className="btn btn-secondary btn-sm" title="إعادة النص للأصل">
             <RotateCcw size={13} />
             <span>إعادة تعيين</span>
           </button>
         </div>
       </div>
 
-      {/* A4 Sheet Container (Word-like document viewport) */}
-      <div style={{
-        background: 'var(--bg-app)',
-        padding: '2rem 1rem',
-        borderRadius: '0 0 var(--radius-lg, 12px) var(--radius-lg, 12px)',
-        border: '1px solid var(--border-color)',
-        display: 'flex',
-        justifyContent: 'center',
-        overflowX: 'auto'
-      }}>
-        {/* The Authentic A4 Page */}
-        <div
-          id="legal-document-print-area"
-          className="legal-editor-sheet"
-          style={{
-            width: '100%',
-            maxWidth: '820px',
-            minHeight: '1100px',
-            background: '#ffffff',
-            color: '#1a1a1a',
-            padding: '45px 50px',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.12)',
-            borderRadius: '2px',
-            direction: 'rtl',
-            fontFamily: "'Simplified Arabic', 'Traditional Arabic', 'Amiri', Cairo, Arial, sans-serif",
-            fontSize: fontSize,
-            lineHeight: lineHeight,
-            textAlign: textAlign,
-            fontWeight: isBold ? 'bold' : 'normal',
-            textDecoration: isUnderline ? 'underline' : 'none',
-            boxSizing: 'border-box',
-            position: 'relative'
-          }}
-        >
-          {/* Printable Official Law Firm Header */}
-          {includeOfficialHeader && (
-            <LawFirmPrintHeader />
-          )}
+      <div className="editor-viewport">
+        <div id="legal-document-print-area" className="legal-editor-sheet editor-sheet" style={textStyle}>
+          {includeOfficialHeader && <LawFirmPrintHeader />}
 
-          {/* Document Content Area (Editable textarea for screen) */}
           <textarea
             ref={editorRef}
-            className="no-print"
+            className="no-print editor-textarea"
             value={documentContent}
             onChange={handleContentChange}
-            placeholder="اكتب أو عدل نص المستند هنا..."
-            style={{
-              width: '100%',
-              minHeight: '850px',
-              border: 'none',
-              outline: 'none',
-              resize: 'vertical',
-              background: 'transparent',
-              color: '#111827',
-              fontFamily: 'inherit',
-              fontSize: 'inherit',
-              lineHeight: 'inherit',
-              textAlign: 'inherit',
-              fontWeight: 'inherit',
-              textDecoration: 'inherit',
-              padding: 0,
-              boxShadow: 'none'
-            }}
+            placeholder="اكتب أو عدّل نص المستند هنا"
           />
 
-          {/* Clean Printed Content for Paper / PDF Output */}
-          <div
-            className="only-print"
-            style={{
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              fontFamily: 'inherit',
-              fontSize: fontSize,
-              lineHeight: lineHeight,
-              textAlign: textAlign,
-              fontWeight: isBold ? 'bold' : 'normal',
-              textDecoration: isUnderline ? 'underline' : 'none'
-            }}
-          >
+          <div className="only-print editor-printed" style={textStyle}>
             {documentContent}
           </div>
 
-          {/* Footer note in document */}
-          <div style={{
-            marginTop: '2rem',
-            paddingTop: '1rem',
-            borderTop: '1px dashed #d1d5db',
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: '0.78rem',
-            color: '#6b7280'
-          }} className="document-signature-footer">
+          <div className="document-signature-footer editor-footer">
             <span>تحريراً في: {formValues.session_date || formValues.action_date || formValues.contract_date || new Date().toISOString().substring(0, 10)}</span>
             <span>توقيع المحامي الوكيل: ............................................</span>
           </div>
         </div>
       </div>
 
-      {/* Unsaved Changes Exit Confirmation Modal */}
       {showExitConfirm && (
-        <div className="modal-backdrop" style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 9999
-        }}>
-          <div style={{
-            background: 'var(--bg-card)',
-            padding: '1.5rem',
-            borderRadius: '12px',
-            maxWidth: '420px',
-            width: '90%',
-            border: '1px solid var(--border-color)',
-            boxShadow: '0 8px 30px rgba(0,0,0,0.2)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--warning)', marginBottom: '0.75rem' }}>
-              <AlertTriangle size={22} />
-              <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>تنبيه: تغييرات غير محفوظة</h3>
+        <div className="modal-backdrop confirm-backdrop">
+          <div className="modal-dialog confirm-dialog">
+            <div className="modal-header">
+              <h3>تعديلات غير محفوظة</h3>
             </div>
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', lineHeight: '1.6', margin: '0 0 1.25rem 0' }}>
-              لديك تعديلات قمت بكتابتها داخل المستند ولم تحفظها، هل تريد حفظ المستند قبل المغادرة أم المغادرة بدون حفظ؟
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+            <div className="modal-body">
+              <p className="confirm-text">
+                لديك تعديلات داخل المستند لم تُحفظ. هل تريد حفظ المستند قبل المغادرة؟
+              </p>
+            </div>
+            <div className="modal-footer">
               <button
                 type="button"
-                className="btn btn-secondary btn-sm"
+                className="btn btn-secondary"
                 onClick={() => {
                   setShowExitConfirm(false);
                   onBack();
@@ -569,7 +286,7 @@ export default function LegalDocumentEditor({
               </button>
               <button
                 type="button"
-                className="btn btn-gold btn-sm"
+                className="btn btn-primary"
                 onClick={() => {
                   handleSave();
                   setShowExitConfirm(false);

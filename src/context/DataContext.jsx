@@ -7,6 +7,39 @@ import { isDebitTransaction } from '../lib/financialCalculations';
 
 const DataContext = createContext(null);
 
+/**
+ * supabase-js does NOT throw when a query fails, it returns { error }.
+ * The old code only used try/catch, so a rejected update was ignored: the screen showed the new
+ * value from local state, then the next refresh brought the old value back.
+ * This helper reads the error, and when a column does not exist in the table (older databases)
+ * it retries without that column, so the rest of the update still reaches the database.
+ * It returns { error, droppedColumns }.
+ */
+async function updateRowSafely(table, updates, match) {
+  const payload = { ...updates };
+  const droppedColumns = [];
+  for (let attempt = 0; attempt < 8; attempt++) {
+    let query = supabase.from(table).update(payload);
+    Object.entries(match).forEach(([k, v]) => { query = query.eq(k, v); });
+    const { error } = await query;
+    if (!error) {
+      if (droppedColumns.length) console.warn(`[${table}] لا تحتوي الأعمدة: ${droppedColumns.join(', ')} — تم حفظ باقي البيانات`);
+      return { error: null, droppedColumns };
+    }
+    const msg = `${error.message || ''} ${error.details || ''}`;
+    const m = msg.match(/'([a-z_]+)' column/i) || msg.match(/column "?([a-z_]+)"? (?:of relation|does not exist)/i);
+    const col = m && m[1];
+    if (col && col in payload) {
+      delete payload[col];
+      droppedColumns.push(col);
+      continue;
+    }
+    console.error(`[${table}] فشل التحديث:`, error);
+    return { error, droppedColumns };
+  }
+  return { error: new Error('تعذر حفظ التحديث'), droppedColumns };
+}
+
 export const DEFAULT_OFFICE_PROFILE = {
   office_name: 'مكتب المحاماة والاستشارات القانونية',
   lawyer_name: '',
@@ -677,14 +710,9 @@ export function DataProvider({ children }) {
 
   const updateAdminTask = async (id, updates) => {
     if (!user) throw new Error('يجب تسجيل الدخول أولاً');
-    try {
-      await supabase
-        .from('admin_tasks')
-        .update(updates)
-        .eq('id', id)
-        .eq('user_id', user.id);
-    } catch (e) {
-      // ignore
+    const saveResult = await updateRowSafely('admin_tasks', updates, { id, user_id: user.id });
+    if (saveResult.error) {
+      throw new Error('تعذر حفظ التعديل في قاعدة البيانات: ' + (saveResult.error.message || 'خطأ غير معروف'));
     }
 
     setAdminTasks(prev => {
@@ -760,14 +788,10 @@ export function DataProvider({ children }) {
       taskUpdates.completed_by = null;
     }
 
-    try {
-      await supabase
-        .from('admin_tasks')
-        .update(taskUpdates)
-        .eq('id', taskId)
-        .eq('user_id', user.id);
-    } catch (e) {
-      // fallback
+    const saveResult = await updateRowSafely('admin_tasks', taskUpdates, { id: taskId, user_id: user.id });
+    if (saveResult.error) {
+      // nothing reached the database: do not pretend it worked
+      throw new Error('تعذر حفظ حالة العمل الإداري في قاعدة البيانات: ' + (saveResult.error.message || 'خطأ غير معروف'));
     }
 
     setAdminTasks(prev => {
@@ -795,7 +819,8 @@ export function DataProvider({ children }) {
     };
 
     try {
-      await supabase.from('admin_task_updates').insert([historyRecord]);
+      const { error: historyError } = await supabase.from('admin_task_updates').insert([historyRecord]);
+      if (historyError) console.error('[admin_task_updates] فشل حفظ سجل التحديث:', historyError);
     } catch (e) {
       // fallback
     }
@@ -934,14 +959,9 @@ export function DataProvider({ children }) {
 
   const updateBailiffTask = async (id, updates) => {
     if (!user) throw new Error('يجب تسجيل الدخول أولاً');
-    try {
-      await supabase
-        .from('bailiff_tasks')
-        .update(updates)
-        .eq('id', id)
-        .eq('user_id', user.id);
-    } catch (e) {
-      // ignore
+    const saveResult = await updateRowSafely('bailiff_tasks', updates, { id, user_id: user.id });
+    if (saveResult.error) {
+      throw new Error('تعذر حفظ التعديل في قاعدة البيانات: ' + (saveResult.error.message || 'خطأ غير معروف'));
     }
 
     setBailiffTasks(prev => {
@@ -1161,9 +1181,7 @@ export function DataProvider({ children }) {
 
   const updateAppeal = async (id, updates) => {
     if (!user) throw new Error('يجب تسجيل الدخول أولاً');
-    try {
-      await supabase.from('appeals').update(updates).eq('id', id).eq('user_id', user.id);
-    } catch (e) {}
+    await updateRowSafely('appeals', updates, { id, user_id: user.id });
 
     setAppeals(prev => {
       const updated = prev.map(a => a.id === id ? { ...a, ...updates } : a);
@@ -1195,9 +1213,7 @@ export function DataProvider({ children }) {
 
   const updateAgendaEvent = async (id, updates) => {
     if (!user) throw new Error('يجب تسجيل الدخول أولاً');
-    try {
-      await supabase.from('agenda_events').update(updates).eq('id', id).eq('user_id', user.id);
-    } catch (e) {}
+    await updateRowSafely('agenda_events', updates, { id, user_id: user.id });
 
     setAgendaEvents(prev => {
       const updated = prev.map(ev => ev.id === id ? { ...ev, ...updates } : ev);

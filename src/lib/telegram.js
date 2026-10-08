@@ -65,7 +65,7 @@ export async function sendTestMessage(chatId, clientName, lawyerUser) {
   const lawyerPhone = lawyerUser?.user_metadata?.phone || '';
 
   const message = `
-⚖️ <b>الأجندة القضائية — رسالة تأكيد</b>
+⚖️ <b>الديوان — رسالة تأكيد</b>
 
 مرحباً بك أستاذ/ة <b>${escapeHtml(clientName || 'الموكل العزيز')}</b>،
 
@@ -153,7 +153,7 @@ ${caseItem?.notes ? `📝 <b>ملاحظات:</b> ${escapeHtml(caseItem.notes)}` 
   });
 
   return `
-🏛️ <b>الأجندة القضائية — إشعار بمجريات الدعوى</b>
+🏛️ <b>الديوان — إشعار بمجريات الدعوى</b>
 
 مرحباً بك أستاذ/ة <b>${escapeHtml(clientName)}</b>،
 إخطار صادر من مكتب: <b>أ / ${escapeHtml(lawyerName)}</b> ${lawyerPhone ? `(📞 ${escapeHtml(lawyerPhone)})` : ''}
@@ -169,7 +169,7 @@ ${decisionDetails}
 
 ━━━━━━━━━━━━━━━━━━━
 🗓️ <i>تاريخ التحديث: ${escapeHtml(todayArabic)}</i>
-⚖️ <i>نظام المتابعة الآلي — الأجندة القضائية</i>
+⚖️ <i>نظام المتابعة الآلي — الديوان</i>
   `.trim();
 }
 
@@ -283,7 +283,7 @@ ${balanceText}
 
 📌 <i>طرق السداد المتاحة: نقداً بمقر المكتب، أو عبر المحافظ الإلكترونية / إنستاباي.</i>
 🗓️ <i>تاريخ الكشف: ${escapeHtml(todayArabic)}</i>
-⚖️ <i>نظام الإدارة المالية — الأجندة القضائية</i>
+⚖️ <i>نظام الإدارة المالية — الديوان</i>
   `.trim();
 }
 

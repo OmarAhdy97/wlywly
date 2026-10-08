@@ -15,6 +15,7 @@
 import { createDocumentModel, documentListToTable } from './documentModel.js';
 import { evaluateCondition } from './fieldValidation.js';
 import { createFormulaSnapshot, DEFAULT_DISCLAIMER } from './formulaSchema.js';
+import { formatEgyptPhone } from './phone';
 
 /**
  * Renders an array of document items into a formal Arabic court table.
@@ -224,7 +225,7 @@ export function generateDocumentContent(formula, formValues = {}, context = {}) 
     '{{client.name}}': selectedClient?.name || formValues.client_name || '',
     '{{client.national_id}}': selectedClient?.national_id || formValues.client_id || '',
     '{{client.address}}': selectedClient?.address || formValues.client_address || '',
-    '{{client.phone}}': selectedClient?.phone || '',
+    '{{client.phone}}': selectedClient?.phone ? formatEgyptPhone(selectedClient.phone) : '',
     '{{opponent.name}}': selectedCase?.defendant_name || formValues.opponent_name || '',
     '{{opponent.address}}': formValues.opponent_address || '',
     '{{case.number}}': selectedCase?.case_number || formValues.case_number || '',
@@ -235,7 +236,7 @@ export function generateDocumentContent(formula, formValues = {}, context = {}) 
     '{{office.name}}': officeProfile?.office_name || '',
     '{{office.lawyer_name}}': officeProfile?.lawyer_name || formValues.lawyer_name || '',
     '{{office.address}}': officeProfile?.address || '',
-    '{{office.phone}}': officeProfile?.phone || '',
+    '{{office.phone}}': officeProfile?.phone ? formatEgyptPhone(officeProfile.phone) : '',
     '{{document.date}}': formValues.session_date || formValues.action_date || formValues.notice_date || formValues.contract_date || new Date().toISOString().substring(0, 10),
     '{{system.today}}': new Date().toISOString().substring(0, 10)
   };

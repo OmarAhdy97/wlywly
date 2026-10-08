@@ -22,7 +22,10 @@ import {
   ClipboardList
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
-import { calculateAppealFollowUpDate, formatArabicDate, addDaysToDate, APPEAL_FOLLOW_UP_DAYS } from '../../lib/dateRules';
+import { calculateAppealFollowUpDate, formatArabicDate, addDaysToDate, getAppealRule } from '../../lib/dateRules';
+import { notify } from '../../lib/dialog';
+import Select from './Select';
+import DateInput from './DateInput';
 
 const DECISIONS = [
   { id: 'adjourned', tone: 'adjourned', label: 'تأجيل', hint: 'تحديد جلسة محكمة قادمة وسبب التأجيل', Icon: Clock },
@@ -97,6 +100,7 @@ export default function SessionDecisionModal({
   const [rulingNotes, setRulingNotes] = useState('');
   const [judgmentDate, setJudgmentDate] = useState(baseSessionDate);
   const [willAppeal, setWillAppeal] = useState(null); // true | false | null
+  const [appealDays, setAppealDays] = useState(null); // null = the statutory default for the case type
 
   // FORM FIELDS: 3. Preliminary Judgment (حكم تمهيدي)
   const [prelimActionType, setPrelimActionType] = useState('expert');
@@ -129,6 +133,7 @@ export default function SessionDecisionModal({
       setRulingNotes('');
       setJudgmentDate(baseSessionDate);
       setWillAppeal(null);
+      setAppealDays(null);
 
       setPrelimActionType('expert');
       setExpertName('');
@@ -164,7 +169,9 @@ export default function SessionDecisionModal({
   const hasTelegram = !!(clientObj && clientObj.telegram_chat_id);
 
   // Calculated Appeal Follow-up Date
-  const calculatedAppealDate = judgmentDate ? calculateAppealFollowUpDate(judgmentDate, APPEAL_FOLLOW_UP_DAYS) : '';
+  const appealRule = getAppealRule(caseItem.case_type);
+  const effectiveAppealDays = Number(appealDays ?? appealRule.days) || appealRule.days;
+  const calculatedAppealDate = judgmentDate ? calculateAppealFollowUpDate(judgmentDate, effectiveAppealDays) : '';
 
   const activeDecision = DECISIONS.find(d => d.id === decisionType);
 
@@ -387,7 +394,7 @@ export default function SessionDecisionModal({
 
     } catch (err) {
       console.error('Error in recordSessionDecision:', err);
-      alert('حدث خطأ أثناء حفظ القرار: ' + (err.message || 'يرجى إعادة المحاولة'));
+      notify('حدث خطأ أثناء حفظ القرار: ' + (err.message || 'يرجى إعادة المحاولة'));
       setIsSubmitting(false);
     }
   };
@@ -501,14 +508,12 @@ export default function SessionDecisionModal({
 
                       <div className="form-group">
                         <label className="form-label sd-label">تاريخ الجلسة القادمة بالمحكمة *</label>
-                        <input
-                          type="date"
+                        <DateInput
                           className="form-input"
                           required
                           min={addDaysToDate(baseSessionDate, 1)}
                           value={nextSessionDate}
-                          onChange={(e) => setNextSessionDate(e.target.value)}
-                        />
+                          onChange={(e) => setNextSessionDate(e.target.value)} />
                       </div>
 
                       <div className="sd-quick">
@@ -616,12 +621,10 @@ export default function SessionDecisionModal({
                             </div>
                             <div className="form-group">
                               <label className="form-label">تاريخ متابعة الخبير *</label>
-                              <input
-                                type="date"
+                              <DateInput
                                 className="form-input"
                                 value={actionFollowUpDate}
-                                onChange={(e) => setActionFollowUpDate(e.target.value)}
-                              />
+                                onChange={(e) => setActionFollowUpDate(e.target.value)} />
                             </div>
                           </div>
                           <div className="form-group sd-flush">
@@ -640,12 +643,10 @@ export default function SessionDecisionModal({
                         <div className="sd-panel">
                           <div className="form-group">
                             <label className="form-label">تاريخ متابعة الإجراء *</label>
-                            <input
-                              type="date"
+                            <DateInput
                               className="form-input"
                               value={actionFollowUpDate}
-                              onChange={(e) => setActionFollowUpDate(e.target.value)}
-                            />
+                              onChange={(e) => setActionFollowUpDate(e.target.value)} />
                           </div>
                           <div className="form-group sd-flush">
                             <label className="form-label">تفاصيل وملاحظات الإجراء المطلوب</label>
@@ -687,14 +688,12 @@ export default function SessionDecisionModal({
                         {hasNextCourtSession && (
                           <div className="sd-next-court">
                             <label className="form-label sd-label">تاريخ جلسة المحكمة القادمة *</label>
-                            <input
-                              type="date"
+                            <DateInput
                               className="form-input"
                               min={addDaysToDate(baseSessionDate, 1)}
                               value={nextCourtSessionDate}
                               onChange={(e) => setNextCourtSessionDate(e.target.value)}
-                              required
-                            />
+                              required />
                             <DateWarnings value={nextCourtSessionDate} afterOk={nextCourtDateIsAfter} />
                             <div className="sd-help">سيتم إدراج هذه الجلسة في رول الجلسات والأجندة كموعد محكمة فعلي.</div>
                           </div>
@@ -786,12 +785,25 @@ export default function SessionDecisionModal({
 
                       {willAppeal === true && (
                         <div className="sd-alert sd-alert-tone sd-alert-block">
-                          <div className="sd-alert-title"><CalendarCheck2 size={20} /> موعد متابعة قيد الاستئناف المحسوب آليًا:</div>
+                          <div className="sd-alert-title"><CalendarCheck2 size={20} /> آخر موعد لقيد الاستئناف:</div>
                           <div className="sd-alert-big">{formatArabicDate(calculatedAppealDate, true)}</div>
                           <div className="sd-help">
-                            • تاريخ صدور الحكم + {APPEAL_FOLLOW_UP_DAYS} يومًا (مع ترحيل يوم الجمعة إلى السبت تلقائيًا).<br />
-                            • سيُضاف هذا الموعد إلى الأجندة والتقويم كموعد متابعة مستقل دون اعتباره جلسة محكمة.
+                            • {appealRule.label}: تاريخ صدور الحكم + {effectiveAppealDays} يومًا ({appealRule.basis})، ولا يُحسب يوم الصدور.<br />
+                            • إذا وافق آخر يوم الجمعة يُرحَّل إلى السبت. الإجازات الرسمية الأخرى لا تُحتسب تلقائيًا، فراجع الموعد.<br />
+                            • إن كان الحكم غيابيًا أو معتبرًا حضوريًا فالميعاد يبدأ من تاريخ إعلانه لا من صدوره.<br />
+                            • يُضاف الموعد إلى الأجندة والتقويم كمتابعة مستقلة دون اعتباره جلسة محكمة.
                           </div>
+                          <label className="sd-days">
+                            <span>مدة الميعاد (بالأيام)</span>
+                            <input
+                              type="number"
+                              min="1"
+                              max="120"
+                              className="form-input"
+                              value={appealDays ?? appealRule.days}
+                              onChange={(e) => setAppealDays(e.target.value === '' ? null : e.target.value)}
+                            />
+                          </label>
                         </div>
                       )}
 
@@ -862,12 +874,12 @@ export default function SessionDecisionModal({
 
                         <div className="form-group sd-flush">
                           <label className="form-label sd-mini-title"><UserCheck size={15} /> إسناد / تكليف عضو من الفريق لمتابعة هذه الدعوى (اختياري)</label>
-                          <select className="form-select" value={assignedLawyerId} onChange={(e) => setAssignedLawyerId(e.target.value)}>
+                          <Select className="form-select" value={assignedLawyerId} onChange={(e) => setAssignedLawyerId(e.target.value)}>
                             <option value="">-- بدون إسناد / الإبقاء على الحالي --</option>
                             {team.map((m) => (
                               <option key={m.id} value={m.id}>الأستاذ / {m.name}</option>
                             ))}
-                          </select>
+                          </Select>
                         </div>
                       </div>
                     )}

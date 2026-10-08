@@ -1,17 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import {
-  Wallet,
-  Receipt,
-  Printer,
-  Send,
-  Trash2,
-  Layers,
-  Search,
-  Plus,
-  ArrowUpRight,
-  ArrowDownLeft,
-  X
-} from 'lucide-react';
+import { Printer, Send, Trash2, Search, Plus, X } from 'lucide-react';
 import {
   formatMoney,
   calculateClientFinancialSummary,
@@ -23,12 +11,19 @@ import { printReceipt } from '../../lib/financeOverview';
 import { useData } from '../../context/DataContext';
 import AddTransactionModal from './AddTransactionModal';
 import ClientAccountStatement from './ClientAccountStatement';
+import { confirmDialog, notify } from '../../lib/dialog';
+import Select from '../common/Select';
 
 const TABS = [
   { id: 'overview', label: 'نظرة عامة' },
   { id: 'transactions', label: 'سجل الحركات' },
+];
+
+const KINDS = [
+  { id: 'all', label: 'الكل' },
   { id: 'fees', label: 'الأتعاب' },
   { id: 'expenses', label: 'المصروفات' },
+  { id: 'payments', label: 'المسدد' },
 ];
 
 const isExpenseType = (t) => t === 'client_expense' || t === 'expense';
@@ -52,6 +47,8 @@ export default function ClientFinancialManager({
   onSendTelegram = null
 }) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [kind, setKind] = useState('all');
+  const [showIdle, setShowIdle] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCaseId, setSelectedCaseId] = useState('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -78,18 +75,15 @@ export default function ClientFinancialManager({
 
   const counts = useMemo(() => {
     const own = (transactions || []).filter(t => t.client_id === client?.id);
-    return {
-      transactions: own.length,
-      fees: own.filter(t => t.type === 'fee').length,
-      expenses: own.filter(t => isExpenseType(t.type)).length,
-    };
+    return { transactions: own.length };
   }, [transactions, client]);
 
   const displayLedger = useMemo(() => {
     if (!filtered) return [];
     let list = filtered.displayLedger;
-    if (activeTab === 'fees') list = list.filter(tx => tx.type === 'fee');
-    else if (activeTab === 'expenses') list = list.filter(tx => isExpenseType(tx.type));
+    if (kind === 'fees') list = list.filter(tx => tx.type === 'fee');
+    else if (kind === 'expenses') list = list.filter(tx => isExpenseType(tx.type));
+    else if (kind === 'payments') list = list.filter(tx => !tx.isDebit);
 
     const q = searchTerm.trim().toLowerCase();
     if (q) {
@@ -100,9 +94,14 @@ export default function ClientFinancialManager({
       );
     }
     return list;
-  }, [filtered, activeTab, searchTerm]);
+  }, [filtered, kind, searchTerm]);
 
   if (!client || !overall) return null;
+
+  const hasActivity = (b) => b.fees || b.clientExpenses || b.payments || b.balance;
+  const activeBreakdown = overall.caseBreakdown.filter(hasActivity);
+  const idleCount = overall.caseBreakdown.length - activeBreakdown.length;
+  const breakdown = showIdle ? overall.caseBreakdown : activeBreakdown;
 
   const handlePrintStatement = () => {
     document.body.classList.add('printing-statement-document');
@@ -114,25 +113,25 @@ export default function ClientFinancialManager({
   };
 
   const handleDelete = async (txId) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذه الحركة المالية نهائياً؟ سيتم إعادة احتساب الرصيد تلقائياً.')) return;
+    if (!await confirmDialog('هل أنت متأكد من حذف هذه الحركة المالية نهائياً؟ سيتم إعادة احتساب الرصيد تلقائياً.', { danger: true, confirmLabel: 'حذف' })) return;
     try {
       setIsDeletingId(txId);
       await onDeleteTransaction(txId);
     } catch (err) {
-      alert('خطأ أثناء حذف المعاملة: ' + err.message);
+      notify('خطأ أثناء حذف المعاملة: ' + err.message);
     } finally {
       setIsDeletingId(null);
     }
   };
 
-  const tabCount = { overview: null, transactions: counts.transactions, fees: counts.fees, expenses: counts.expenses };
+  const tabCount = { overview: null, transactions: counts.transactions };
   const heroLabel = overall.isDebtor ? 'المستحق على الموكل' : overall.isCreditor ? 'المتبقي لصالح الموكل' : 'الرصيد المستحق';
   const heroTone = overall.isDebtor ? 'is-debt' : overall.isCreditor ? 'is-credit' : '';
 
   const typeBadge = (tx) => (
     <span
       className="fin-type"
-      style={{ backgroundColor: tx.typeMeta.badgeBg, color: tx.typeMeta.badgeColor, borderColor: `${tx.typeMeta.badgeColor}33` }}
+      style={{ backgroundColor: tx.typeMeta.badgeBg, color: tx.typeMeta.badgeColor, borderColor: 'transparent' }}
     >
       {tx.typeMeta.label}
     </span>
@@ -182,22 +181,20 @@ export default function ClientFinancialManager({
         {/* HEADER */}
         <div className="modal-header cfm-modal-header fin-header">
           <div className="fin-header-main">
-            <div className="fin-header-icon"><Wallet size={20} /></div>
             <div className="fin-header-text">
-              <h3>الإدارة المالية وحساب الموكل: {client.name}</h3>
+              <h3>حساب الموكل: {client.name}</h3>
               <div className="fin-header-sub">
-                {client.power_of_attorney_number ? `توكيل رسمي رقم: ${client.power_of_attorney_number}` : 'توكيل عام قضايا'}
-                {client.phone && ` | هاتف: ${client.phone}`}
+                {[client.power_of_attorney_number && `توكيل رقم ${client.power_of_attorney_number}`, client.phone].filter(Boolean).join(' · ')}
               </div>
             </div>
           </div>
           <div className="cfm-header-actions">
-            <button type="button" className="btn btn-gold" onClick={() => setIsAddModalOpen(true)}>
+            <button type="button" className="btn btn-primary" onClick={() => setIsAddModalOpen(true)}>
               <Plus size={16} />
-              <span>إضافة حركة مالية</span>
+              <span>إضافة حركة</span>
             </button>
           </div>
-          <button type="button" className="btn btn-secondary btn-icon cfm-close-btn" onClick={onClose} title="إغلاق" aria-label="إغلاق">
+          <button type="button" className="icon-btn cfm-close-btn" onClick={onClose} title="إغلاق" aria-label="إغلاق">
             <X size={18} />
           </button>
         </div>
@@ -209,37 +206,24 @@ export default function ClientFinancialManager({
             <div className={`fin-kpi fin-kpi-hero ${heroTone}`}>
               <div className="fin-kpi-top">
                 <span className="fin-kpi-label">{heroLabel}</span>
-                <span className="fin-kpi-chip">{overall.statusLabel}</span>
               </div>
               <div className="fin-kpi-value">{formatMoney(overall.outstandingBalance)}</div>
               <div className="fin-kpi-foot is-tafqeet">{overall.tafqeetBalance}</div>
             </div>
 
             <div className="fin-kpi">
-              <div className="fin-kpi-top">
-                <span className="fin-kpi-label">إجمالي الأتعاب</span>
-                <Receipt size={16} />
-              </div>
+              <div className="fin-kpi-top"><span className="fin-kpi-label">إجمالي الأتعاب</span></div>
               <div className="fin-kpi-value">{formatMoney(overall.totalFees)}</div>
-              <div className="fin-kpi-foot">أتعاب قضايا واستشارات</div>
             </div>
 
             <div className="fin-kpi">
-              <div className="fin-kpi-top">
-                <span className="fin-kpi-label">المصروفات المحتسبة</span>
-                <ArrowDownLeft size={16} />
-              </div>
+              <div className="fin-kpi-top"><span className="fin-kpi-label">المصروفات</span></div>
               <div className="fin-kpi-value is-warn">{formatMoney(overall.totalClientExpenses)}</div>
-              <div className="fin-kpi-foot">رسوم، خبراء ومأموريات</div>
             </div>
 
             <div className="fin-kpi">
-              <div className="fin-kpi-top">
-                <span className="fin-kpi-label">إجمالي المسدد</span>
-                <ArrowUpRight size={16} />
-              </div>
+              <div className="fin-kpi-top"><span className="fin-kpi-label">المسدد</span></div>
               <div className="fin-kpi-value is-credit">{formatMoney(overall.totalPayments)}</div>
-              <div className="fin-kpi-foot">دفعات نقدية وبنكية</div>
             </div>
           </div>
 
@@ -263,13 +247,20 @@ export default function ClientFinancialManager({
 
             {activeTab !== 'overview' && (
               <div className="cfm-filters-container fin-filters">
-                <select className="form-select" value={selectedCaseId} onChange={(e) => setSelectedCaseId(e.target.value)}>
+                <div className="seg-tabs fin-kinds" role="tablist">
+                  {KINDS.map(k => (
+                    <button key={k.id} type="button" role="tab" aria-selected={kind === k.id} className={`seg-tab ${kind === k.id ? 'is-active' : ''}`} onClick={() => setKind(k.id)}>
+                      {k.label}
+                    </button>
+                  ))}
+                </div>
+                <Select className="form-select" value={selectedCaseId} onChange={(e) => setSelectedCaseId(e.target.value)}>
                   <option value="ALL">كل القضايا والحساب العام</option>
                   <option value="GENERAL">عام (بدون قضية)</option>
                   {clientCases.map(c => (
                     <option key={c.id} value={c.id}>دعوى {c.case_number}/{c.case_year}</option>
                   ))}
-                </select>
+                </Select>
                 <div className="cfm-search-input-wrapper fin-search">
                   <Search size={15} />
                   <input
@@ -288,56 +279,70 @@ export default function ClientFinancialManager({
           {activeTab === 'overview' && (
             <div>
               <div className="fin-card">
-                <h4 className="fin-card-title"><Layers size={18} /> توزيع الموقف المالي بحسب القضايا</h4>
-
-                <div className="cfm-table-desktop fin-scroll">
-                  <table className="fin-table">
-                    <thead>
-                      <tr>
-                        <th>القضية</th>
-                        <th>المحكمة / الوصف</th>
-                        <th className="is-num">الأتعاب</th>
-                        <th className="is-num">المصروفات</th>
-                        <th className="is-num">المسدد</th>
-                        <th className="is-num">الرصيد المتبقي</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {overall.caseBreakdown.map(b => (
-                        <tr key={b.caseId}>
-                          <td className="is-strong">{b.caseNumber}</td>
-                          <td className="is-muted">{b.courtName}{b.caseTitle ? ` — ${b.caseTitle}` : ''}</td>
-                          <td className="is-num" dir="ltr">{formatMoney(b.fees, false)}</td>
-                          <td className="is-num" dir="ltr">{formatMoney(b.clientExpenses, false)}</td>
-                          <td className="is-num is-credit" dir="ltr">{formatMoney(b.payments, false)}</td>
-                          <td className={`is-num is-strong ${balanceTone(b.balance)}`} dir="ltr">{formatMoney(b.balance, false)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="fin-card-head">
+                  <h4 className="fin-card-title">الموقف المالي بحسب القضايا</h4>
+                  <span className="fin-card-meta">
+                    {overall.totalTransactionsCount} حركة
+                    {overall.firstTxDate ? ` · من ${overall.firstTxDate} إلى ${overall.lastTxDate}` : ''}
+                  </span>
                 </div>
 
-                <div className="cfm-cards-mobile">
-                  {overall.caseBreakdown.map(b => (
-                    <div key={b.caseId} className="fin-mini-card">
-                      <div className="fin-mini-head">
-                        <span className="fin-case-pill">{b.caseNumber}</span>
-                        <span className="fin-mini-sub">{b.courtName}{b.caseTitle ? ` — ${b.caseTitle}` : ''}</span>
-                      </div>
-                      <div className="fin-mini-grid">
-                        <div><span>الأتعاب</span><b dir="ltr">{formatMoney(b.fees)}</b></div>
-                        <div><span>المصروفات</span><b dir="ltr">{formatMoney(b.clientExpenses)}</b></div>
-                        <div><span>المسدد</span><b className="is-credit" dir="ltr">{formatMoney(b.payments)}</b></div>
-                        <div><span>الرصيد المتبقي</span><b className={balanceTone(b.balance)} dir="ltr">{formatMoney(b.balance)}</b></div>
-                      </div>
+                {breakdown.length === 0 ? (
+                  <p className="empty-line">لا توجد حركات مسجلة على أي قضية بعد.</p>
+                ) : (
+                  <>
+                    <div className="cfm-table-desktop fin-scroll">
+                      <table className="fin-table">
+                        <thead>
+                          <tr>
+                            <th>القضية</th>
+                            <th className="is-num">الأتعاب</th>
+                            <th className="is-num">المصروفات</th>
+                            <th className="is-num">المسدد</th>
+                            <th className="is-num">المتبقي</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {breakdown.map(b => (
+                            <tr key={b.caseId}>
+                              <td>
+                                <div className="is-strong">{b.caseNumber}</div>
+                                {b.courtName && <div className="is-muted fin-sub">{b.courtName}</div>}
+                              </td>
+                              <td className="is-num" dir="ltr">{formatMoney(b.fees, false)}</td>
+                              <td className="is-num" dir="ltr">{formatMoney(b.clientExpenses, false)}</td>
+                              <td className="is-num is-credit" dir="ltr">{formatMoney(b.payments, false)}</td>
+                              <td className={`is-num is-strong ${balanceTone(b.balance)}`} dir="ltr">{formatMoney(b.balance, false)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              <div className="fin-summary-bar">
-                <b>إجمالي الحركات المسجلة: {overall.totalTransactionsCount} حركة</b>
-                <span>أول حركة: <b>{overall.firstTxDate || 'لا يوجد'}</b> | آخر حركة: <b>{overall.lastTxDate || 'لا يوجد'}</b></span>
+                    <div className="cfm-cards-mobile">
+                      {breakdown.map(b => (
+                        <div key={b.caseId} className="fin-mini-card">
+                          <div className="fin-mini-head">
+                            <span className="fin-case-pill">{b.caseNumber}</span>
+                            <span className="fin-mini-sub">{b.courtName}</span>
+                          </div>
+                          <div className="fin-mini-grid">
+                            <div><span>الأتعاب</span><b dir="ltr">{formatMoney(b.fees)}</b></div>
+                            <div><span>المصروفات</span><b dir="ltr">{formatMoney(b.clientExpenses)}</b></div>
+                            <div><span>المسدد</span><b className="is-credit" dir="ltr">{formatMoney(b.payments)}</b></div>
+                            <div><span>المتبقي</span><b className={balanceTone(b.balance)} dir="ltr">{formatMoney(b.balance)}</b></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {idleCount > 0 && (
+                  <button type="button" className="fin-idle-toggle" onClick={() => setShowIdle(v => !v)}>
+                    {showIdle ? 'إخفاء القضايا بلا حركات' : `إظهار ${idleCount} قضية بلا حركات مالية`}
+                  </button>
+                )}
               </div>
             </div>
           )}

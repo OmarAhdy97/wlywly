@@ -1,23 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Gavel,
-  Mail,
-  Lock,
-  ArrowLeft,
-  User,
-  Phone,
-  Award,
-  CheckCircle2,
-  KeyRound,
-  RotateCcw,
-  ShieldCheck,
-  HelpCircle,
-  Eye,
-  EyeOff,
-  Building2
-} from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { supabase, USER_ROLES } from '../lib/supabase';
+import Select from '../components/common/Select';
 
 export default function AuthPage() {
   // Modes: 'login' | 'signup' | 'forgot' | 'reset'
@@ -155,529 +140,153 @@ export default function AuthPage() {
     }
   };
 
+  const switchMode = (next) => {
+    setMode(next);
+    handleResetMessages();
+  };
+
+  const SUBTITLE = {
+    login: 'تسجيل الدخول إلى مكتبك',
+    signup: 'إنشاء حساب جديد',
+    forgot: 'استعادة كلمة المرور',
+    reset: 'تعيين كلمة مرور جديدة',
+  };
+  const SUBMIT = {
+    login: 'تسجيل الدخول',
+    signup: 'إنشاء الحساب',
+    forgot: 'إرسال رابط الاستعادة',
+    reset: 'حفظ كلمة المرور',
+  };
+
+  const passwordField = (id, label, value, setValue, withToggle) => (
+    <div className="form-group auth-field">
+      <div className="auth-label-row">
+        <label className="form-label" htmlFor={id}>{label}</label>
+        {id === 'auth-password' && mode === 'login' && (
+          <button type="button" className="auth-link" onClick={() => switchMode('forgot')}>نسيت كلمة المرور؟</button>
+        )}
+      </div>
+      <div className="auth-input-wrap">
+        <input
+          id={id}
+          type={showPassword ? 'text' : 'password'}
+          required
+          dir="ltr"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="••••••••"
+          className="form-input auth-ltr"
+          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+        />
+        {withToggle && (
+          <button
+            type="button"
+            className="auth-eye"
+            onClick={() => setShowPassword(!showPassword)}
+            title={showPassword ? 'إخفاء' : 'إظهار'}
+            aria-label={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+          >
+            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="auth-page-container" style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'radial-gradient(circle at top right, #37040a, #1a0205)',
-      padding: '1.5rem',
-      position: 'relative',
-      overflow: 'hidden'
-    }}>
-      {/* Decorative luxury legal ambient glow */}
-      <div style={{
-        position: 'absolute',
-        top: '-15%',
-        right: '-10%',
-        width: '500px',
-        height: '500px',
-        borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(197, 152, 40, 0.18) 0%, rgba(55, 4, 10, 0) 70%)',
-        pointerEvents: 'none'
-      }}></div>
-
-      <div style={{
-        position: 'absolute',
-        bottom: '-20%',
-        left: '-10%',
-        width: '600px',
-        height: '600px',
-        borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(24, 37, 42, 0.3) 0%, rgba(26, 2, 5, 0) 70%)',
-        pointerEvents: 'none'
-      }}></div>
-
-      <div className="auth-card" style={{
-        width: '100%',
-        maxWidth: mode === 'signup' ? '500px' : '440px',
-        background: 'rgba(255, 255, 255, 0.98)',
-        borderRadius: '20px',
-        padding: mode === 'signup' ? '2.2rem 2rem' : '2.5rem 2rem',
-        boxShadow: '0 20px 45px rgba(26, 2, 5, 0.35)',
-        border: '1px solid rgba(197, 152, 40, 0.3)',
-        position: 'relative',
-        zIndex: 10,
-        transition: 'max-width 0.25s ease'
-      }}>
-        {/* Brand Header */}
-        <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
-          <div style={{
-            width: '54px',
-            height: '54px',
-            borderRadius: '16px',
-            background: 'var(--accent)',
-            color: 'var(--on-accent)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 0.85rem',
-            boxShadow: '0 6px 16px rgba(197, 152, 40, 0.3)'
-          }}>
-            <Gavel size={28} />
-          </div>
-
-          <h1 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#1a0205', marginBottom: '0.2rem' }}>
-            الأجندة القضائية
-          </h1>
-
-          <p style={{ color: '#6b4c51', fontSize: '0.86rem', margin: 0 }}>
-            {mode === 'login' && 'بوابة الإدارة الرقمية لمكاتب السادة المحامين'}
-            {mode === 'signup' && 'إنشاء حساب محاماة جديد للانضمام للمنظومة'}
-            {mode === 'forgot' && 'استعادة والوصول إلى حسابك المسجل'}
-            {mode === 'reset' && 'تعيين كلمة مرور جديدة وآمنة'}
-          </p>
+    <div className="auth-page-container">
+      <div className={`auth-card ${mode === 'signup' ? 'is-wide' : ''}`}>
+        <div className="auth-brand">
+          <img src="/logo.png" alt="" className="auth-logo" />
+          <h1>الديوان</h1>
+          <p>{SUBTITLE[mode]}</p>
         </div>
 
-        {/* Error / Success Alerts */}
-        {errorMsg && (
-          <div style={{
-            background: 'var(--status-dismissed-bg)',
-            color: 'var(--status-dismissed)',
-            padding: '0.75rem 1rem',
-            borderRadius: '10px',
-            marginBottom: '1.2rem',
-            fontSize: '0.85rem',
-            border: '1px solid #fca5a5',
-            lineHeight: '1.4'
-          }}>
-            {errorMsg}
-          </div>
-        )}
+        {errorMsg && <div className="auth-alert is-error" role="alert">{errorMsg}</div>}
+        {successMsg && <div className="auth-alert is-ok" role="status">{successMsg}</div>}
 
-        {successMsg && (
-          <div style={{
-            background: 'var(--status-active-bg)',
-            color: 'var(--status-active)',
-            padding: '0.75rem 1rem',
-            borderRadius: '10px',
-            marginBottom: '1.2rem',
-            fontSize: '0.85rem',
-            border: '1px solid #86efac',
-            lineHeight: '1.4'
-          }}>
-            {successMsg}
-          </div>
-        )}
-
-        {/* Google One-Click OAuth Button (shown in Login and Signup modes) */}
         {(mode === 'login' || mode === 'signup') && (
           <>
-            <button
-              type="button"
-              onClick={handleGoogleLogin}
-              disabled={googleLoading}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.75rem',
-                padding: '0.75rem 1rem',
-                borderRadius: '12px',
-                border: '1px solid #ebdcde',
-                background: '#ffffff',
-                color: '#24070b',
-                fontWeight: '700',
-                fontSize: '0.9rem',
-                cursor: googleLoading ? 'not-allowed' : 'pointer',
-                boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
-                transition: 'all 0.15s ease',
-                marginBottom: '1.2rem'
-              }}
-            >
-              {/* Google SVG Logo */}
-              <svg width="19" height="19" viewBox="0 0 24 24">
+            <button type="button" className="auth-google" onClick={handleGoogleLogin} disabled={googleLoading}>
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                 <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z" />
                 <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z" />
                 <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z" />
                 <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z" />
               </svg>
-              <span>{googleLoading ? 'جاري الاتصال بـ Google...' : (mode === 'login' ? 'تسجيل الدخول باستخدام Google' : 'التسجيل السريع عبر Google')}</span>
+              <span>{googleLoading ? 'جارٍ الاتصال…' : 'المتابعة عبر Google'}</span>
             </button>
-
-            {/* Divider */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.8rem',
-              margin: '1.2rem 0',
-              color: '#987a80',
-              fontSize: '0.78rem'
-            }}>
-              <div style={{ flex: 1, height: '1px', background: '#ebdcde' }}></div>
-              <span>أو عبر البيانات المباشرة</span>
-              <div style={{ flex: 1, height: '1px', background: '#ebdcde' }}></div>
-            </div>
+            <div className="auth-divider"><span>أو</span></div>
           </>
         )}
 
-        {/* Dynamic Form based on mode */}
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '0.95rem' }}>
-
-          {/* SIGNUP SPECIFIC FIELDS */}
+        <form onSubmit={handleSubmit} className="auth-form">
           {mode === 'signup' && (
             <>
-              {/* Full Name */}
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label" style={{ color: '#24070b', fontWeight: '700', fontSize: '0.84rem' }}>
-                  اسم الأستاذ المحامي المسؤول *
-                </label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="مثال: أ / أحمد محمود إبراهيم"
-                    className="form-input"
-                    style={{
-                      width: '100%',
-                      paddingRight: '2.6rem',
-                      paddingLeft: '0.9rem',
-                      fontSize: '0.88rem',
-                      borderRadius: '10px'
-                    }}
-                  />
-                  <User size={17} color="#987a80" style={{ position: 'absolute', right: '12px', pointerEvents: 'none' }} />
-                </div>
+              <div className="form-group auth-field">
+                <label className="form-label" htmlFor="auth-name">اسم المحامي المسؤول *</label>
+                <input id="auth-name" type="text" required className="form-input" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="أ / الاسم بالكامل" />
               </div>
 
-              {/* Office Name (Optional) */}
-              <div className="form-group" style={{ margin: 0 }}>
-                <label className="form-label" style={{ color: '#24070b', fontWeight: '700', fontSize: '0.84rem' }}>
-                  اسم مكتب المحاماة <span style={{ color: '#987a80', fontWeight: 'normal', fontSize: '0.78rem' }}>(اختياري — للهوية والمطبوعات)</span>
-                </label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <input
-                    type="text"
-                    value={officeName}
-                    onChange={(e) => setOfficeName(e.target.value)}
-                    placeholder="مثال: مكتب الأستاذ / أحمد محمود للمحاماة والاستشارات"
-                    className="form-input"
-                    style={{
-                      width: '100%',
-                      paddingRight: '2.6rem',
-                      paddingLeft: '0.9rem',
-                      fontSize: '0.88rem',
-                      borderRadius: '10px'
-                    }}
-                  />
-                  <Building2 size={17} color="#987a80" style={{ position: 'absolute', right: '12px', pointerEvents: 'none' }} />
-                </div>
+              <div className="form-group auth-field">
+                <label className="form-label" htmlFor="auth-office">اسم المكتب <span className="auth-optional">(اختياري، يظهر في المطبوعات)</span></label>
+                <input id="auth-office" type="text" className="form-input" value={officeName} onChange={(e) => setOfficeName(e.target.value)} />
               </div>
 
-              {/* Phone & Role Grid */}
-              <div className="form-grid-2" style={{ gap: '0.75rem' }}>
-                {/* Phone */}
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label" style={{ color: '#24070b', fontWeight: '700', fontSize: '0.84rem' }}>
-                    رقم الهاتف
-                  </label>
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                    <input
-                      type="tel"
-                      dir="ltr"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="010XXXXXXXX"
-                      className="form-input"
-                      style={{
-                        width: '100%',
-                        paddingLeft: '2.5rem',
-                        textAlign: 'left',
-                        fontSize: '0.88rem',
-                        borderRadius: '10px'
-                      }}
-                    />
-                    <Phone size={16} color="#987a80" style={{ position: 'absolute', left: '12px', pointerEvents: 'none' }} />
-                  </div>
+              <div className="form-grid">
+                <div className="form-group auth-field">
+                  <label className="form-label" htmlFor="auth-phone">رقم الهاتف</label>
+                  <input id="auth-phone" type="tel" dir="ltr" className="form-input auth-ltr" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="010XXXXXXXX" />
                 </div>
-
-                {/* Role */}
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label" style={{ color: '#24070b', fontWeight: '700', fontSize: '0.84rem' }}>
-                    الدرجة المهنية
-                  </label>
-                  <select
-                    className="form-select"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    style={{ borderRadius: '10px', fontSize: '0.85rem', padding: '0.55rem 0.6rem' }}
-                  >
+                <div className="form-group auth-field">
+                  <label className="form-label" htmlFor="auth-role">الدرجة المهنية</label>
+                  <Select id="auth-role" className="form-select" value={role} onChange={(e) => setRole(e.target.value)}>
                     {Object.entries(USER_ROLES).map(([k, v]) => (
                       <option key={k} value={k}>{v}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               </div>
             </>
           )}
 
-          {/* EMAIL FIELD (Login, Signup, Forgot) */}
           {mode !== 'reset' && (
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label" style={{ color: '#24070b', fontWeight: '700', fontSize: '0.84rem' }}>
-                البريد الإلكتروني *
-              </label>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <input
-                  type="email"
-                  required
-                  dir="ltr"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="lawyer@example.com"
-                  className="form-input"
-                  style={{
-                    width: '100%',
-                    paddingLeft: '2.8rem',
-                    paddingRight: '1rem',
-                    textAlign: 'left',
-                    direction: 'ltr',
-                    borderRadius: '10px',
-                    fontSize: '0.9rem'
-                  }}
-                />
-                <Mail size={17} color="#987a80" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-              </div>
+            <div className="form-group auth-field">
+              <label className="form-label" htmlFor="auth-email">البريد الإلكتروني *</label>
+              <input
+                id="auth-email"
+                type="email"
+                required
+                dir="ltr"
+                className="form-input auth-ltr"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="lawyer@example.com"
+                autoComplete="email"
+              />
             </div>
           )}
 
-          {/* PASSWORD FIELD (Login, Signup, Reset) */}
-          {mode !== 'forgot' && (
-            <div className="form-group" style={{ margin: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                <label className="form-label" style={{ color: '#24070b', fontWeight: '700', fontSize: '0.84rem', margin: 0 }}>
-                  {mode === 'reset' ? 'كلمة المرور الجديدة *' : 'كلمة المرور *'}
-                </label>
-                {mode === 'login' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode('forgot');
-                      handleResetMessages();
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--primary-800)',
-                      fontSize: '0.78rem',
-                      fontWeight: '700',
-                      cursor: 'pointer',
-                      padding: 0
-                    }}
-                  >
-                    نسيت كلمة المرور؟
-                  </button>
-                )}
-              </div>
+          {mode !== 'forgot' &&
+            passwordField('auth-password', mode === 'reset' ? 'كلمة المرور الجديدة *' : 'كلمة المرور *', password, setPassword, true)}
 
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  dir="ltr"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="form-input"
-                  style={{
-                    width: '100%',
-                    paddingLeft: '2.8rem',
-                    paddingRight: '2.6rem',
-                    textAlign: 'left',
-                    direction: 'ltr',
-                    borderRadius: '10px',
-                    fontSize: '0.9rem'
-                  }}
-                />
-                <Lock size={17} color="#987a80" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+          {(mode === 'signup' || mode === 'reset') &&
+            passwordField('auth-confirm', 'تأكيد كلمة المرور *', confirmPassword, setConfirmPassword, false)}
 
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    color: '#987a80',
-                    cursor: 'pointer',
-                    padding: 0,
-                    display: 'flex',
-                    alignItems: 'center'
-                  }}
-                  title={showPassword ? 'إخفاء' : 'إظهار'}
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* CONFIRM PASSWORD (Signup and Reset modes) */}
-          {(mode === 'signup' || mode === 'reset') && (
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label" style={{ color: '#24070b', fontWeight: '700', fontSize: '0.84rem' }}>
-                تأكيد كلمة المرور *
-              </label>
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  dir="ltr"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="form-input"
-                  style={{
-                    width: '100%',
-                    paddingLeft: '2.8rem',
-                    paddingRight: '1rem',
-                    textAlign: 'left',
-                    direction: 'ltr',
-                    borderRadius: '10px',
-                    fontSize: '0.9rem'
-                  }}
-                />
-                <KeyRound size={17} color="#987a80" style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-              </div>
-            </div>
-          )}
-
-          {/* SUBMIT BUTTON */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-primary"
-            style={{
-              width: '100%',
-              padding: '0.85rem',
-              fontSize: '0.98rem',
-              fontWeight: '700',
-              borderRadius: '12px',
-              marginTop: '0.4rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.5rem',
-              boxShadow: '0 4px 14px rgba(55, 4, 10, 0.25)',
-              border: '1px solid var(--accent-gold)'
-            }}
-          >
-            {loading ? (
-              <span>جاري المعالجة...</span>
-            ) : (
-              <>
-                {mode === 'login' && <span>تسجيل الدخول</span>}
-                {mode === 'signup' && <span>تأكيد وإنشاء الحساب القضائي</span>}
-                {mode === 'forgot' && <span>إرسال رابط الاستعادة</span>}
-                {mode === 'reset' && <span>حفظ كلمة المرور الجديدة</span>}
-                <ArrowLeft size={17} />
-              </>
-            )}
+          <button type="submit" disabled={loading} className="btn btn-primary auth-submit">
+            {loading ? 'جارٍ المعالجة…' : SUBMIT[mode]}
           </button>
         </form>
 
-        {/* Footer Navigation / Toggles */}
-        <div style={{ textAlign: 'center', marginTop: '1.4rem', fontSize: '0.86rem', color: '#6b4c51' }}>
+        <div className="auth-switch">
           {mode === 'login' && (
-            <div>
-              <span>ليس لديك حساب بعد؟ </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('signup');
-                  handleResetMessages();
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--primary-800)',
-                  fontWeight: '800',
-                  textDecoration: 'underline',
-                  cursor: 'pointer',
-                  padding: 0
-                }}
-              >
-                إنشاء حساب محامي جديد
-              </button>
-            </div>
+            <>ليس لديك حساب؟ <button type="button" className="auth-link" onClick={() => switchMode('signup')}>إنشاء حساب</button></>
           )}
-
           {mode === 'signup' && (
-            <div>
-              <span>لديك حساب بالفعل؟ </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('login');
-                  handleResetMessages();
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--primary-800)',
-                  fontWeight: '800',
-                  textDecoration: 'underline',
-                  cursor: 'pointer',
-                  padding: 0
-                }}
-              >
-                تسجيل الدخول
-              </button>
-            </div>
+            <>لديك حساب؟ <button type="button" className="auth-link" onClick={() => switchMode('login')}>تسجيل الدخول</button></>
           )}
-
-          {mode === 'forgot' && (
-            <div>
-              <span>تذكرت كلمة المرور؟ </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('login');
-                  handleResetMessages();
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--primary-800)',
-                  fontWeight: '800',
-                  textDecoration: 'underline',
-                  cursor: 'pointer',
-                  padding: 0
-                }}
-              >
-                العودة لتسجيل الدخول
-              </button>
-            </div>
-          )}
-
-          {mode === 'reset' && (
-            <div>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode('login');
-                  handleResetMessages();
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: 'var(--primary-800)',
-                  fontWeight: '800',
-                  textDecoration: 'underline',
-                  cursor: 'pointer',
-                  padding: 0
-                }}
-              >
-                العودة لصفحة تسجيل الدخول
-              </button>
-            </div>
+          {(mode === 'forgot' || mode === 'reset') && (
+            <button type="button" className="auth-link" onClick={() => switchMode('login')}>العودة لتسجيل الدخول</button>
           )}
         </div>
       </div>

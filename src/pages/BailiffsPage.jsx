@@ -1,30 +1,13 @@
 import RowAction, { RowActions } from '../components/common/RowAction';
 import React, { useState } from 'react';
-import {
-  Send,
-  Search,
-  Plus,
-  CheckCircle2,
-  Clock,
-  FileText,
-  Building2,
-  Calendar,
-  MapPin,
-  User,
-  UserCheck,
-  Edit3,
-  Trash2,
-  X,
-  RotateCcw,
-  Check,
-  ChevronLeft,
-  Hash,
-  PenTool,
-  Mic,
-  ListFilter
-} from 'lucide-react';
+import { Search, Plus, Edit3, Trash2, X, RotateCcw, Check } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { USER_ROLES } from '../lib/supabase';
+import { confirmDialog, notify } from '../lib/dialog';
+import Select from '../components/common/Select';
+import CourtInput from '../components/common/CourtInput';
+import DateInput from '../components/common/DateInput';
+import { formatEgyptPhone } from '../lib/phone';
 
 export default function BailiffsPage() {
   const { bailiffTasks, clients, team, addBailiffTask, updateBailiffTask, deleteBailiffTask, toggleBailiffStatus } = useData();
@@ -99,7 +82,7 @@ export default function BailiffsPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!noticeNature.trim()) {
-      alert('يرجى كتابة طبيعة الإعلان أو الصحيفة');
+      notify('يرجى كتابة طبيعة الإعلان أو الصحيفة', 'warn');
       return;
     }
 
@@ -130,7 +113,7 @@ export default function BailiffsPage() {
       setIsModalOpen(false);
       handleResetForm();
     } catch (err) {
-      alert('خطأ أثناء حفظ بيانات المحضر: ' + err.message);
+      notify('خطأ أثناء حفظ بيانات المحضر: ' + err.message);
     } finally {
       setIsSaving(false);
     }
@@ -138,7 +121,7 @@ export default function BailiffsPage() {
 
   // Handle Delete
   const handleDelete = async (id) => {
-    if (window.confirm('هل أنت متأكد من حذف ورقة المحضرين هذه نهائياً؟')) {
+    if (await confirmDialog('هل أنت متأكد من حذف ورقة المحضرين هذه نهائياً؟', { danger: true, confirmLabel: 'حذف' })) {
       await deleteBailiffTask(id);
     }
   };
@@ -171,7 +154,6 @@ export default function BailiffsPage() {
     <div className="page-wrapper">
       <div className="page-head">
         <div>
-          <div className="page-eyebrow"><span className="page-dot" />محاضر المحاكم والإعلانات القضائية</div>
           <h1>المحضرون</h1>
         </div>
         <div className="page-head-actions">
@@ -188,7 +170,7 @@ export default function BailiffsPage() {
           <input
             type="text"
             className="form-input"
-            placeholder="البحث في أوراق المحضرين..."
+            placeholder="طبيعة الإعلان، الموكل، المحكمة، رقم المحضر"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -209,413 +191,161 @@ export default function BailiffsPage() {
 
       {/* Records List or Empty State */}
       {filteredRecords.length === 0 ? (
-        <div style={{
-          padding: '4rem 1.5rem',
-          textAlign: 'center',
-          background: 'var(--bg-card)',
-          borderRadius: '16px',
-          border: '1px dashed var(--border-color)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginTop: '1rem'
-        }}>
-          <div style={{
-            width: '80px',
-            height: '80px',
-            borderRadius: '50%',
-            background: 'var(--bg-card-subtle)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-subtle)',
-            marginBottom: '1.25rem',
-            opacity: 0.6
-          }}>
-            <Clock size={38} strokeWidth={1.5} />
-          </div>
-
-          <h3 style={{ fontSize: '1.18rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.4rem' }}>
-            {filterStatus === 'pending' ? 'لا يوجد محضرين غير مستلمين' : 'لا توجد أوراق محضرين تطابق بحثك'}
-          </h3>
-          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', maxWidth: '380px', margin: '0 auto 1.5rem', lineHeight: '1.5' }}>
-            إجمالي المحضرين: {totalCount}
-          </p>
-
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ background: 'var(--accent)', borderRadius: '10px', padding: '0.6rem 1.4rem', fontWeight: '700' }}
-            onClick={handleOpenNew}
-          >
-            <Plus size={16} />
-            <span>إضافة ورقة محضرين جديدة</span>
+        <div className="card empty-block">
+          <h3>{filterStatus === 'pending' ? 'لا توجد أوراق غير مستلمة' : 'لا توجد أوراق مطابقة'}</h3>
+          <p>إجمالي أوراق المحضرين: {totalCount}</p>
+          <button type="button" className="btn btn-primary empty-block-action" onClick={handleOpenNew}>
+            <Plus size={16} /> إضافة ورقة محضرين
           </button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 290px), 1fr))', gap: '1rem' }}>
-          {filteredRecords.map(record => {
+        <div className="card row-list">
+          {filteredRecords.map((record) => {
             const isDone = record.status === 'delivered';
+            const member = record.assigned_to ? team.find((m) => m.id === record.assigned_to) : null;
+            const day = (d) => new Date(d).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' });
 
             return (
-              <div
-                key={record.id}
-                style={{
-                  background: 'var(--bg-card)',
-                  border: isDone ? '1px solid #dcfce7' : '1px solid var(--border-color)',
-                  borderRadius: '14px',
-                  padding: '1.2rem',
-                  boxShadow: 'var(--shadow-sm)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.85rem',
-                  position: 'relative'
-                }}
-              >
-                {/* Card Top: Client badge & Status */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', background: 'var(--bg-card-subtle)', padding: '0.25rem 0.65rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: '700', color: 'var(--text-main)' }}>
-                    <User size={13} color="var(--primary-700)" />
-                    <span>{record.client_name || 'بدون موكل محدد'}</span>
+              <article key={record.id} className={`list-row ${isDone ? 'is-done' : ''}`}>
+                <div className="list-row-main">
+                  <div className="list-row-body">
+                    <div className="list-row-top">
+                      <h3 className="row-title">
+                        {record.bailiff_number && <span className="row-key">#{record.bailiff_number}</span>}
+                        {record.notice_nature}
+                      </h3>
+                      <span className="status-chip" style={{ '--dot': isDone ? 'var(--success)' : 'var(--status-adjourned)' }}>
+                        {isDone ? 'مستلم' : 'غير مستلم'}
+                      </span>
+                    </div>
+                    <p className="list-row-sub">
+                      {[record.client_name || 'بدون موكل', record.court_name, record.bailiff_office].filter(Boolean).join(' · ')}
+                    </p>
+                    {record.notes && <p className="list-row-text">{record.notes}</p>}
                   </div>
 
-                  <span style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: '20px',
-                    fontSize: '0.78rem',
-                    fontWeight: '700',
-                    background: isDone ? 'var(--status-active-bg)' : 'var(--primary-50)',
-                    color: isDone ? '#15803d' : 'var(--primary-800)',
-                    border: isDone ? '1px solid #bbf7d0' : '1px solid var(--primary-100)'
-                  }}>
-                    {isDone ? <Check size={12} strokeWidth={3} /> : <Clock size={12} />}
-                    <span>{isDone ? 'مستلم' : 'غير مستلم'}</span>
-                  </span>
-                </div>
-
-                {/* Nature of Notice */}
-                <div>
-                  <h3 style={{ fontSize: '1.08rem', fontWeight: '800', color: 'var(--text-main)', margin: '0 0 0.35rem' }}>
-                    {record.notice_nature}
-                  </h3>
-                  {record.bailiff_number && (
-                    <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                      <Hash size={14} color="var(--primary-700)" />
-                      <span>رقم المحضرين: <strong>{record.bailiff_number}</strong></span>
+                  <dl className="list-row-facts is-three">
+                    <div><dt>التسليم</dt><dd>{record.delivery_date ? day(record.delivery_date) : '—'}</dd></div>
+                    <div><dt>الاستلام</dt><dd>{record.receipt_date ? day(record.receipt_date) : <span className="cell-sub">قيد الإعلان</span>}</dd></div>
+                    <div>
+                      <dt>المتابعة</dt>
+                      <dd className="row-owner">
+                        {member ? (<>{member.name}</>) : <span className="cell-sub">غير مسند</span>}
+                      </dd>
                     </div>
-                  )}
-                </div>
+                  </dl>
 
-                {/* Court & Office details */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem', fontSize: '0.85rem', background: 'var(--bg-card-subtle)', padding: '0.75rem 0.9rem', borderRadius: '10px' }}>
-                  {record.court_name && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
-                      <Building2 size={15} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                      <span><strong>المحكمة:</strong> {record.court_name}</span>
-                    </div>
-                  )}
-
-                  {record.bailiff_office && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
-                      <PenTool size={15} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                      <span><strong>قلم المحضرين:</strong> {record.bailiff_office}</span>
-                    </div>
-                  )}
-
-                  {record.assigned_to && (() => {
-                    const member = team.find(m => m.id === record.assigned_to);
-                    return member ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
-                        <UserCheck size={15} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                        <span><strong>المكلف بالمتابعة:</strong> الأستاذ / {member.name}</span>
-                      </div>
-                    ) : null;
-                  })()}
-                </div>
-
-                {/* Dates Section */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.82rem', background: 'var(--bg-card-subtle)', padding: '0.65rem 0.8rem', borderRadius: '10px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>تاريخ التسليم:</span>
-                    <strong style={{ color: 'var(--text-main)' }}>
-                      {record.delivery_date ? new Date(record.delivery_date).toLocaleDateString('ar-EG') : '—'}
-                    </strong>
+                  <div className="list-row-actions">
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={async () => { try { await toggleBailiffStatus(record.id); } catch (err) { notify(err.message); } }}
+                    >
+                      {isDone ? <RotateCcw size={14} /> : <Check size={14} />}
+                      <span>{isDone ? 'إعادة لغير مستلم' : 'تم الاستلام'}</span>
+                    </button>
+                    <RowActions>
+                      <RowAction icon={Edit3} label="تعديل" onClick={() => handleOpenEdit(record)} />
+                      <RowAction icon={Trash2} label="حذف" tone="danger" onClick={() => handleDelete(record.id)} />
+                    </RowActions>
                   </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>تاريخ الاستلام:</span>
-                    <strong style={{ color: isDone ? '#15803d' : 'var(--text-muted)' }}>
-                      {record.receipt_date ? new Date(record.receipt_date).toLocaleDateString('ar-EG') : 'قيد الإعلان'}
-                    </strong>
-                  </div>
-
-                  {record.session_date && (
-                    <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary-900)', borderTop: '1px dashed var(--border-subtle)', paddingTop: '0.35rem', marginTop: '0.2rem' }}>
-                      <Calendar size={13} color="var(--primary-700)" />
-                      <span>تاريخ الجلسة: <strong>{new Date(record.session_date).toLocaleDateString('ar-EG')}</strong></span>
-                    </div>
-                  )}
                 </div>
-
-                {/* Notes */}
-                {record.notes && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-subtle)', fontStyle: 'italic', borderTop: '1px dashed var(--border-subtle)', paddingTop: '0.4rem' }}>
-                    ملاحظات: {record.notes}
-                  </div>
-                )}
-
-                {/* Card Actions Footer */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto', paddingTop: '0.6rem', borderTop: '1px solid var(--border-subtle)' }}>
-                  <button type="button" className={`btn ${isDone ? 'btn-secondary' : 'btn-primary'} dash-row-btn`} onClick={() => toggleBailiffStatus(record.id)}>
-                    {isDone ? <RotateCcw size={14} /> : <Check size={14} strokeWidth={3} />}
-                    <span>{isDone ? 'إعادة لغير مستلم' : 'تم الاستلام'}</span>
-                  </button>
-
-                  <RowActions>
-                    <RowAction icon={Edit3} label="تعديل ورقة المحضرين" onClick={() => handleOpenEdit(record)} />
-                    <RowAction icon={Trash2} label="حذف" tone="danger" onClick={() => handleDelete(record.id)} />
-                  </RowActions>
-                </div>
-              </div>
+              </article>
             );
           })}
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* ADD / EDIT BAILIFF RECORD MODAL (MATCHING SCREENSHOT 2 & 3)               */}
-      {/* ========================================================================= */}
       {isModalOpen && (
         <div className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
-          <div
-            className="modal-dialog"
-            style={{ maxWidth: '620px', maxHeight: '92vh', display: 'flex', flexDirection: 'column', borderRadius: '16px', overflow: 'hidden' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
+          <div className="modal-dialog task-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>
-                  {editingTask ? 'تعديل بيانات المحضر' : 'إضافة محضرين'}
-                </h3>
+              <h3>{editingTask ? 'تعديل ورقة المحضرين' : 'إضافة ورقة محضرين'}</h3>
               <div className="modal-header-actions">
-                <button
-                type="button"
-                className="btn btn-secondary btn-icon"
-                title="إعادة تعيين الحقول"
-                aria-label="إعادة تعيين الحقول"
-                onClick={handleResetForm}
-              >
-                <RotateCcw size={16} />
-              </button>
-                <button type="button" className="btn btn-secondary btn-icon" title="إغلاق" aria-label="إغلاق" onClick={() => setIsModalOpen(false)}>
+                <button type="button" className="icon-btn" title="إعادة تعيين الحقول" aria-label="إعادة تعيين الحقول" onClick={handleResetForm}>
+                  <RotateCcw size={16} />
+                </button>
+                <button type="button" className="icon-btn" title="إغلاق" aria-label="إغلاق" onClick={() => setIsModalOpen(false)}>
                   <X size={18} />
                 </button>
               </div>
             </div>
 
-            {/* Modal Body / Form */}
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-              <div className="modal-body" style={{ overflowY: 'auto', padding: '1.25rem 1.4rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                {/* SECTION 1: اختيار الموكل */}
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.95rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.5rem' }}>
-                    <User size={16} color="var(--primary-700)" />
-                    <span>اختيار الموكل (اختياري)</span>
-                  </div>
-
-                  <select
-                    className="form-select"
-                    value={clientId}
-                    onChange={(e) => setClientId(e.target.value)}
-                    style={{ background: 'var(--bg-card)', borderRadius: '10px', padding: '0.65rem 0.9rem', fontSize: '0.92rem' }}
-                  >
-                    <option value="">-- اضغط لاختيار الموكل من السجل... --</option>
-                    {clients.map(c => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.phone ? `(${c.phone})` : ''}
-                      </option>
+            <form onSubmit={handleSubmit} className="task-form">
+              <div className="modal-body task-form-body">
+                <div className="form-group">
+                  <label className="form-label">الموكل (اختياري)</label>
+                  <Select className="form-select" value={clientId} onChange={(e) => setClientId(e.target.value)}>
+                    <option value="">اختر الموكل من السجل</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}{c.phone ? ` (${formatEgyptPhone(c.phone)})` : ''}</option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
-                {/* SECTION 2: بيانات المحضر */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.95rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.2rem' }}>
-                    <FileText size={16} color="var(--primary-700)" />
-                    <span>بيانات المحضر</span>
-                  </div>
+                <div className="form-group">
+                  <label className="form-label">طبيعة الإعلان *</label>
+                  <input
+                    type="text"
+                    required
+                    className="form-input"
+                    placeholder="إعادة إعلان، صحيفة دعوى، إنذار على يد محضر، عرض مال…"
+                    value={noticeNature}
+                    onChange={(e) => setNoticeNature(e.target.value)}
+                  />
+                </div>
 
-                  {/* طبيعة الإعلان */}
+                <div className="form-grid">
                   <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: '700' }}>طبيعة الإعلان *</label>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        required
-                        className="form-input"
-                        placeholder="مثال: إعادة إعلان، صحيفة دعوى، إنذار على يد محضر، عرض مال..."
-                        value={noticeNature}
-                        onChange={(e) => setNoticeNature(e.target.value)}
-                        style={{ paddingLeft: '2.5rem' }}
-                      />
-                      <FileText size={17} style={{ position: 'absolute', left: '12px', color: 'var(--text-subtle)', pointerEvents: 'none' }} />
-                    </div>
+                    <label className="form-label">رقم المحضر</label>
+                    <input type="text" className="form-input" placeholder="كما في الجهة" value={bailiffNumber} onChange={(e) => setBailiffNumber(e.target.value)} />
                   </div>
-
-                  {/* رقم المحضرين */}
                   <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: '700' }}>رقم المحضرين</label>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="الرقم كما في الجهة"
-                        value={bailiffNumber}
-                        onChange={(e) => setBailiffNumber(e.target.value)}
-                        style={{ paddingLeft: '2.5rem' }}
-                      />
-                      <Hash size={17} style={{ position: 'absolute', left: '12px', color: 'var(--text-subtle)', pointerEvents: 'none' }} />
-                    </div>
-                  </div>
-
-                  {/* المحكمة */}
-                  <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: '700' }}>المحكمة</label>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="مثال: محكمة دمياط الابتدائية، محكمة أسكندرية الجزئية..."
-                        value={courtName}
-                        onChange={(e) => setCourtName(e.target.value)}
-                        style={{ paddingLeft: '2.5rem' }}
-                      />
-                      <Building2 size={17} style={{ position: 'absolute', left: '12px', color: 'var(--text-subtle)', pointerEvents: 'none' }} />
-                    </div>
-                  </div>
-
-                  {/* قلم المحضرين */}
-                  <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: '700' }}>قلم المحضرين</label>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="مثال: قلم محضرين بندر دمياط، قلم المحضرين بمحكمة الجيزة..."
-                        value={bailiffOffice}
-                        onChange={(e) => setBailiffOffice(e.target.value)}
-                        style={{ paddingLeft: '2.5rem' }}
-                      />
-                      <PenTool size={17} style={{ position: 'absolute', left: '12px', color: 'var(--text-subtle)', pointerEvents: 'none' }} />
-                    </div>
+                    <label className="form-label">المحكمة</label>
+                    <CourtInput value={courtName} onChange={setCourtName} />
                   </div>
                 </div>
 
-                {/* SECTION 3: التواريخ */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.95rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.2rem' }}>
-                    <Calendar size={16} color="var(--primary-700)" />
-                    <span>التواريخ</span>
+                <div className="form-group">
+                  <label className="form-label">قلم المحضرين</label>
+                  <input type="text" className="form-input" value={bailiffOffice} onChange={(e) => setBailiffOffice(e.target.value)} />
+                </div>
+
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">تاريخ التسليم *</label>
+                    <DateInput required className="form-input" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} />
                   </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    {/* تاريخ التسليم */}
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: '700' }}>تاريخ التسليم *</label>
-                      <input
-                        type="date"
-                        required
-                        className="form-input"
-                        value={deliveryDate}
-                        onChange={(e) => setDeliveryDate(e.target.value)}
-                      />
-                    </div>
-
-                    {/* تاريخ الاستلام */}
-                    <div className="form-group">
-                      <label className="form-label">تاريخ الاستلام</label>
-                      <input
-                        type="date"
-                        className="form-input"
-                        value={receiptDate}
-                        onChange={(e) => setReceiptDate(e.target.value)}
-                      />
-                    </div>
+                  <div className="form-group">
+                    <label className="form-label">تاريخ الاستلام</label>
+                    <DateInput className="form-input" value={receiptDate} onChange={(e) => setReceiptDate(e.target.value)} />
                   </div>
-
-                  {/* تاريخ الجلسة */}
                   <div className="form-group">
                     <label className="form-label">تاريخ الجلسة</label>
-                    <input
-                      type="date"
-                      className="form-input"
-                      value={sessionDate}
-                      onChange={(e) => setSessionDate(e.target.value)}
-                    />
+                    <DateInput className="form-input" value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} />
                   </div>
                 </div>
 
-                {/* SECTION 4: ملاحظات */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.95rem', fontWeight: '800', color: 'var(--text-main)' }}>
-                    <ListFilter size={16} color="var(--primary-700)" />
-                    <span>ملاحظات</span>
-                  </div>
+                <div className="form-group">
+                  <label className="form-label">ملاحظات</label>
+                  <textarea className="form-textarea" rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+                </div>
 
-                  <div className="form-group">
-                    <textarea
-                      className="form-textarea"
-                      rows={3}
-                      placeholder="أضف أي ملاحظات إضافية..."
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                    />
-                  </div>
-
-                  {/* المكلف بالمتابعة والتنفيذ */}
-                  <div className="form-group" style={{ marginTop: '0.6rem' }}>
-                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: '700' }}>
-                      <UserCheck size={15} color="var(--primary-700)" />
-                      <span>تكليف عضو من فريق العمل بالمتابعة</span>
-                    </label>
-                    <select
-                      className="form-select"
-                      value={assignedTo}
-                      onChange={(e) => setAssignedTo(e.target.value)}
-                    >
-                      <option value="">-- بدون تكليف محدد --</option>
-                      {team.map(m => (
-                        <option key={m.id} value={m.id}>
-                          الأستاذ / {m.name} ({USER_ROLES[m.role] || m.role || 'محامي'})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="form-group">
+                  <label className="form-label">تكليف عضو من الفريق بالمتابعة</label>
+                  <Select className="form-select" value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>
+                    <option value="">بدون تكليف محدد</option>
+                    {team.map((m) => (
+                      <option key={m.id} value={m.id}>الأستاذ / {m.name} ({USER_ROLES[m.role] || m.role || 'محامي'})</option>
+                    ))}
+                  </Select>
                 </div>
               </div>
 
-              {/* Modal Footer */}
-              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.4rem', borderTop: '1px solid var(--border-color)' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ borderRadius: '10px', padding: '0.6rem 1.5rem', fontWeight: '700' }}
-                  onClick={() => setIsModalOpen(false)}
-                >
-                  إلغاء
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="btn btn-primary"
-                  style={{ background: 'var(--accent)', color: 'var(--on-accent)', borderRadius: '10px', padding: '0.6rem 1.6rem', fontWeight: '700', border: '1px solid var(--accent-gold)' }}
-                >
-                  {isSaving ? 'جاري الحفظ...' : (editingTask ? 'تحديث المحضر' : 'حفظ المحضر')}
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>إلغاء</button>
+                <button type="submit" disabled={isSaving} className="btn btn-primary">
+                  {isSaving ? 'جارٍ الحفظ…' : (editingTask ? 'حفظ التعديلات' : 'حفظ')}
                 </button>
               </div>
             </form>

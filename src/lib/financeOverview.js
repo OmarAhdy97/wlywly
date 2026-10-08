@@ -1,5 +1,7 @@
 import { calculateClientFinancialSummary, isDebitTransaction, getTransactionMeta, getPaymentMethodLabel, formatMoney } from './financialCalculations.js';
 import { formatCurrencyToArabic } from './numberToArabicWords.js';
+import { notify } from './dialog';
+import { formatEgyptPhone } from './phone';
 
 const monthKey = (dateStr) => (dateStr || '').slice(0, 7);
 
@@ -79,27 +81,28 @@ export function printReceipt({ tx, client, caseItem, officeProfile, balanceAfter
   );
 
   const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>${esc(title)} — ${esc(client?.name)}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Arabic:wght@400;600;700&display=swap">
 <style>
   @page { size: A5 landscape; margin: 12mm; }
   * { box-sizing: border-box; }
-  body { font-family: 'Cairo','Segoe UI',Tahoma,sans-serif; color: #1f1416; margin: 0; padding: 0; }
-  .sheet { border: 1.5px solid #37040a; padding: 14px 18px; }
-  .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #37040a; padding-bottom: 8px; margin-bottom: 12px; }
-  .office b { font-size: 16px; color: #37040a; display: block; }
-  .office span { font-size: 11px; color: #5b4b4e; display: block; }
-  h1 { font-size: 18px; margin: 0; color: #37040a; text-align: left; }
-  .no { font-size: 11px; color: #5b4b4e; text-align: left; margin-top: 2px; }
+  body { font-family: 'Noto Sans Arabic','Segoe UI',Tahoma,sans-serif; color: #0f172a; margin: 0; padding: 0; }
+  .sheet { border: 1.5px solid #111827; padding: 14px 18px; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #111827; padding-bottom: 8px; margin-bottom: 12px; }
+  .office b { font-size: 16px; color: #111827; display: block; }
+  .office span { font-size: 11px; color: #475569; display: block; }
+  h1 { font-size: 18px; margin: 0; color: #111827; text-align: left; }
+  .no { font-size: 11px; color: #475569; text-align: left; margin-top: 2px; }
   .row { display: flex; gap: 8px; margin: 7px 0; font-size: 13px; }
-  .row .k { color: #5b4b4e; min-width: 110px; }
-  .row .v { font-weight: 700; flex: 1; border-bottom: 1px dotted #c9bcbe; padding-bottom: 2px; }
-  .amount { margin: 12px 0; padding: 8px 12px; background: #f6f3f3; border-radius: 6px; font-size: 13px; }
-  .amount strong { font-size: 20px; color: #37040a; }
+  .row .k { color: #475569; min-width: 110px; }
+  .row .v { font-weight: 700; flex: 1; border-bottom: 1px dotted #cbd5e1; padding-bottom: 2px; }
+  .amount { margin: 12px 0; padding: 8px 12px; background: #f1f5f9; border-radius: 6px; font-size: 13px; }
+  .amount strong { font-size: 20px; color: #111827; }
   .foot { display: flex; justify-content: space-between; margin-top: 18px; font-size: 12px; }
-  .sig { width: 40%; text-align: center; border-top: 1px solid #1f1416; padding-top: 4px; }
-  .note { font-size: 11px; color: #5b4b4e; margin-top: 8px; }
+  .sig { width: 40%; text-align: center; border-top: 1px solid #0f172a; padding-top: 4px; }
+  .note { font-size: 11px; color: #475569; margin-top: 8px; }
 </style></head><body><div class="sheet">
   <div class="head">
-    <div class="office"><b>${esc(office.office_name || 'مكتب المحاماة')}</b>${office.lawyer_name ? `<span>${esc(office.lawyer_name)}</span>` : ''}${office.address ? `<span>${esc(office.address)}</span>` : ''}${office.phone ? `<span>هاتف: ${esc(office.phone)}</span>` : ''}</div>
+    <div class="office"><b>${esc(office.office_name || 'مكتب المحاماة')}</b>${office.lawyer_name ? `<span>${esc(office.lawyer_name)}</span>` : ''}${office.address ? `<span>${esc(office.address)}</span>` : ''}${office.phone ? `<span>هاتف: <bdi dir="ltr">${esc(formatEgyptPhone(office.phone, { isolate: false }))}</bdi></span>` : ''}</div>
     <div><h1>${esc(title)}</h1><div class="no">التاريخ: ${esc(date)}</div></div>
   </div>
   <div class="row"><span class="k">${isPayment ? 'استلمنا من السيد/' : 'السيد/'}</span><span class="v">${esc(client?.name)}</span></div>
@@ -113,7 +116,7 @@ export function printReceipt({ tx, client, caseItem, officeProfile, balanceAfter
 
   const w = window.open('', '_blank', 'width=900,height=650');
   if (!w) {
-    alert('المتصفح منع فتح نافذة الطباعة. اسمح بالنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة.');
+    notify('المتصفح منع فتح نافذة الطباعة. اسمح بالنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة.', 'warn');
     return;
   }
   w.document.open();

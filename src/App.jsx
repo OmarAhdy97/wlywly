@@ -5,6 +5,9 @@ import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import BottomNav from './components/layout/BottomNav';
 import QuickActionModal from './components/layout/QuickActionModal';
+import SubTabs from './components/layout/SubTabs';
+import CommandPalette from './components/layout/CommandPalette';
+import DialogHost from './components/common/DialogHost';
 import AuthPage from './pages/AuthPage';
 import DashboardPage from './pages/DashboardPage';
 import AgendaPage from './pages/AgendaPage';
@@ -30,6 +33,7 @@ function MainApp() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
   // Theme management (Dark / Light)
@@ -49,21 +53,19 @@ function MainApp() {
 
   const toggleTheme = () => setIsDark(!isDark);
 
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsPaletteOpen(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'var(--bg-app)',
-        color: 'var(--primary-700)',
-        fontSize: '1.2rem',
-        fontWeight: 'bold',
-      }}>
-        جاري تحميل الأجندة القضائية...
-      </div>
-    );
+    return <div className="app-loading">جاري تحميل الديوان...</div>;
   }
 
   if (!user) {
@@ -92,9 +94,11 @@ function MainApp() {
             setSearchTerm={setSearchTerm}
             setActiveTab={setActiveTab}
             onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+            onOpenPalette={() => setIsPaletteOpen(true)}
           />
 
           <main className="main-content-scroll">
+            <SubTabs activeTab={activeTab} setActiveTab={setActiveTab} />
             {activeTab === 'dashboard' && (
               <DashboardPage 
                 setActiveTab={setActiveTab} 
@@ -170,6 +174,12 @@ function MainApp() {
           onOpenQuickAction={() => setIsQuickActionOpen(true)}
         />
 
+        <CommandPalette
+          isOpen={isPaletteOpen}
+          onClose={() => setIsPaletteOpen(false)}
+          setActiveTab={setActiveTab}
+        />
+
         {/* Global Quick Action Modal */}
         <QuickActionModal 
           isOpen={isQuickActionOpen} 
@@ -184,6 +194,7 @@ export default function App() {
   return (
     <AuthProvider>
       <MainApp />
+      <DialogHost />
     </AuthProvider>
   );
 }

@@ -3,7 +3,7 @@
  * Manages unique, descriptive document titles for browser print-to-PDF operations.
  */
 
-export const DEFAULT_APP_TITLE = 'الأجندة القضائية — إدارة مكاتب المحاماة';
+export const DEFAULT_APP_TITLE = 'الديوان — إدارة مكاتب المحاماة';
 
 /**
  * Triggers window.print() with a unique, descriptive document title.

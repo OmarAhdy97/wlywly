@@ -47,7 +47,12 @@ import { printWithTitle, DEFAULT_APP_TITLE } from '../lib/printUtils';
 import ClientFinancialManager from '../components/financial/ClientFinancialManager';
 import QuickActionModal from '../components/layout/QuickActionModal';
 import RowAction, { RowActions } from '../components/common/RowAction';
+import PhoneField from '../components/common/PhoneField';
+import { takeFocusTarget, onFocusTarget } from '../lib/focusTarget';
 import { calculateClientFinancialSummary, formatMoney } from '../lib/financialCalculations';
+import { confirmDialog, notify } from '../lib/dialog';
+import PersonFileDialog from '../components/history/PersonFileDialog';
+import { formatEgyptPhone } from '../lib/phone';
 
 const CLIENT_FILTERS = [
   { id: 'all', label: 'الكل' },
@@ -69,9 +74,19 @@ export default function ClientsPage({ setActiveTab }) {
   const { user } = useAuth();
 
   const [searchTerm, setSearchTerm] = useState('');
+
+  // opened from the global search: show just that client
+  useEffect(() => {
+    const open = (t) => { setClientFilter('all'); setSearchTerm(t.name || ''); };
+    const pending = takeFocusTarget('client');
+    if (pending) open(pending);
+    return onFocusTarget('client', open);
+  }, []);
   const [clientFilter, setClientFilter] = useState('all');
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState(null);
+  // A window opened from a client's file returns to that file when it closes.
+  const [returnClientId, setReturnClientId] = useState(null);
   const [editingClient, setEditingClient] = useState(null);
 
   // Telegram link modal state
@@ -128,7 +143,7 @@ export default function ClientsPage({ setActiveTab }) {
   });
 
   const handleDeleteClient = async (id) => {
-    if (window.confirm('هل أنت متأكد من حذف هذا الموكل؟')) {
+    if (await confirmDialog('هل أنت متأكد من حذف هذا الموكل؟', { danger: true, confirmLabel: 'حذف' })) {
       await deleteClient(id);
       if (selectedClient?.id === id) setSelectedClient(null);
       if (telegramModalClient?.id === id) setTelegramModalClient(null);
@@ -151,14 +166,21 @@ export default function ClientsPage({ setActiveTab }) {
       setEditingClient(null);
     } catch (err) {
       if (err.message && err.message.includes('telegram_chat_id')) {
-        alert('تنبيه: يجب إضافة حقل telegram_chat_id في جدول clients في Supabase أولاً.\nالأمر:\nALTER TABLE clients ADD COLUMN telegram_chat_id BIGINT DEFAULT NULL;');
+        notify('تنبيه: يجب إضافة حقل telegram_chat_id في جدول clients في Supabase أولاً.\nالأمر:\nALTER TABLE clients ADD COLUMN telegram_chat_id BIGINT DEFAULT NULL;', 'warn');
       } else {
-        alert('خطأ أثناء تعديل بيانات الموكل: ' + err.message);
+        notify('خطأ أثناء تعديل بيانات الموكل: ' + err.message);
       }
     }
   };
 
   // Open Telegram connection modal
+  useEffect(() => {
+    if (!returnClientId || statementClient || editingClient || telegramModalClient) return;
+    const back = clients.find((c) => c.id === returnClientId);
+    setReturnClientId(null);
+    if (back) setSelectedClient(back);
+  }, [returnClientId, statementClient, editingClient, telegramModalClient, clients]);
+
   const openTelegramModal = (client) => {
     setTelegramModalClient(client);
     setTelegramStatusMsg(null);
@@ -226,12 +248,12 @@ export default function ClientsPage({ setActiveTab }) {
 
   const handleManualSaveChatId = async (client) => {
     if (!manualChatId.trim()) {
-      alert('يرجى كتابة رقم الـ Chat ID');
+      notify('يرجى كتابة رقم الـ Chat ID', 'warn');
       return;
     }
     const parsedId = parseInt(manualChatId.trim());
     if (isNaN(parsedId)) {
-      alert('الـ Chat ID يجب أن يتكون من أرقام فقط');
+      notify('الـ Chat ID يجب أن يتكون من أرقام فقط', 'warn');
       return;
     }
 
@@ -252,7 +274,7 @@ export default function ClientsPage({ setActiveTab }) {
       if (dbErr.message && dbErr.message.includes('telegram_chat_id')) {
         setSchemaError(true);
       } else {
-        alert('خطأ أثناء حفظ المعرف: ' + dbErr.message);
+        notify('خطأ أثناء حفظ المعرف: ' + dbErr.message);
       }
     }
   };
@@ -278,7 +300,7 @@ export default function ClientsPage({ setActiveTab }) {
   };
 
   const handleUnlinkTelegram = async (client) => {
-    if (!window.confirm('هل أنت متأكد من إلغاء ربط تليجرام هذا الموكل؟ لن تصله إشعارات الجلسات التلقائية.')) {
+    if (!await confirmDialog('هل أنت متأكد من إلغاء ربط تليجرام هذا الموكل؟ لن تصله إشعارات الجلسات التلقائية.')) {
       return;
     }
     try {
@@ -296,7 +318,7 @@ export default function ClientsPage({ setActiveTab }) {
         text: 'تم إلغاء ربط التليجرام بنجاح.',
       });
     } catch (err) {
-      alert('خطأ: ' + err.message);
+      notify('خطأ: ' + err.message);
     }
   };
 
@@ -362,11 +384,11 @@ export default function ClientsPage({ setActiveTab }) {
   });
 
   return (
-    <div className="page-wrapper" style={{ maxWidth: '1400px' }}>
+    <div className="page-wrapper">
       <div className="page-head no-print">
         <div>
-          <div className="page-eyebrow"><span className="page-dot" />قاعدة بيانات الموكلين والتوكيلات</div>
           <h1>الموكلون</h1>
+          <p className="page-sub">{visibleClients.length === clients.length ? `${clients.length} موكل` : `${visibleClients.length} من ${clients.length} موكل`}</p>
         </div>
         <div className="page-head-actions">
           <button type="button" className="btn btn-primary" onClick={() => setIsAddClientOpen(true)}>
@@ -376,13 +398,13 @@ export default function ClientsPage({ setActiveTab }) {
         </div>
       </div>
 
-      <div className="clients-toolbar no-print">
-        <div className="fin-search clients-search">
-          <Search size={15} />
+      <div className="page-toolbar no-print">
+        <div className="page-search">
+          <Search size={16} />
           <input
             type="text"
             className="form-input"
-            placeholder="ابحث باسم الموكل أو هاتفه أو رقمه القومي أو التوكيل..."
+            placeholder="اسم الموكل، الهاتف، الرقم القومي، التوكيل"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -394,139 +416,85 @@ export default function ClientsPage({ setActiveTab }) {
             </button>
           ))}
         </div>
-        <span className="clients-count">{visibleClients.length} موكل</span>
       </div>
 
       {visibleClients.length === 0 ? (
-        <div className="card no-print dash-empty">
-          <Users size={32} />
-          <b>لا يوجد موكلون مطابقون</b>
+        <div className="card no-print empty-block">
+          <h3>لا يوجد موكلون مطابقون</h3>
+          <p>غيّر البحث أو الفلتر، أو أضف موكلاً جديداً.</p>
         </div>
       ) : (
-        <div className="no-print clients-cards-grid">
+        <div className="no-print card row-list">
           {visibleClients.map((client) => {
             const clientCases = cases.filter(c => c.client_id === client.id);
             const isTelegramLinked = !!client.telegram_chat_id;
             return (
-              <article key={client.id} className="card client-card">
-                <header className="client-card-head">
-                  <div className="avatar client-avatar">{client.name ? client.name.charAt(0) : 'م'}</div>
-                  <div className="client-card-id">
-                    <h3>{client.name}</h3>
-                    {client.phone && <span className="cell-sub" dir="ltr">+20 {client.phone.startsWith('0') ? client.phone.substring(1) : client.phone}</span>}
+              <article key={client.id} className="list-row">
+                <div className="list-row-main">
+                  <div className="list-row-body list-row-person is-clickable" onClick={() => setSelectedClient(client)}>
+                    <div className="list-row-person-text">
+                      <div className="list-row-top">
+                        <button type="button" className="row-title row-title-link"><span className="row-title-text">{client.name}</span></button>
+                        {isTelegramLinked && <span className="status-chip" style={{ '--dot': 'var(--accent)' }}>تليجرام</span>}
+                      </div>
+                      <p className="list-row-sub">
+                        {[client.phone && formatEgyptPhone(client.phone),
+                          client.power_of_attorney_number ? `توكيل ${client.power_of_attorney_number}` : 'بدون توكيل مسجل',
+                        ].filter(Boolean).join(' · ')}
+                      </p>
+                    </div>
                   </div>
-                  <RowActions>
-                    <RowAction icon={Edit3} label="تعديل" onClick={() => setEditingClient({ ...client })} />
-                    <RowAction icon={Trash2} label="حذف" tone="danger" onClick={() => handleDeleteClient(client.id)} />
-                  </RowActions>
-                </header>
 
-                <div className="client-poa">
-                  <span className="cell-sub">التوكيل</span>
-                  <b>{client.power_of_attorney_number || 'غير مسجل'}</b>
-                  <span className="cell-sub">{client.power_of_attorney_type || 'توكيل رسمي عام في القضايا'}</span>
+                  <dl className="list-row-facts">
+                    <div><dt>القضايا</dt><dd>{clientCases.length}</dd></div>
+                    <div><dt>الرصيد</dt><dd>{renderBalanceBadge(ledgerBalance(client.id))}</dd></div>
+                  </dl>
+
+                  <div className="list-row-actions">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => { setStatementClient(client); setBillFeedback(null); }}>
+                      <Receipt size={14} /> كشف الحساب
+                    </button>
+                    <RowActions>
+                      <RowAction icon={MessageSquare} label={isTelegramLinked ? 'إعدادات تليجرام' : 'ربط تليجرام'} onClick={() => openTelegramModal(client)} />
+                      <RowAction icon={Edit3} label="تعديل" onClick={() => setEditingClient({ ...client })} />
+                      <RowAction icon={Trash2} label="حذف" tone="danger" onClick={() => handleDeleteClient(client.id)} />
+                    </RowActions>
+                  </div>
                 </div>
-
-                <div className="client-stats">
-                  <div className="client-stat is-wide">
-                    <span className="cell-sub">الرصيد</span>
-                    {renderBalanceBadge(ledgerBalance(client.id))}
-                  </div>
-                  <div className="client-stat">
-                    <span className="cell-sub">القضايا</span>
-                    <b>{clientCases.length}</b>
-                  </div>
-                  <button type="button" className={`client-stat client-stat-tg ${isTelegramLinked ? 'is-linked' : ''}`} onClick={() => openTelegramModal(client)}>
-                    <span className="cell-sub">تليجرام</span>
-                    <b><MessageSquare size={13} /> {isTelegramLinked ? 'مربوط' : 'ربط'}</b>
-                  </button>
-                </div>
-
-                <footer className="client-card-actions">
-                  <button type="button" className="btn btn-secondary" onClick={() => setSelectedClient(client)}>
-                    <Briefcase size={15} />
-                    <span>ملف الموكل</span>
-                  </button>
-                  <button type="button" className="btn btn-secondary" onClick={() => { setStatementClient(client); setBillFeedback(null); }}>
-                    <Receipt size={15} />
-                    <span>كشف الحساب</span>
-                  </button>
-                </footer>
               </article>
             );
           })}
         </div>
       )}
 
-      {/* Client file (read-only) */}
+      {/* Client file: details, linked work and the history of each */}
       {selectedClient && (
-        <div className="modal-backdrop" onClick={() => setSelectedClient(null)}>
-          <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="fin-header-main">
-                <div className="avatar client-avatar">{selectedClient.name ? selectedClient.name.charAt(0) : 'م'}</div>
-                <div className="fin-header-text">
-                  <h3>{selectedClient.name}</h3>
-                  <div className="fin-header-sub">الملف التعريفي والبيانات القضائية</div>
-                </div>
-              </div>
-              <button className="btn btn-secondary btn-icon" onClick={() => setSelectedClient(null)} aria-label="إغلاق">
-                <X size={18} />
+        <PersonFileDialog
+          kind="client"
+          person={selectedClient}
+          onClose={() => setSelectedClient(null)}
+          facts={[
+            ['الهاتف', selectedClient.phone ? formatEgyptPhone(selectedClient.phone) : 'غير مسجل'],
+            ['الرقم القومي', selectedClient.national_id || 'غير مسجل'],
+            ['رقم التوكيل', selectedClient.power_of_attorney_number || 'غير مسجل'],
+            ['نوع التوكيل', selectedClient.power_of_attorney_type || 'غير مسجل'],
+            ['الموقف المالي', renderBalanceBadge(ledgerBalance(selectedClient.id), true)],
+            ['تليجرام', selectedClient.telegram_chat_id ? 'مربوط' : 'غير مربوط'],
+          ]}
+          actions={(
+            <>
+              <button type="button" className="btn btn-primary" onClick={() => { const c = selectedClient; setReturnClientId(c.id); setSelectedClient(null); setStatementClient(c); setBillFeedback(null); }}>
+                <Receipt size={15} /> كشف الحساب
               </button>
-            </div>
-            <div className="modal-body">
-              <dl className="client-facts">
-                <div><dt>الهاتف</dt><dd dir="ltr">{selectedClient.phone ? (selectedClient.phone.startsWith('+') ? selectedClient.phone : `+20 ${selectedClient.phone}`) : 'غير مسجل'}</dd></div>
-                <div><dt>الرقم القومي</dt><dd>{selectedClient.national_id || 'غير مسجل'}</dd></div>
-                <div><dt>رقم التوكيل</dt><dd>{selectedClient.power_of_attorney_number || 'غير مسجل'}</dd></div>
-                <div><dt>نوع التوكيل</dt><dd>{selectedClient.power_of_attorney_type || 'غير مسجل'}</dd></div>
-                <div><dt>الموقف المالي</dt><dd>{renderBalanceBadge(ledgerBalance(selectedClient.id), true)}</dd></div>
-                <div>
-                  <dt>تليجرام</dt>
-                  <dd>{selectedClient.telegram_chat_id ? `مربوط (${selectedClient.telegram_chat_id})` : 'غير مربوط'}</dd>
-                </div>
-              </dl>
-
-              <div className="client-file-actions">
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => { const c = selectedClient; setSelectedClient(null); setStatementClient(c); setBillFeedback(null); }}
-                >
-                  <Receipt size={15} />
-                  <span>كشف الحساب</span>
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => { const c = selectedClient; setSelectedClient(null); openTelegramModal(c); }}
-                >
-                  <MessageSquare size={15} />
-                  <span>{selectedClient.telegram_chat_id ? 'إدارة ربط التليجرام' : 'ربط بالتليجرام'}</span>
-                </button>
-              </div>
-
-              <h4 className="client-section-title">الدعاوى المرتبطة بهذا الموكل</h4>
-              {cases.filter(c => c.client_id === selectedClient.id).length === 0 ? (
-                <p className="cell-sub">لا توجد دعاوى مسجلة باسم هذا الموكل حاليًا.</p>
-              ) : (
-                <ul className="dash-list">
-                  {cases.filter(c => c.client_id === selectedClient.id).map(c => (
-                    <li key={c.id} className="dash-row">
-                      <div className="dash-row-main">
-                        <b>دعوى {c.case_number}/{c.case_year} — {c.case_title || c.plaintiff_name}</b>
-                        <span className="cell-sub">
-                          {c.court_name} · الجلسة القادمة: {c.next_session_date ? new Date(c.next_session_date).toLocaleDateString('ar-EG') : 'غير محدد'}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setSelectedClient(null)}>إغلاق</button>
-            </div>
-          </div>
-        </div>
+              <button type="button" className="btn btn-secondary" onClick={() => { const c = selectedClient; setReturnClientId(c.id); setSelectedClient(null); setEditingClient({ ...c }); }}>
+                <Edit3 size={15} /> تعديل
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => { const c = selectedClient; setReturnClientId(c.id); setSelectedClient(null); openTelegramModal(c); }}>
+                <MessageSquare size={15} /> {selectedClient.telegram_chat_id ? 'تليجرام' : 'ربط تليجرام'}
+              </button>
+            </>
+          )}
+        />
       )}
 
       {/* ========================================================================= */}
@@ -547,7 +515,7 @@ export default function ClientsPage({ setActiveTab }) {
           onClose={() => setStatementClient(null)}
           onSendTelegram={() => {
             if (!statementClient.telegram_chat_id) {
-              alert('الموكل غير مربوط بالتليجرام بعد. يرجى الضغط على زر "ربط تليجرام" للموكل أولاً.');
+              notify('الموكل غير مربوط بالتليجرام بعد. يرجى الضغط على زر "ربط تليجرام" للموكل أولاً.', 'warn');
               return;
             }
             setConfirmTelegramBill(true);
@@ -555,309 +523,137 @@ export default function ClientsPage({ setActiveTab }) {
         />
       )}
 
-      {/* ========================================================================= */}
-      {/* Confirmation Modal Before Sending Bill via Telegram (Prompt Asked as Requested) */}
-      {/* ========================================================================= */}
-      {
-        confirmTelegramBill && statementClient && (
-          <div className="modal-backdrop" style={{ zIndex: 1100 }} onClick={() => setConfirmTelegramBill(false)}>
-            <div className="modal-dialog" style={{ maxWidth: '480px' }} onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#0284c7' }}>
-                  <MessageSquare size={20} />
-                  <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '800' }}>
-                    تأكيد إرسال كشف الحساب للموكل
-                  </h3>
-                </div>
-                <button className="btn btn-secondary btn-icon" onClick={() => setConfirmTelegramBill(false)}>
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="modal-body" style={{ fontSize: '0.9rem', lineHeight: '1.6' }}>
-                <p style={{ margin: '0 0 1rem 0' }}>
-                  هل تود إرسال كشف الحساب الرسمي والمطالبة المالية الآن إلى تليجرام الموكل:
-                  <br />
-                  <strong style={{ color: 'var(--primary-700)', fontSize: '1rem' }}>{statementClient.name}</strong>؟
-                </p>
-
-                <div style={{ padding: '0.8rem', background: 'var(--bg-card-subtle)', borderRadius: '10px', border: '1px solid var(--border-color)', fontSize: '0.85rem' }}>
-                  <div>• الموقف المالي: {renderBalanceBadge(ledgerBalance(statementClient.id), true)}</div>
-                  <div style={{ marginTop: '0.3rem', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
-                    • سيتم إرسال ملخص الحساب مع تفاصيل آخر المعاملات المالية وطرق السداد المتاحة.
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setConfirmTelegramBill(false)}
-                  disabled={isSendingBill}
-                >
-                  تراجع
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  style={{ background: '#0284c7', borderColor: '#0284c7' }}
-                  onClick={handleConfirmSendBillTelegram}
-                  disabled={isSendingBill}
-                >
-                  {isSendingBill ? 'جارٍ الإرسال...' : 'نعم، إرسال المطالبة الآن 🚀'}
-                </button>
+      {confirmTelegramBill && statementClient && (
+        <div className="modal-backdrop confirm-backdrop" onClick={() => setConfirmTelegramBill(false)}>
+          <div className="modal-dialog confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>إرسال كشف الحساب للموكل</h3>
+              <button type="button" className="icon-btn" onClick={() => setConfirmTelegramBill(false)} aria-label="إغلاق">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="confirm-text">
+                سيُرسل كشف الحساب والمطالبة المالية الآن إلى تليجرام الموكل <strong>{statementClient.name}</strong>.
+              </p>
+              <div className="update-summary">
+                <div>الموقف المالي: {renderBalanceBadge(ledgerBalance(statementClient.id), true)}</div>
+                <span className="cell-sub">يتضمن الملخص آخر المعاملات المالية وطرق السداد المتاحة.</span>
               </div>
             </div>
-          </div>
-        )
-      }
-
-      {/* Telegram Connection Modal */}
-      {
-        telegramModalClient && (
-          <div className="modal-backdrop" onClick={() => setTelegramModalClient(null)}>
-            <div className="modal-dialog" style={{ maxWidth: '580px' }} onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                  <div style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '50%',
-                    background: 'rgba(2, 132, 199, 0.1)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#0284c7'
-                  }}>
-                    <MessageSquare size={20} />
-                  </div>
-                  <div>
-                    <h3 style={{ margin: 0, fontSize: '1.15rem', fontWeight: '800' }}>
-                      ربط تليجرام للموكل: {telegramModalClient.name}
-                    </h3>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                      بوت المنصة: @{TELEGRAM_BOT_USERNAME}
-                    </span>
-                  </div>
-                </div>
-                <button className="btn btn-secondary btn-icon" onClick={() => setTelegramModalClient(null)}>
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                {/* Status Banner */}
-                {telegramStatusMsg && (
-                  <div style={{
-                    padding: '0.85rem 1rem',
-                    borderRadius: '10px',
-                    fontSize: '0.85rem',
-                    lineHeight: '1.5',
-                    background: telegramStatusMsg.type === 'success' ? 'var(--status-active-bg)' : telegramStatusMsg.type === 'error' ? 'var(--status-dismissed-bg)' : 'var(--status-prelim-bg)',
-                    border: '1px solid transparent',
-                    color: telegramStatusMsg.type === 'success' ? 'var(--status-active)' : telegramStatusMsg.type === 'error' ? 'var(--status-dismissed)' : 'var(--status-prelim)',
-                  }}>
-                    {telegramStatusMsg.text}
-                  </div>
-                )}
-
-                {/* Schema Error Notice */}
-                {schemaError && (
-                  <div style={{
-                    padding: '0.85rem 1rem',
-                    borderRadius: '10px',
-                    fontSize: '0.83rem',
-                    background: 'var(--status-adjourned-bg)',
-                    border: '1px solid transparent',
-                    color: 'var(--status-adjourned)',
-                    lineHeight: '1.5'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: '700', marginBottom: '0.3rem' }}>
-                      <ShieldAlert size={16} />
-                      <span>تنبيه: يلزم إضافة العمود في Supabase</span>
-                    </div>
-                    يرجى فتح لوحة Supabase وكتابة هذا الأمر في SQL Editor:
-                    <pre style={{ background: 'var(--bg-card)', color: 'var(--text-main)', padding: '0.5rem', borderRadius: '6px', direction: 'ltr', fontSize: '0.75rem', margin: '0.4rem 0' }}>
-                      ALTER TABLE clients ADD COLUMN telegram_chat_id BIGINT DEFAULT NULL;
-                    </pre>
-                  </div>
-                )}
-
-                {/* If Linked */}
-                {telegramModalClient.telegram_chat_id ? (
-                  <div style={{
-                    background: 'var(--status-active-bg)',
-                    border: '1px solid transparent',
-                    borderRadius: '14px',
-                    padding: '1.25rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1rem'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--status-active)' }}>
-                        <CheckCircle size={22} />
-                      </div>
-                      <div>
-                        <h4 style={{ margin: 0, fontSize: '1rem', color: 'var(--status-active)', fontWeight: '800' }}>
-                          الحساب مربوط ونشط ✅
-                        </h4>
-                        <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                          معرّف التليجرام (Chat ID): <code style={{ direction: 'ltr', display: 'inline-block', fontWeight: '700' }}>{telegramModalClient.telegram_chat_id}</code>
-                        </span>
-                      </div>
-                    </div>
-
-                    <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: '1.6' }}>
-                      ستصل الموكل إشعارات تلقائية فورية عند تأجيل الجلسات، أو صدور قرارات وأحكام، أو تحديث حالة قضاياه المسجلة، بالإضافة لفواتير الأتعاب.
-                    </p>
-
-                    <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', paddingTop: '0.5rem', borderTop: '1px solid var(--border-color)' }}>
-                      <button
-                        className="btn btn-primary"
-                        style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-                        onClick={() => handleSendTest(telegramModalClient)}
-                        disabled={isSendingTest}
-                      >
-                        <Send size={15} />
-                        <span>{isSendingTest ? 'جارٍ الإرسال...' : 'إرسال رسالة تجريبية 📨'}</span>
-                      </button>
-
-                      <button
-                        className="btn btn-danger"
-                        style={{ fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-                        onClick={() => handleUnlinkTelegram(telegramModalClient)}
-                      >
-                        <Unlink size={15} />
-                        <span>إلغاء الربط</span>
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  /* If NOT linked */
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-                    {/* Step 1: Send link */}
-                    <div style={{
-                      background: 'var(--bg-card-subtle)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '12px',
-                      padding: '1rem'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                        <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800' }}>1</span>
-                        <strong style={{ fontSize: '0.9rem' }}>شارك رابط الدعوة مع الموكل:</strong>
-                      </div>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 0.6rem 0' }}>
-                        أرسل الرابط التالي للموكل عبر واتساب أو رسالة، ليفتحه على هاتفه:
-                      </p>
-
-                      <div className="telegram-link-row">
-                        <input
-                          type="text"
-                          readOnly
-                          value={generateClientInviteLink(telegramModalClient.id)}
-                          style={{
-                            fontSize: '0.8rem',
-                            direction: 'ltr',
-                            background: 'var(--bg-main)',
-                            border: '1px solid var(--border-color)',
-                            padding: '0.5rem 0.75rem',
-                            borderRadius: '8px',
-                            flex: 1,
-                            color: 'var(--text-secondary)'
-                          }}
-                        />
-                        <button
-                          className="btn btn-secondary"
-                          style={{ padding: '0.5rem 0.75rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}
-                          onClick={() => handleCopyLink(telegramModalClient.id)}
-                        >
-                          {copiedLink ? <Check size={15} color="#16a34a" /> : <Copy size={15} />}
-                          <span>{copiedLink ? 'تم النسخ!' : 'نسخ الرابط'}</span>
-                        </button>
-                        <a
-                          href={generateClientInviteLink(telegramModalClient.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn btn-secondary btn-icon"
-                          title="فتح في تليجرام"
-                          style={{ width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                        >
-                          <ExternalLink size={15} />
-                        </a>
-                      </div>
-                    </div>
-
-                    {/* Step 2: Client presses start */}
-                    <div style={{
-                      background: 'var(--bg-card-subtle)',
-                      border: '1px solid var(--border-color)',
-                      borderRadius: '12px',
-                      padding: '1rem'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                        <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--accent)', color: 'var(--on-accent)', fontSize: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800' }}>2</span>
-                        <strong style={{ fontSize: '0.9rem' }}>التحقق والربط التلقائي:</strong>
-                      </div>
-                      <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '0 0 0.8rem 0' }}>
-                        بعد أن يضغط الموكل على زر <b>بدء / Start</b> في تليجرام، اضغط الزر بالأسفل للتحقق فوراً:
-                      </p>
-
-                      <button
-                        className="btn btn-primary"
-                        style={{ width: '100%', fontSize: '0.88rem', padding: '0.65rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-                        onClick={() => handleCheckTelegramLink(telegramModalClient)}
-                        disabled={isCheckingTelegram}
-                      >
-                        <RefreshCw size={16} className={isCheckingTelegram ? 'spin' : ''} />
-                        <span>{isCheckingTelegram ? 'جارٍ فحص رسائل البوت...' : 'فحص وتأكيد الربط التلقائي 🔄'}</span>
-                      </button>
-                    </div>
-
-                    {/* Step 3: Or manual Chat ID */}
-                    <div style={{
-                      borderTop: '1px dashed var(--border-color)',
-                      paddingTop: '0.9rem'
-                    }}>
-                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.4rem' }}>
-                        أو: إدخال معرّف التليجرام (Chat ID) يدوياً إذا كان معروفاً:
-                      </span>
-                      <div className="telegram-manual-row">
-                        <input
-                          type="text"
-                          placeholder="مثال: 123456789"
-                          value={manualChatId}
-                          onChange={(e) => setManualChatId(e.target.value)}
-                          style={{
-                            fontSize: '0.82rem',
-                            direction: 'ltr',
-                            padding: '0.45rem 0.75rem',
-                            borderRadius: '8px',
-                            border: '1px solid var(--border-color)',
-                            flex: 1
-                          }}
-                        />
-                        <button
-                          className="btn btn-secondary"
-                          style={{ fontSize: '0.8rem', padding: '0.45rem 0.85rem' }}
-                          onClick={() => handleManualSaveChatId(telegramModalClient)}
-                        >
-                          حفظ المعرف
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="modal-footer">
-                <button className="btn btn-secondary" onClick={() => setTelegramModalClient(null)}>
-                  إغلاق
-                </button>
-              </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setConfirmTelegramBill(false)} disabled={isSendingBill}>
+                تراجع
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleConfirmSendBillTelegram} disabled={isSendingBill}>
+                {isSendingBill ? 'جارٍ الإرسال…' : 'إرسال الآن'}
+              </button>
             </div>
           </div>
-        )
-      }
+        </div>
+      )}
+
+      {telegramModalClient && (
+        <div className="modal-backdrop" onClick={() => setTelegramModalClient(null)}>
+          <div className="modal-dialog tg-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h3>ربط تليجرام: {telegramModalClient.name}</h3>
+                <span className="cell-sub">بوت المكتب @{TELEGRAM_BOT_USERNAME}</span>
+              </div>
+              <button type="button" className="icon-btn" onClick={() => setTelegramModalClient(null)} aria-label="إغلاق">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="modal-body tg-body">
+              {telegramStatusMsg && (
+                <div className={`auth-alert ${telegramStatusMsg.type === 'success' ? 'is-ok' : telegramStatusMsg.type === 'error' ? 'is-error' : 'is-info'}`} role="status">
+                  {telegramStatusMsg.text}
+                </div>
+              )}
+
+              {schemaError && (
+                <div className="auth-alert is-warn" role="alert">
+                  <strong>يلزم إضافة العمود في Supabase.</strong> شغّل هذا الأمر في SQL Editor:
+                  <pre className="tg-code">ALTER TABLE clients ADD COLUMN telegram_chat_id BIGINT DEFAULT NULL;</pre>
+                </div>
+              )}
+
+              {telegramModalClient.telegram_chat_id ? (
+                <div className="tg-linked">
+                  <strong>الحساب مربوط</strong>
+                  <span className="cell-sub">
+                    معرّف المحادثة: <code>{telegramModalClient.telegram_chat_id}</code>
+                  </span>
+                  <p>تصل الموكل إشعارات عند تأجيل الجلسات وصدور الأحكام وتحديث حالة قضاياه، إضافة إلى مطالبات الأتعاب.</p>
+                  <div className="tg-actions">
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => handleSendTest(telegramModalClient)} disabled={isSendingTest}>
+                      {isSendingTest ? 'جارٍ الإرسال…' : 'إرسال رسالة تجريبية'}
+                    </button>
+                    <button type="button" className="btn btn-danger btn-sm" onClick={() => handleUnlinkTelegram(telegramModalClient)}>
+                      إلغاء الربط
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <section className="tg-step">
+                    <h4><span className="tg-num">1</span> أرسل رابط الدعوة للموكل</h4>
+                    <p>أرسل الرابط عبر واتساب ليفتحه على هاتفه.</p>
+                    <div className="telegram-link-row">
+                      <input type="text" readOnly className="form-input tg-link" value={generateClientInviteLink(telegramModalClient.id)} />
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleCopyLink(telegramModalClient.id)}>
+                        {copiedLink ? <Check size={15} /> : <Copy size={15} />}
+                        <span>{copiedLink ? 'تم النسخ' : 'نسخ'}</span>
+                      </button>
+                      <a
+                        href={generateClientInviteLink(telegramModalClient.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="icon-btn"
+                        title="فتح في تليجرام"
+                        aria-label="فتح في تليجرام"
+                      >
+                        <ExternalLink size={15} />
+                      </a>
+                    </div>
+                  </section>
+
+                  <section className="tg-step">
+                    <h4><span className="tg-num">2</span> تأكيد الربط</h4>
+                    <p>بعد أن يضغط الموكل زر <b>Start</b> في تليجرام، اضغط للتحقق.</p>
+                    <button type="button" className="btn btn-primary tg-check" onClick={() => handleCheckTelegramLink(telegramModalClient)} disabled={isCheckingTelegram}>
+                      <RefreshCw size={16} className={isCheckingTelegram ? 'spin' : ''} />
+                      <span>{isCheckingTelegram ? 'جارٍ الفحص…' : 'فحص الربط'}</span>
+                    </button>
+                  </section>
+
+                  <section className="tg-manual">
+                    <span className="cell-sub">أو أدخل معرّف المحادثة (Chat ID) يدوياً إن كان معروفاً:</span>
+                    <div className="telegram-manual-row">
+                      <input
+                        type="text"
+                        className="form-input tg-link"
+                        placeholder="123456789"
+                        value={manualChatId}
+                        onChange={(e) => setManualChatId(e.target.value)}
+                      />
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleManualSaveChatId(telegramModalClient)}>
+                        حفظ
+                      </button>
+                    </div>
+                  </section>
+                </>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setTelegramModalClient(null)}>إغلاق</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Client Modal */}
       {
@@ -886,30 +682,7 @@ export default function ClientsPage({ setActiveTab }) {
                   <div className="client-form-grid-2col">
                     <div className="form-group">
                       <label className="form-label">رقم الهاتف (مصر)</label>
-                      <div style={{ display: 'flex', direction: 'ltr', alignItems: 'center' }}>
-                        <span style={{
-                          padding: '0.6rem 0.75rem',
-                          background: 'var(--bg-card-subtle)',
-                          border: '1px solid var(--border-color)',
-                          borderRight: 'none',
-                          borderRadius: 'var(--radius-md) 0 0 var(--radius-md)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                          fontWeight: '700',
-                          fontSize: '0.85rem'
-                        }}>
-                          <span>🇪🇬</span>
-                          <span>+20</span>
-                        </span>
-                        <input
-                          type="text"
-                          className="form-input"
-                          style={{ borderRadius: '0 var(--radius-md) var(--radius-md) 0', textAlign: 'left', direction: 'ltr' }}
-                          value={editingClient.phone || ''}
-                          onChange={(e) => setEditingClient({ ...editingClient, phone: e.target.value })}
-                        />
-                      </div>
+                      <PhoneField value={editingClient.phone || ''} onChange={(v) => setEditingClient({ ...editingClient, phone: v })} />
                     </div>
                     <div className="form-group">
                       <label className="form-label">الرقم القومي</label>

@@ -2,8 +2,28 @@
  * Legal Deadlines & Date Utilities for Egyptian Legal Practice
  */
 
-// Configurable product rule for appeal follow-up reminder
+// Default appeal period (civil, commercial, family, labour first-instance judgments)
 export const APPEAL_FOLLOW_UP_DAYS = 40;
+
+/**
+ * The statutory period to challenge a judgment depends on the kind of case.
+ * The returned days are only the default: the lawyer can change them in the decision dialog.
+ */
+export function getAppealRule(caseType) {
+  switch (caseType) {
+    case 'misdemeanor':
+    case 'criminal':
+      return { days: 10, label: 'استئناف حكم جنح', basis: 'مادة 406 إجراءات جنائية' };
+    case 'felony':
+      return { days: 60, label: 'الطعن بالنقض في حكم الجنايات', basis: 'قانون 57 لسنة 1959 (لا استئناف في الجنايات)' };
+    case 'urgency':
+      return { days: 15, label: 'استئناف حكم مستعجل', basis: 'مادة 227 مرافعات' };
+    case 'administrative':
+      return { days: 60, label: 'الطعن أمام المحكمة الإدارية العليا', basis: 'مادة 44 من قانون مجلس الدولة 47 لسنة 1972' };
+    default:
+      return { days: APPEAL_FOLLOW_UP_DAYS, label: 'استئناف', basis: 'مادة 227 مرافعات' };
+  }
+}
 
 /**
  * Calculates the appeal follow-up date based on judgment date and configured days.

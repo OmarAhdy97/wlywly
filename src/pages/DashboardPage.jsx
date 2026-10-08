@@ -28,6 +28,7 @@ import { formatMoney } from '../lib/financialCalculations';
 import { buildFinanceOverview } from '../lib/financeOverview';
 import SessionDecisionModal from '../components/common/SessionDecisionModal';
 import AdministrativeTaskUpdateModal from '../components/common/AdministrativeTaskUpdateModal';
+import CountUp from '../components/common/CountUp';
 import QuickActionModal from '../components/layout/QuickActionModal';
 
 const dayOf = (v) => (v || '').split('T')[0];
@@ -249,7 +250,7 @@ export default function DashboardPage({ setActiveTab }) {
           <button key={a.key} type="button" className={`dash-attn-item ${a.count > 0 ? `is-${a.tone}` : 'is-zero'}`} onClick={a.action}>
             <span className="dash-attn-icon"><a.icon size={18} /></span>
             <span className="dash-attn-text">
-              <b>{a.count}</b>
+              <b><CountUp value={a.count} /></b>
               <span>{a.label}</span>
             </span>
           </button>

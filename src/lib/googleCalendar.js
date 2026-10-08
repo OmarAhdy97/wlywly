@@ -26,7 +26,7 @@ export function buildRichLegalEvent(session, caseData, eventType = 'court_sessio
 • منطوق الحكم الصادر: ${session?.judgment_text || session?.ruling_text || caseData?.ruling_text || 'صدر حكم نهائي'}
 • الإجراء المطلوب: التأكد من قيد وإيداع صحيفة الاستئناف وسداد الرسوم قبل فوات الميعاد القانوني.
 ────────────────────────────
-الأجندة القضائية — نظام إدارة مكاتب المحاماة`;
+الديوان — نظام إدارة مكاتب المحاماة`;
   } else if (eventType === 'administrative_task' || session?.event_type === 'administrative_task') {
     summary = `📋 عمل إداري: ${session?.title || 'متابعة إدارية للدعوى'} (${caseData?.case_number || ''}/${caseData?.case_year || ''})`;
     description =
@@ -37,7 +37,7 @@ export function buildRichLegalEvent(session, caseData, eventType = 'court_sessio
 • المحكمة / الجهة: ${session?.location || caseData?.court_name || 'جهة الاختصاص'}
 • المطلوب والملاحظات: ${session?.requirements || session?.notes || 'مباشرة الإجراء'}
 ────────────────────────────
-الأجندة القضائية — نظام إدارة مكاتب المحاماة`;
+الديوان — نظام إدارة مكاتب المحاماة`;
   } else {
     description = 
 `⚖️ بيانات الجلسة والدعوى القضائية:
@@ -60,7 +60,7 @@ ${session?.ruling_text || caseData?.ruling_text ? '• منطوق القرار/�
 ⏰ التنبيهات:
 • تم ضبط إشعار صوتي تلقائي قبل موعد الجلسة بـ 24 ساعة وساعة واحدة.
 ────────────────────────────
-الأجندة القضائية — نظام إدارة مكاتب المحاماة`;
+الديوان — نظام إدارة مكاتب المحاماة`;
   }
 
   const location = `${caseData?.court_name || ''}${caseData?.court_room ? ' - قاعة ' + caseData.court_room : ''}`;

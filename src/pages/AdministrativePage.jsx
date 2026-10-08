@@ -1,38 +1,13 @@
 import RowAction, { RowActions } from '../components/common/RowAction';
 import React, { useState } from 'react';
-import {
-  ClipboardList,
-  Search,
-  Plus,
-  CheckCircle2,
-  Clock,
-  Briefcase,
-  Calendar,
-  MapPin,
-  FileText,
-  User,
-  UserCheck,
-  Edit3,
-  Trash2,
-  X,
-  RotateCcw,
-  Check,
-  ChevronLeft,
-  FileCheck,
-  FolderX,
-  Mic,
-  ListFilter,
-  AlertTriangle,
-  Ban,
-  History,
-  Scale,
-  ChevronDown,
-  ChevronUp,
-  ArrowRight
-} from 'lucide-react';
+import { Plus, Search, Edit3, Trash2, X, RotateCcw, Check, Clock, ArrowRight } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { USER_ROLES } from '../lib/supabase';
 import AdministrativeTaskUpdateModal, { ADMIN_TASK_STATUSES } from '../components/common/AdministrativeTaskUpdateModal';
+import { confirmDialog, notify } from '../lib/dialog';
+import Select from '../components/common/Select';
+import DateInput from '../components/common/DateInput';
+import { formatEgyptPhone } from '../lib/phone';
 
 export default function AdministrativePage() {
   const {
@@ -58,7 +33,7 @@ export default function AdministrativePage() {
   const [taskToUpdate, setTaskToUpdate] = useState(null); // For AdministrativeTaskUpdateModal
 
   // Expandable Timeline State per Card
-  const [expandedHistoryTaskIds, setExpandedHistoryTaskIds] = useState(new Set());
+  const [detailTaskId, setDetailTaskId] = useState(null);
 
   // Form Fields for Add/Edit Basic Task
   const [caseId, setCaseId] = useState('');
@@ -71,18 +46,6 @@ export default function AdministrativePage() {
   const [assignedTo, setAssignedTo] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Toggle History View for a specific task
-  const toggleTaskHistory = (taskId) => {
-    setExpandedHistoryTaskIds(prev => {
-      const next = new Set(prev);
-      if (next.has(taskId)) {
-        next.delete(taskId);
-      } else {
-        next.add(taskId);
-      }
-      return next;
-    });
-  };
 
   // Open modal for new task
   const handleOpenNew = () => {
@@ -127,7 +90,7 @@ export default function AdministrativePage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!title.trim()) {
-      alert('يرجى إدخال عنوان العمل الإداري');
+      notify('يرجى إدخال عنوان العمل الإداري', 'warn');
       return;
     }
 
@@ -155,7 +118,7 @@ export default function AdministrativePage() {
       setIsModalOpen(false);
       handleResetForm();
     } catch (err) {
-      alert('خطأ أثناء حفظ العمل الإداري: ' + (err.message || err));
+      notify('خطأ أثناء حفظ العمل الإداري: ' + (err.message || err));
     } finally {
       setIsSaving(false);
     }
@@ -163,7 +126,7 @@ export default function AdministrativePage() {
 
   // Handle Delete
   const handleDelete = async (id) => {
-    if (window.confirm('هل أنت متأكد من حذف هذا العمل الإداري وسجله نهائياً؟')) {
+    if (await confirmDialog('هل أنت متأكد من حذف هذا العمل الإداري وسجله نهائياً؟', { danger: true, confirmLabel: 'حذف' })) {
       await deleteAdminTask(id);
     }
   };
@@ -223,7 +186,6 @@ export default function AdministrativePage() {
     <div className="page-wrapper">
       <div className="page-head">
         <div>
-          <div className="page-eyebrow"><span className="page-dot" />الإدارة والمعاملات ومسار الأعمال الخارجية</div>
           <h1>الأعمال الإدارية</h1>
         </div>
         <div className="page-head-actions">
@@ -240,7 +202,7 @@ export default function AdministrativePage() {
           <input
             type="text"
             className="form-input"
-            placeholder="ابحث عن عمل إداري، موكل، قضية، أو مكان تنفيذ..."
+            placeholder="عمل إداري، موكل، مكان التنفيذ"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -262,718 +224,297 @@ export default function AdministrativePage() {
         </div>
       </div>
 
-      {/* Task List or Empty State */}
       {filteredTasks.length === 0 ? (
-        <div style={{
-          padding: '4rem 1.5rem',
-          textAlign: 'center',
-          background: 'var(--bg-card)',
-          borderRadius: '16px',
-          border: '1px dashed var(--border-color)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginTop: '1rem'
-        }}>
-          <div style={{
-            width: '80px',
-            height: '80px',
-            borderRadius: '50%',
-            background: 'var(--bg-card-subtle)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--text-subtle)',
-            marginBottom: '1.25rem',
-            opacity: 0.6
-          }}>
-            <Briefcase size={38} strokeWidth={1.5} />
-          </div>
-
-          <h3 style={{ fontSize: '1.18rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.4rem' }}>
-            لا توجد أعمال إدارية تطابق بحثك
-          </h3>
-          <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', maxWidth: '380px', margin: '0 auto 1.5rem', lineHeight: '1.5' }}>
-            حاول تغيير تبويب الفلتر أو البحث عن شيء آخر، أو أضف عملاً إدارياً جديداً للمكتب.
-          </p>
-
-          <button
-            type="button"
-            className="btn btn-primary"
-            style={{ background: 'var(--accent)', borderRadius: '10px', padding: '0.6rem 1.4rem', fontWeight: '700' }}
-            onClick={handleOpenNew}
-          >
-            <Plus size={16} />
-            <span>إضافة عمل إداري جديد</span>
+        <div className="card empty-block">
+          <h3>لا توجد أعمال إدارية مطابقة</h3>
+          <p>غيّر الفلتر أو البحث، أو أضف عملاً إدارياً جديداً.</p>
+          <button type="button" className="btn btn-primary empty-block-action" onClick={handleOpenNew}>
+            <Plus size={16} /> إضافة عمل إداري
           </button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 340px), 1fr))', gap: '1.1rem', alignItems: 'start' }}>
-          {filteredTasks.map(task => {
+        <div className="card row-list">
+          {filteredTasks.map((task) => {
             const isDone = task.status === 'completed';
             const isCancelled = task.status === 'cancelled';
-            const assignedMember = team.find(m => m.id === task.assigned_to);
+            const assignedMember = team.find((m) => m.id === task.assigned_to);
             const statusConfig = ADMIN_TASK_STATUSES[task.status] || ADMIN_TASK_STATUSES.pending;
-            const StatusIcon = statusConfig.icon;
-            const relatedCase = task.case_id ? cases.find(c => c.id === task.case_id) : null;
+            const relatedCase = task.case_id ? cases.find((c) => c.id === task.case_id) : null;
 
-            // Audit history for this task
             const taskHistory = (adminTaskUpdates || [])
-              .filter(u => u.admin_task_id === task.id)
+              .filter((u) => u.admin_task_id === task.id)
               .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+            const isDetailOpen = detailTaskId === task.id;
+            const postponementCount = taskHistory.filter((u) => u.action_type === 'postponed' || u.new_status === 'postponed').length;
 
-            const isHistoryExpanded = expandedHistoryTaskIds.has(task.id);
-
-            // Calculate how many times postponed
-            const postponementCount = taskHistory.filter(u => u.action_type === 'postponed' || u.new_status === 'postponed').length;
+            const historyItems = taskHistory.length > 0 ? taskHistory : [{
+              id: `init_${task.id}`,
+              action_type: 'created',
+              new_status: task.status || 'pending',
+              update_text: task.requirements || 'تم إنشاء العمل الإداري',
+              created_at: task.created_at || new Date().toISOString(),
+              created_by: null,
+            }];
 
             return (
-              <div
-                key={task.id}
-                style={{
-                  background: 'var(--bg-card)',
-                  border: isDone ? '1px solid var(--status-active)' : (isCancelled ? '1px solid var(--status-dismissed)' : '1px solid var(--border-color)'),
-                  borderRadius: '14px',
-                  padding: '1.2rem',
-                  boxShadow: 'var(--shadow-sm)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.85rem',
-                  position: 'relative',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                {/* Card Top: Client & Case badge + Current Status Badge */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
-                    {/* Client Name */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.35rem',
-                      background: 'var(--bg-card-subtle)',
-                      padding: '0.25rem 0.65rem',
-                      borderRadius: '8px',
-                      fontSize: '0.82rem',
-                      fontWeight: '700',
-                      color: 'var(--text-main)'
-                    }}>
-                      <User size={13} color="var(--primary-700)" />
-                      <span>{task.client_name || 'بدون موكل محدد'}</span>
+              <article key={task.id} className={`list-row ${isDone ? 'is-done' : ''} ${isCancelled ? 'is-cancelled' : ''}`}>
+                <div className="list-row-main">
+                  <div className="list-row-body is-clickable" onClick={() => setDetailTaskId(task.id)}>
+                    <div className="list-row-top">
+                      <h3 className="row-title"><span className="row-title-text" title={task.title}>{task.title}</span></h3>
+                      <span className="status-chip" style={{ '--dot': statusConfig.color }}>{statusConfig.label}</span>
                     </div>
-
-                    {/* Related Case Badge if present */}
-                    {relatedCase && (
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.35rem',
-                        background: 'var(--status-prelim-bg)',
-                        color: '#1d4ed8',
-                        padding: '0.25rem 0.6rem',
-                        borderRadius: '8px',
-                        fontSize: '0.78rem',
-                        fontWeight: '800',
-                        border: '1px solid #bfdbfe'
-                      }}>
-                        <Scale size={13} />
-                        <span>دعوى {relatedCase.case_number}/{relatedCase.case_year}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Status Badge */}
-                  <span style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.35rem',
-                    padding: '0.25rem 0.75rem',
-                    borderRadius: '20px',
-                    fontSize: '0.78rem',
-                    fontWeight: '800',
-                    background: statusConfig.bg,
-                    color: statusConfig.color,
-                    border: `1px solid ${statusConfig.border}`
-                  }}>
-                    <StatusIcon size={13} />
-                    <span>{statusConfig.label}</span>
-                  </span>
-                </div>
-
-                {/* Task Title */}
-                <div>
-                  <h3 style={{
-                    fontSize: '1.08rem',
-                    fontWeight: '800',
-                    color: isDone || isCancelled ? 'var(--text-muted)' : 'var(--text-main)',
-                    margin: '0 0 0.2rem',
-                    textDecoration: isDone || isCancelled ? 'line-through' : 'none'
-                  }}>
-                    {task.title}
-                  </h3>
-                </div>
-
-                {/* Key Details: Current Follow-up Date, Assignee, Location */}
-                <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '0.5rem',
-                  fontSize: '0.85rem',
-                  background: 'var(--bg-card-subtle)',
-                  padding: '0.8rem 0.95rem',
-                  borderRadius: '10px',
-                  border: '1px solid var(--border-subtle)'
-                }}>
-                  {/* Current Follow-up Date */}
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
-                      <Calendar size={15} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                      <span>
-                        <strong>المتابعة القادمة:</strong>{' '}
-                        {task.execution_date
-                          ? new Date(task.execution_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })
-                          : 'بدون موعد محدد'}
-                      </span>
-                    </div>
-
-                    {postponementCount > 0 && (
-                      <span style={{
-                        fontSize: '0.72rem',
-                        fontWeight: '800',
-                        color: '#c2410c',
-                        background: 'var(--status-adjourned-bg)',
-                        padding: '0.1rem 0.45rem',
-                        borderRadius: '6px',
-                        border: '1px solid #ffedd5'
-                      }}>
-                        تأجلت {postponementCount} {postponementCount === 1 ? 'مرة' : 'مرات'}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Assignee */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
-                    <UserCheck size={15} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                    <span><strong>المسند إليه حالياً:</strong> {assignedMember ? `الأستاذ / ${assignedMember.name}` : 'غير مسند'}</span>
-                  </div>
-
-                  {/* Location */}
-                  {task.location && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-main)' }}>
-                      <MapPin size={15} color="var(--primary-700)" style={{ flexShrink: 0 }} />
-                      <span><strong>المكان:</strong> {task.location}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Requirements */}
-                {task.requirements && (
-                  <div style={{ fontSize: '0.84rem', color: 'var(--text-main)', lineHeight: '1.45' }}>
-                    <strong style={{ color: 'var(--primary-800)', display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.2rem' }}>
-                      <FileCheck size={14} /> المطلوب:
-                    </strong>
-                    <p style={{ margin: 0, whiteSpace: 'pre-wrap', color: 'var(--text-muted)' }}>
-                      {task.requirements}
+                    <p className="list-row-sub">
+                      {[
+                        task.client_name || 'بدون موكل',
+                        relatedCase ? `دعوى ${relatedCase.case_number}/${relatedCase.case_year}` : null,
+                        task.location,
+                      ].filter(Boolean).join(' · ')}
                     </p>
+                    {(task.requirements || task.notes) && (
+                      <p className="list-row-text">
+                        {task.requirements}
+                        {task.requirements && task.notes ? ' — ' : ''}
+                        {task.notes && <span className="list-row-note">{task.notes}</span>}
+                      </p>
+                    )}
                   </div>
-                )}
 
-                {/* Notes */}
-                {task.notes && (
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-subtle)', fontStyle: 'italic', borderTop: '1px dashed var(--border-subtle)', paddingTop: '0.35rem' }}>
-                    ملاحظات: {task.notes}
-                  </div>
-                )}
+                  <dl className="list-row-facts">
+                    <div>
+                      <dt>المتابعة</dt>
+                      <dd>
+                        {task.execution_date
+                          ? new Date(task.execution_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })
+                          : 'بدون موعد'}
+                        {postponementCount > 0 && <span className="task-postponed">تأجلت {postponementCount}×</span>}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>المسؤول</dt>
+                      <dd className="row-owner">
+                        {assignedMember ? (
+                          <>
+                            
+                            {assignedMember.name}
+                          </>
+                        ) : <span className="cell-sub">غير مسند</span>}
+                      </dd>
+                    </div>
+                  </dl>
 
-                {/* Card Actions Toolbar */}
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginTop: 'auto',
-                  paddingTop: '0.7rem',
-                  borderTop: '1px solid var(--border-subtle)',
-                  flexWrap: 'wrap',
-                  gap: '0.5rem'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                    {/* Primary Button: تحديث */}
-                    <button
-                      type="button"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                        background: 'var(--accent)',
-                        color: 'var(--on-accent)',
-                        border: '1px solid var(--accent-gold)',
-                        padding: '0.38rem 0.85rem',
-                        borderRadius: '8px',
-                        fontSize: '0.83rem',
-                        fontWeight: '800',
-                        cursor: 'pointer',
-                        boxShadow: '0 2px 6px rgba(55, 4, 10, 0.15)'
-                      }}
-                      onClick={() => setTaskToUpdate(task)}
-                    >
-                      <Clock size={14} />
-                      <span>تحديث</span>
+                  <div className="list-row-actions">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => setTaskToUpdate(task)}>
+                      <Clock size={14} /> تحديث
                     </button>
-
-                    {/* Secondary Button: عرض السجل */}
-                    <button
-                      type="button"
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.4rem',
-                        background: isHistoryExpanded ? 'var(--primary-50)' : 'var(--bg-card)',
-                        color: isHistoryExpanded ? 'var(--primary-800)' : 'var(--text-main)',
-                        border: isHistoryExpanded ? '1.5px solid var(--primary-600)' : '1px solid var(--border-color)',
-                        padding: '0.38rem 0.8rem',
-                        borderRadius: '8px',
-                        fontSize: '0.82rem',
-                        fontWeight: '700',
-                        cursor: 'pointer'
-                      }}
-                      onClick={() => toggleTaskHistory(task.id)}
-                    >
-                      <History size={14} color="var(--primary-700)" />
-                      <span>{isHistoryExpanded ? 'إخفاء السجل' : 'عرض السجل'}</span>
-                      <span style={{
-                        background: isHistoryExpanded ? 'var(--primary-200)' : 'var(--bg-card-subtle)',
-                        color: 'var(--primary-800)',
-                        fontSize: '0.72rem',
-                        padding: '0.05rem 0.4rem',
-                        borderRadius: '8px',
-                        fontWeight: '800'
-                      }}>
-                        {taskHistory.length || 1}
-                      </span>
-                      {isHistoryExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                    </button>
+                    <RowActions>
+                      <RowAction
+                        icon={isDone ? RotateCcw : Check}
+                        label={isDone ? 'إعادة المهمة للتنفيذ' : 'إتمام العمل'}
+                        tone={isDone ? undefined : 'primary'}
+                        onClick={async () => { try { await toggleAdminTaskStatus(task.id); } catch (err) { notify(err.message); } }}
+                      />
+                      <RowAction icon={Edit3} label="تعديل" onClick={() => handleOpenEdit(task)} />
+                      <RowAction icon={Trash2} label="حذف" tone="danger" onClick={() => handleDelete(task.id)} />
+                    </RowActions>
                   </div>
-
-                  <RowActions>
-                    <RowAction
-                      icon={isDone ? RotateCcw : Check}
-                      label={isDone ? 'إعادة المهمة للتنفيذ' : 'إتمام العمل بنجاح'}
-                      tone={isDone ? undefined : 'primary'}
-                      onClick={() => toggleAdminTaskStatus(task.id)}
-                    />
-                    <RowAction icon={Edit3} label="تعديل البيانات الأساسية" onClick={() => handleOpenEdit(task)} />
-                    <RowAction icon={Trash2} label="حذف" tone="danger" onClick={() => handleDelete(task.id)} />
-                  </RowActions>
                 </div>
 
-                {/* ========================================================================= */}
-                {/* EXPANDABLE AUDIT TIMELINE SECTION (السجل الزمني الكامل للمهمة)             */}
-                {/* ========================================================================= */}
-                {isHistoryExpanded && (
-                  <div style={{
-                    marginTop: '0.4rem',
-                    padding: '0.85rem 1rem',
-                    background: 'var(--bg-card-subtle)',
-                    borderRadius: '12px',
-                    border: '1px solid var(--border-subtle)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.75rem'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', borderBottom: '1px dashed var(--border-subtle)', paddingBottom: '0.45rem' }}>
-                      <History size={15} color="var(--primary-700)" />
-                      <strong style={{ fontSize: '0.88rem', color: 'var(--text-main)' }}>
-                        سجل التحديثات والحركات التاريخية ({taskHistory.length || 1})
-                      </strong>
-                    </div>
+                {isDetailOpen && (
+                  <div className="modal-backdrop" onClick={() => setDetailTaskId(null)}>
+                    <div className="modal-dialog task-detail-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+                      <div className="modal-header">
+                        <div className="case-dialog-title">
+                          <h3>{task.title}</h3>
+                          <span className="status-chip" style={{ '--dot': statusConfig.color }}>{statusConfig.label}</span>
+                        </div>
+                        <button type="button" className="icon-btn" onClick={() => setDetailTaskId(null)} aria-label="إغلاق">
+                          <X size={18} />
+                        </button>
+                      </div>
+                      <div className="modal-body">
+                        <dl className="facts">
+                          {[
+                            ['الموكل', task.client_name],
+                            ['القضية', relatedCase ? `دعوى ${relatedCase.case_number}/${relatedCase.case_year}` : 'عمل عام'],
+                            ['المكان', task.location],
+                            ['المتابعة القادمة', task.execution_date ? new Date(task.execution_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }) : 'بدون موعد'],
+                            ['المسؤول', assignedMember ? `الأستاذ / ${assignedMember.name}` : 'غير مسند'],
+                            ['مرات التأجيل', postponementCount ? String(postponementCount) : ''],
+                          ].filter(([, v]) => v).map(([k, v]) => (
+                            <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
+                          ))}
+                        </dl>
+                        {task.requirements && <p className="task-detail-text"><b>المطلوب:</b> {task.requirements}</p>}
+                        {task.notes && <p className="task-detail-text is-muted"><b>ملاحظات:</b> {task.notes}</p>}
 
-                    {/* Timeline List */}
-                    <div style={{ position: 'relative', paddingRight: '16px' }}>
-                      {/* Vertical connector line */}
-                      <div style={{
-                        position: 'absolute',
-                        right: '5px',
-                        top: '8px',
-                        bottom: '8px',
-                        width: '2px',
-                        background: 'var(--border-color)',
-                        borderRight: '1.5px dashed var(--border-subtle)'
-                      }} />
+                        <div className="case-dialog-actions">
+                          <button type="button" className="btn btn-primary" onClick={() => { setDetailTaskId(null); setTaskToUpdate(task); }}>
+                            <Clock size={16} /> تحديث
+                          </button>
+                          <button type="button" className="btn btn-secondary" onClick={() => { setDetailTaskId(null); handleOpenEdit(task); }}>
+                            <Edit3 size={16} /> تعديل
+                          </button>
+                        </div>
 
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-                        {(taskHistory.length > 0 ? taskHistory : [
-                          {
-                            id: `init_${task.id}`,
-                            action_type: 'created',
-                            new_status: task.status || 'pending',
-                            new_due_date: task.execution_date,
-                            new_assigned_to: task.assigned_to,
-                            update_text: task.requirements || 'تم إنشاء العمل الإداري',
-                            created_at: task.created_at || new Date().toISOString(),
-                            created_by: null
-                          }
-                        ]).map((item, idx) => {
-                          const itemStatus = ADMIN_TASK_STATUSES[item.new_status] || ADMIN_TASK_STATUSES.pending;
-                          const dateObj = new Date(item.created_at);
-                          const dateStr = dateObj.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' });
-                          const timeStr = dateObj.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+                        <h4 className="task-detail-heading">السجل ({historyItems.length})</h4>
+                  <ol className="tl task-history">
+                    {historyItems.map((item, idx) => {
+                      const itemStatus = ADMIN_TASK_STATUSES[item.new_status] || ADMIN_TASK_STATUSES.pending;
+                      const dateObj = new Date(item.created_at);
+                      const when = `${dateObj.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })} — ${dateObj.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}`;
 
-                          let actionTitle = 'تحديث مسار العمل الإداري';
-                          let actionColor = itemStatus.color;
+                      let title = 'تحديث مسار العمل';
+                      let tone = 'settled';
+                      if (item.action_type === 'created') { title = 'إنشاء العمل الإداري'; tone = 'prelim'; }
+                      else if (item.action_type === 'postponed' || item.new_status === 'postponed') { title = 'تأجيل المتابعة'; tone = 'adjourned'; }
+                      else if (item.action_type === 'completed' || item.new_status === 'completed') { title = 'إتمام العمل'; tone = 'active'; }
+                      else if (item.action_type === 'reopened') { title = 'إعادة فتح المهمة'; tone = 'reserved'; }
+                      else if (item.action_type === 'cancelled' || item.new_status === 'cancelled') { title = 'إلغاء العمل'; tone = 'dismissed'; }
+                      else if (item.action_type === 'reassigned') { title = 'إعادة إسناد المهمة'; tone = 'settled'; }
 
-                          if (item.action_type === 'created') {
-                            actionTitle = 'تم إنشاء العمل الإداري والتكليف المبدئي';
-                            actionColor = 'var(--primary-700)';
-                          } else if (item.action_type === 'postponed' || item.new_status === 'postponed') {
-                            actionTitle = 'تم تأجيل المتابعة';
-                            actionColor = '#c2410c';
-                          } else if (item.action_type === 'completed' || item.new_status === 'completed') {
-                            actionTitle = 'تم إتمام العمل الإداري بنجاح';
-                            actionColor = '#15803d';
-                          } else if (item.action_type === 'reopened') {
-                            actionTitle = 'إعادة فتح المهمة للتنفيذ';
-                            actionColor = '#7c3aed';
-                          } else if (item.action_type === 'cancelled' || item.new_status === 'cancelled') {
-                            actionTitle = 'تم إلغاء العمل الإداري';
-                            actionColor = '#dc2626';
-                          } else if (item.action_type === 'reassigned') {
-                            actionTitle = 'إعادة إسناد المهمة';
-                            actionColor = '#0284c7';
-                          }
-
-                          return (
-                            <div key={item.id || idx} style={{ position: 'relative' }}>
-                              {/* Node Dot */}
-                              <div style={{
-                                position: 'absolute',
-                                right: '-15px',
-                                top: '4px',
-                                width: '10px',
-                                height: '10px',
-                                borderRadius: '50%',
-                                background: actionColor,
-                                border: '2px solid #ffffff',
-                                boxShadow: `0 0 0 1.5px ${actionColor}`,
-                                zIndex: 1
-                              }} />
-
-                              {/* Event Body */}
-                              <div style={{
-                                background: 'var(--bg-card)',
-                                border: '1px solid var(--border-subtle)',
-                                borderRadius: '8px',
-                                padding: '0.65rem 0.8rem',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '0.35rem',
-                                fontSize: '0.82rem'
-                              }}>
-                                {/* Header: Date/Time + Actor */}
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.3rem' }}>
-                                  <div style={{ fontWeight: '800', color: actionColor, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                    <span>{actionTitle}</span>
-                                  </div>
-
-                                  <div style={{ fontSize: '0.74rem', color: 'var(--text-subtle)' }}>
-                                    {dateStr} — {timeStr}
-                                  </div>
-                                </div>
-
-                                {/* Status & Assignee transition */}
-                                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', fontSize: '0.78rem' }}>
-                                  {/* Status transition if provided */}
-                                  {item.previous_status && item.previous_status !== item.new_status ? (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--text-muted)' }}>
-                                      <span>الحالة:</span>
-                                      <span style={{ textDecoration: 'line-through' }}>{ADMIN_TASK_STATUSES[item.previous_status]?.label || item.previous_status}</span>
-                                      <ArrowRight size={11} />
-                                      <strong style={{ color: itemStatus.color }}>{itemStatus.label}</strong>
-                                    </div>
-                                  ) : (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                                      <span>الحالة:</span>
-                                      <strong style={{ color: itemStatus.color }}>{itemStatus.label}</strong>
-                                    </div>
-                                  )}
-
-                                  {/* Assignee transition if changed */}
-                                  {item.previous_assigned_to !== item.new_assigned_to && item.new_assigned_to && (
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--text-muted)' }}>
-                                      <span>المسؤول:</span>
-                                      {item.previous_assigned_to && (
-                                        <>
-                                          <span style={{ textDecoration: 'line-through' }}>{resolveAssigneeName(item.previous_assigned_to)}</span>
-                                          <ArrowRight size={11} />
-                                        </>
-                                      )}
-                                      <strong style={{ color: 'var(--primary-800)' }}>{resolveAssigneeName(item.new_assigned_to)}</strong>
-                                    </div>
-                                  )}
-                                </div>
-
-                                {/* Due date postponement info */}
-                                {item.previous_due_date !== item.new_due_date && item.new_due_date && (
-                                  <div style={{
-                                    fontSize: '0.78rem',
-                                    color: '#c2410c',
-                                    background: 'var(--status-adjourned-bg)',
-                                    padding: '0.25rem 0.5rem',
-                                    borderRadius: '6px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.35rem'
-                                  }}>
-                                    <Calendar size={12} />
-                                    <span>
-                                      المتابعة: {item.previous_due_date ? `كانت ${item.previous_due_date.split('T')[0]}` : 'لم تكن محددة'} ← <strong>الجديد: {item.new_due_date.split('T')[0]}</strong>
-                                    </span>
-                                  </div>
-                                )}
-
-                                {/* Notes / Reasons */}
-                                {item.update_text && (
-                                  <div style={{
-                                    fontSize: '0.8rem',
-                                    color: 'var(--text-main)',
-                                    background: 'var(--bg-card-subtle)',
-                                    padding: '0.4rem 0.6rem',
-                                    borderRadius: '6px',
-                                    borderRight: `3px solid ${actionColor}`,
-                                    whiteSpace: 'pre-wrap',
-                                    lineHeight: '1.4'
-                                  }}>
-                                    {item.update_text}
-                                  </div>
-                                )}
-
-                                {/* Actor snapshot */}
-                                <div style={{ fontSize: '0.72rem', color: 'var(--text-subtle)', textAlign: 'left', marginTop: '0.1rem' }}>
-                                  بواسطة: {resolveActorName(item.created_by)}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
+                      return (
+                        <li key={item.id || idx} className="tl-item" style={{ '--tone': `var(--status-${tone})`, '--tone-bg': `var(--status-${tone}-bg)` }}>
+                          <div className="tl-head">
+                            <strong>{title}</strong>
+                            <span className="cell-sub">{when}</span>
+                          </div>
+                          <p className="tl-line">
+                            <span>الحالة:</span>{' '}
+                            {item.previous_status && item.previous_status !== item.new_status ? (
+                              <>
+                                <s>{ADMIN_TASK_STATUSES[item.previous_status]?.label || item.previous_status}</s>
+                                {' '}<ArrowRight size={11} />{' '}
+                              </>
+                            ) : null}
+                            <b>{itemStatus.label}</b>
+                          </p>
+                          {item.previous_assigned_to !== item.new_assigned_to && item.new_assigned_to && (
+                            <p className="tl-line">
+                              <span>المسؤول:</span>{' '}
+                              {item.previous_assigned_to && <><s>{resolveAssigneeName(item.previous_assigned_to)}</s> <ArrowRight size={11} />{' '}</>}
+                              <b>{resolveAssigneeName(item.new_assigned_to)}</b>
+                            </p>
+                          )}
+                          {item.previous_due_date !== item.new_due_date && item.new_due_date && (
+                            <p className="tl-line tl-extra">
+                              المتابعة: {item.previous_due_date ? `كانت ${item.previous_due_date.split('T')[0]}` : 'لم تكن محددة'} ← الجديد {item.new_due_date.split('T')[0]}
+                            </p>
+                          )}
+                          {item.update_text && <p className="tl-line tl-notes">{item.update_text}</p>}
+                          <p className="tl-line tl-by">بواسطة {resolveActorName(item.created_by)}</p>
+                        </li>
+                      );
+                    })}
+                  </ol>
                       </div>
                     </div>
                   </div>
                 )}
-              </div>
+              </article>
             );
           })}
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* 1. UPDATE ADMINISTRATIVE TASK WORKFLOW MODAL                               */}
-      {/* ========================================================================= */}
       <AdministrativeTaskUpdateModal
         isOpen={!!taskToUpdate}
         task={taskToUpdate}
         onClose={() => setTaskToUpdate(null)}
       />
 
-      {/* ========================================================================= */}
-      {/* 2. ADD / EDIT BASIC ADMINISTRATIVE TASK MODAL                              */}
-      {/* ========================================================================= */}
       {isModalOpen && (
         <div className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
-          <div
-            className="modal-dialog"
-            style={{ maxWidth: '640px', maxHeight: '92vh', display: 'flex', flexDirection: 'column', borderRadius: '16px', overflow: 'hidden' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
+          <div className="modal-dialog task-dialog" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>
-                  {editingTask ? 'تعديل العمل الإداري' : 'إضافة عمل إداري جديد'}
-                </h3>
+              <h3>{editingTask ? 'تعديل العمل الإداري' : 'إضافة عمل إداري'}</h3>
               <div className="modal-header-actions">
-                <button
-                type="button"
-                className="btn btn-secondary btn-icon"
-                title="إعادة تعيين الحقول"
-                aria-label="إعادة تعيين الحقول"
-                onClick={handleResetForm}
-              >
-                <RotateCcw size={16} />
-              </button>
-                <button type="button" className="btn btn-secondary btn-icon" title="إغلاق" aria-label="إغلاق" onClick={() => setIsModalOpen(false)}>
+                <button type="button" className="icon-btn" title="إعادة تعيين الحقول" aria-label="إعادة تعيين الحقول" onClick={handleResetForm}>
+                  <RotateCcw size={16} />
+                </button>
+                <button type="button" className="icon-btn" title="إغلاق" aria-label="إغلاق" onClick={() => setIsModalOpen(false)}>
                   <X size={18} />
                 </button>
               </div>
             </div>
 
-            {/* Modal Body / Form */}
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-              <div className="modal-body" style={{ overflowY: 'auto', padding: '1.25rem 1.4rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-                {/* SECTION 1: بيانات الموكل والقضية */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '0.8rem' }}>
-                  {/* الموكل */}
-                  <div>
-                    <label className="form-label" style={{ fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <User size={15} color="var(--primary-700)" />
-                      <span>الموكل (اختياري)</span>
-                    </label>
-                    <select
-                      className="form-select"
-                      value={clientId}
-                      onChange={(e) => setClientId(e.target.value)}
-                      style={{ background: 'var(--bg-card)', borderRadius: '10px', padding: '0.6rem 0.8rem', fontSize: '0.9rem' }}
-                    >
-                      <option value="">-- بدون موكل محدد --</option>
-                      {clients.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} {c.phone ? `(${c.phone})` : ''}
-                        </option>
+            <form onSubmit={handleSubmit} className="task-form">
+              <div className="modal-body task-form-body">
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label className="form-label">الموكل (اختياري)</label>
+                    <Select className="form-select" value={clientId} onChange={(e) => setClientId(e.target.value)}>
+                      <option value="">بدون موكل محدد</option>
+                      {clients.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}{c.phone ? ` (${formatEgyptPhone(c.phone)})` : ''}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
-
-                  {/* القضية المرتبطة */}
-                  <div>
-                    <label className="form-label" style={{ fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <Scale size={15} color="var(--primary-700)" />
-                      <span>القضية المرتبطة (اختياري)</span>
-                    </label>
-                    <select
-                      className="form-select"
-                      value={caseId}
-                      onChange={(e) => setCaseId(e.target.value)}
-                      style={{ background: 'var(--bg-card)', borderRadius: '10px', padding: '0.6rem 0.8rem', fontSize: '0.9rem' }}
-                    >
-                      <option value="">-- عمل إداري عام غير مرتبط بدعوى --</option>
-                      {cases.map(c => (
-                        <option key={c.id} value={c.id}>
-                          دعوى {c.case_number}/{c.case_year} — {c.case_title || c.plaintiff_name || 'بدون مسمى'}
-                        </option>
+                  <div className="form-group">
+                    <label className="form-label">القضية المرتبطة (اختياري)</label>
+                    <Select className="form-select" value={caseId} onChange={(e) => setCaseId(e.target.value)}>
+                      <option value="">عمل عام غير مرتبط بدعوى</option>
+                      {cases.map((c) => (
+                        <option key={c.id} value={c.id}>دعوى {c.case_number}/{c.case_year} — {c.case_title || c.plaintiff_name || 'بدون مسمى'}</option>
                       ))}
-                    </select>
+                    </Select>
                   </div>
                 </div>
 
-                {/* SECTION 2: تفاصيل العمل */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.95rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.2rem' }}>
-                    <ClipboardList size={16} color="var(--primary-700)" />
-                    <span>تفاصيل العمل</span>
-                  </div>
+                <div className="form-group">
+                  <label className="form-label">عنوان العمل *</label>
+                  <input
+                    type="text"
+                    required
+                    className="form-input"
+                    placeholder="متابعة الخبير، استخراج شهادة، قيد صحيفة استئناف…"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                  />
+                </div>
 
-                  {/* عنوان العمل الإداري */}
+                <div className="form-grid">
                   <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: '700' }}>عنوان العمل الإداري *</label>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        required
-                        className="form-input"
-                        placeholder="مثال: متابعة الخبير، استخراج شهادة، قيد صحيفة استئناف..."
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        style={{ paddingLeft: '2.5rem' }}
-                      />
-                      <FileText size={17} style={{ position: 'absolute', left: '12px', color: 'var(--text-subtle)', pointerEvents: 'none' }} />
-                    </div>
+                    <label className="form-label">موعد المتابعة *</label>
+                    <DateInput required className="form-input" value={executionDate} onChange={(e) => setExecutionDate(e.target.value)} />
                   </div>
-
-                  {/* تاريخ المتابعة / التنفيذ الأول */}
                   <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: '700' }}>موعد المتابعة / التنفيذ الأولي *</label>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                      <input
-                        type="date"
-                        required
-                        className="form-input"
-                        value={executionDate}
-                        onChange={(e) => setExecutionDate(e.target.value)}
-                        style={{ paddingLeft: '2.5rem' }}
-                      />
-                      <Calendar size={17} style={{ position: 'absolute', left: '12px', color: 'var(--text-subtle)', pointerEvents: 'none' }} />
-                    </div>
-                  </div>
-
-                  {/* مكان التنفيذ */}
-                  <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: '700' }}>مكان التنفيذ (الجهة / المحكمة / مكتب الخبراء)</label>
-                    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="مثال: مكتب خبراء وزارة العدل، محكمة الأسرة، الشهر العقاري..."
-                        value={location}
-                        onChange={(e) => setLocation(e.target.value)}
-                        style={{ paddingLeft: '2.5rem' }}
-                      />
-                      <MapPin size={17} style={{ position: 'absolute', left: '12px', color: 'var(--text-subtle)', pointerEvents: 'none' }} />
-                    </div>
-                  </div>
-
-                  {/* المطلوب */}
-                  <div className="form-group">
-                    <label className="form-label" style={{ fontWeight: '700' }}>المطلوب (الإجراءات أو المستندات المطلوبة) *</label>
-                    <textarea
-                      required
-                      className="form-textarea"
-                      rows={3}
-                      placeholder="اكتب الأوراق أو الإجراءات المطلوبة بالتفصيل..."
-                      value={requirements}
-                      onChange={(e) => setRequirements(e.target.value)}
+                    <label className="form-label">مكان التنفيذ</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="مكتب الخبراء، محكمة الأسرة، الشهر العقاري…"
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
                     />
                   </div>
+                </div>
 
-                  {/* الملاحظات */}
-                  <div className="form-group">
-                    <label className="form-label">الملاحظات (اختياري)</label>
-                    <textarea
-                      className="form-textarea"
-                      rows={2}
-                      placeholder="أي ملاحظات إضافية أو تعليمات للمحامي المكلف..."
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                    />
-                  </div>
+                <div className="form-group">
+                  <label className="form-label">المطلوب (الإجراءات أو المستندات) *</label>
+                  <textarea required className="form-textarea" rows={3} value={requirements} onChange={(e) => setRequirements(e.target.value)} />
+                </div>
 
-                  {/* المكلف بالتنفيذ */}
-                  <div className="form-group">
-                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <UserCheck size={15} color="var(--primary-700)" />
-                      <span>إسناد المهمة لمحامٍ أو عضو بالفريق</span>
-                    </label>
-                    <select
-                      className="form-select"
-                      value={assignedTo}
-                      onChange={(e) => setAssignedTo(e.target.value)}
-                    >
-                      <option value="">-- بدون تكليف محدد --</option>
-                      {team.map(m => (
-                        <option key={m.id} value={m.id}>
-                          الأستاذ / {m.name} ({USER_ROLES[m.role] || m.role || 'محامي'})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="form-group">
+                  <label className="form-label">ملاحظات (اختياري)</label>
+                  <textarea className="form-textarea" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">إسناد المهمة لعضو بالفريق</label>
+                  <Select className="form-select" value={assignedTo} onChange={(e) => setAssignedTo(e.target.value)}>
+                    <option value="">بدون تكليف محدد</option>
+                    {team.map((m) => (
+                      <option key={m.id} value={m.id}>الأستاذ / {m.name} ({USER_ROLES[m.role] || m.role || 'محامي'})</option>
+                    ))}
+                  </Select>
                 </div>
               </div>
 
-              {/* Modal Footer */}
-              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.4rem', borderTop: '1px solid var(--border-color)' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ borderRadius: '10px', padding: '0.6rem 1.5rem', fontWeight: '700' }}
-                  onClick={() => setIsModalOpen(false)}
-                >
-                  إلغاء
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="btn btn-primary"
-                  style={{ background: 'var(--accent)', color: 'var(--on-accent)', borderRadius: '10px', padding: '0.6rem 1.6rem', fontWeight: '700', border: '1px solid var(--accent-gold)' }}
-                >
-                  {isSaving ? 'جاري الحفظ...' : (editingTask ? 'تحديث العمل الإداري' : 'حفظ العمل الإداري')}
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setIsModalOpen(false)}>إلغاء</button>
+                <button type="submit" disabled={isSaving} className="btn btn-primary">
+                  {isSaving ? 'جارٍ الحفظ…' : (editingTask ? 'حفظ التعديلات' : 'حفظ العمل')}
                 </button>
               </div>
             </form>

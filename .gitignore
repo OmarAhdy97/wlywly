@@ -22,3 +22,19 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# build outputs and large local files
+*.apk
+android/app/release/
+android/app/build/
+android/.gradle/
+Marketing/
+logos/
+test_img.png
+
+# SCC crawler working data (rebuilt by scripts/crawl_scc.py)
+scripts/data/scc_raw.jsonl
+scripts/data/crawl_stdout.txt
+scripts/data/scc_crawl.log
+صيغ الدعاوي/
+~$*

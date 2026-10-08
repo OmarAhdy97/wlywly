@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, Edit3, ArrowRight, Printer, Download, Copy, Check, AlertTriangle, FileText, Sparkles } from 'lucide-react';
+import { Edit3, Printer, Download, Copy, Check, AlertTriangle } from 'lucide-react';
 import LawFirmPrintHeader from '../common/LawFirmPrintHeader';
 import { printWithTitle } from '../../lib/printUtils';
 import { exportTextToDocx, exportDocumentToRealDocx, exportDocumentToDocx } from '../../lib/documentExport';
@@ -63,122 +63,51 @@ export default function FormulaPreview({
   };
 
   return (
-    <div style={{ maxWidth: '920px', margin: '0 auto' }}>
-      {/* Header Bar */}
-      <div className="no-print" style={{
-        background: 'var(--bg-card)',
-        padding: '1rem 1.5rem',
-        borderRadius: 'var(--radius-lg, 12px)',
-        border: '1px solid var(--border-color)',
-        marginBottom: '1rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '0.75rem',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button
-            type="button"
-            onClick={onBackToForm}
-            className="btn btn-secondary btn-sm"
-          >
-            ← العودة لتعديل البيانات
-          </button>
-          <div>
-            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>معاينة المستند القانوني المولد</div>
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold' }}>{formula?.title}</h3>
-          </div>
+    <div className="ff-page fp-page">
+      <div className="no-print fp-bar">
+        <div className="fp-title">
+          <button type="button" onClick={onBackToForm} className="formula-back">← العودة لتعديل البيانات</button>
+          <h2>{formula?.title}</h2>
+          <span className="cell-sub">معاينة المستند قبل الطباعة أو التصدير</span>
         </div>
 
-        {/* Action Controls */}
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={handleCopy}
-            className="btn btn-secondary btn-sm"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
-            {copied ? <Check size={15} style={{ color: 'var(--success)' }} /> : <Copy size={15} />}
+        <div className="fp-actions">
+          <button type="button" onClick={handleCopy} className="btn btn-secondary btn-sm">
+            {copied ? <Check size={15} /> : <Copy size={15} />}
             <span>{copied ? 'تم النسخ' : 'نسخ النص'}</span>
           </button>
-
           <button
             type="button"
             onClick={handleExportRealDocx}
             disabled={exporting}
             className="btn btn-secondary btn-sm"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#1d4ed8' }}
-            title="تصدير ملف Word (.docx) أصلي متوافق مع كافة الإصدارات"
+            title="تصدير ملف Word (.docx) متوافق مع كل الإصدارات"
           >
             <Download size={15} />
-            <span>{exporting ? 'جاري التصدير...' : 'تصدير Word (.docx)'}</span>
+            <span>{exporting ? 'جارٍ التصدير…' : 'تصدير Word'}</span>
           </button>
-
-          <button
-            type="button"
-            onClick={handlePrint}
-            className="btn btn-secondary btn-sm"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}
-          >
+          <button type="button" onClick={handlePrint} className="btn btn-secondary btn-sm">
             <Printer size={15} />
-            <span>طباعة فورية</span>
+            <span>طباعة</span>
           </button>
-
-          <button
-            type="button"
-            onClick={onContinueToEditor}
-            className="btn btn-gold btn-sm"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontWeight: 'bold' }}
-          >
+          <button type="button" onClick={onContinueToEditor} className="btn btn-primary btn-sm">
             <Edit3 size={15} />
-            <span>فتح في المحرر والتنسيق ←</span>
+            <span>فتح في المحرر</span>
           </button>
         </div>
       </div>
 
-      {/* Warning Alert if Placeholders are missing */}
       {hasUnresolvedPlaceholders && (
-        <div className="no-print" style={{
-          background: 'rgba(234, 88, 12, 0.1)',
-          border: '1px solid rgba(234, 88, 12, 0.4)',
-          color: '#c2410c',
-          padding: '0.75rem 1rem',
-          borderRadius: '8px',
-          marginBottom: '1rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.6rem',
-          fontSize: '0.88rem'
-        }}>
-          <AlertTriangle size={18} style={{ flexShrink: 0 }} />
+        <div className="no-print auth-alert is-warn fp-warning" role="alert">
+          <AlertTriangle size={18} />
           <span>
-            <strong>تنبيه قانوني:</strong> يحتوي هذا المستند على بيانات لم يتم ملؤها (مشار إليها بالرمز ⚠️). يرجى مراجعتها وتعبئتها بالعودة للنموذج أو التعديل المباشر في المحرر لتجنب بطلان الإجراءات.
+            <strong>تنبيه:</strong> يحتوي المستند على بيانات لم تُملأ (مشار إليها بالرمز ⚠️). راجعها بالعودة للنموذج أو عدّلها مباشرة في المحرر قبل الاستخدام.
           </span>
         </div>
       )}
 
-      {/* Sheet Preview A4 Style */}
-      <div className="formula-preview-bg" style={{
-        background: 'var(--bg-app)',
-        borderRadius: 'var(--radius-lg, 12px)',
-        border: '1px solid var(--border-color)',
-        display: 'flex',
-        justifyContent: 'center'
-      }}>
-        <div id="formula-printable-sheet" className="formula-sheet" style={{
-          width: '100%',
-          maxWidth: '820px',
-          background: '#ffffff',
-          color: '#1f2937',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-          borderRadius: '4px',
-          fontFamily: "'Simplified Arabic', Cairo, 'Traditional Arabic', Arial, sans-serif",
-          lineHeight: '1.9',
-          textAlign: 'justify',
-          direction: 'rtl'
-        }}>
+      <div className="formula-preview-bg fp-bg">
+        <div id="formula-printable-sheet" className="formula-sheet fp-sheet">
           <LawFirmPrintHeader />
           {(() => {
             const bodyStyle = { whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#111827' };

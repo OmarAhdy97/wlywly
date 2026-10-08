@@ -480,7 +480,7 @@ export async function generateDocx(docModel) {
   const doc = new Document({
     title: metadata.title || 'مستند قانوني',
     description: `${metadata.formulaCategory || ''} - ${metadata.title || ''}`,
-    creator: metadata.generatedBy || 'الأجندة القضائية',
+    creator: metadata.generatedBy || 'الديوان',
     styles: {
       default: {
         document: {

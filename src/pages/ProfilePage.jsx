@@ -1,18 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  Building2,
-  Phone,
-  Sparkles,
-  Upload,
-  Trash2,
-  CheckCircle2,
-  Eye,
-  Scale,
-  FileCheck,
-  AlertCircle
-} from 'lucide-react';
+import { Upload, Trash2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import LawFirmPrintHeader, { LawFirmDefaultLogo } from '../components/common/LawFirmPrintHeader';
+import { notify } from '../lib/dialog';
 
 // Helper function to compress images client-side before storing
 function compressImage(file, maxWidth = 160, maxHeight = 160, quality = 0.8) {
@@ -115,7 +105,7 @@ export default function ProfilePage() {
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('يرجى اختيار ملف صورة صالح (PNG, JPG, SVG)');
+      notify('يرجى اختيار ملف صورة صالح (PNG, JPG, SVG)', 'warn');
       return;
     }
 
@@ -127,7 +117,7 @@ export default function ProfilePage() {
       isDirtyRef.current = true;
       handleInputChange('logo_url', compressedBase64);
     } catch (err) {
-      alert('حدث خطأ أثناء معالجة الصورة: ' + err.message);
+      notify('حدث خطأ أثناء معالجة الصورة: ' + err.message);
     }
   };
 
@@ -158,190 +148,112 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="page-wrapper" style={{ maxWidth: '1200px' }}>
-      {/* Top Page Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '1.5rem',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        borderBottom: '1px solid var(--border-subtle)',
-        paddingBottom: '1rem',
-      }}>
+    <div className="page-wrapper profile-page">
+      <div className="page-head">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-            <Building2 size={18} style={{ color: 'var(--primary-700)' }} />
-            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
-              الهوية الرسمية والمطبوعات
-            </span>
-          </div>
-          <h1 style={{ fontSize: '1.6rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-            هوية مكتب المحاماة والملف التعريفي
-          </h1>
-          <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.86rem', color: 'var(--text-muted)' }}>
-            تظهر هذه البيانات كترويسة معتمدة في كشف الحساب، فواتير الأتعاب، ورول الجلسات القضائية.
-          </p>
+          <h1>هوية المكتب</h1>
+          <p className="page-sub">تظهر هذه البيانات في ترويسة كشف الحساب وفواتير الأتعاب ورول الجلسات.</p>
         </div>
       </div>
 
-      {/* Success Notification */}
       {saveSuccess && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.6rem',
-          background: 'var(--status-active-bg)',
-          border: '1px solid #86efac',
-          color: '#15803d',
-          padding: '0.85rem 1.1rem',
-          borderRadius: '10px',
-          marginBottom: '1.25rem',
-          fontSize: '0.9rem',
-          fontWeight: '700',
-        }}>
-          <CheckCircle2 size={20} />
-          <span>تم حفظ هوية المكتب والملف التعريفي بنجاح! سيتم تطبيقها فوراً على كافة المطبوعات.</span>
+        <div className="inline-notice" role="status">
+          <CheckCircle2 size={18} />
+          <span>تم حفظ هوية المكتب، وستظهر في كل المطبوعات.</span>
         </div>
       )}
 
-      {/* Error Notification */}
       {saveError && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.6rem',
-          background: 'var(--status-dismissed-bg)',
-          border: '1px solid #fca5a5',
-          color: '#b91c1c',
-          padding: '0.85rem 1.1rem',
-          borderRadius: '10px',
-          marginBottom: '1.25rem',
-          fontSize: '0.9rem',
-          fontWeight: '700',
-        }}>
-          <AlertCircle size={20} />
-          <span>خطأ أثناء الحفظ في قاعدة البيانات: {saveError}</span>
+        <div className="inline-notice is-error" role="alert">
+          <AlertCircle size={18} />
+          <span>تعذر الحفظ: {saveError}</span>
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 290px), 1fr))', gap: '1.5rem', marginBottom: '1.5rem' }}>
+        <div className="profile-grid">
+          <div className="card profile-card">
+            <h3 className="card-heading">بيانات المكتب</h3>
 
-          {/* Card 1: Office & Lawyer Identity */}
-          <div className="card" style={{ padding: '1.4rem', display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.6rem' }}>
-              <Building2 size={18} color="var(--primary-700)" />
-              <h3 style={{ fontSize: '1rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-                البيانات الأساسية للمكتب
-              </h3>
-            </div>
-
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>
-                اسم المكتب
-              </label>
+            <div className="form-group">
+              <label className="form-label">اسم المكتب</label>
               <input
                 type="text"
                 required
                 className="form-input"
-                placeholder="مثال: مكتب المحاماة والاستشارات القانونية"
+                placeholder="مكتب المحاماة والاستشارات القانونية"
                 value={formData.office_name}
                 onChange={(e) => handleInputChange('office_name', e.target.value)}
               />
             </div>
 
-            <div className="form-grid-2" style={{ gap: '0.8rem' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>
-                  اسم المحامي المسؤول
-                </label>
+            <div className="form-grid">
+              <div className="form-group">
+                <label className="form-label">اسم المحامي المسؤول</label>
                 <input
                   type="text"
                   required
                   className="form-input"
-                  placeholder="مثال: أ/ اسم المحامي المسؤول"
+                  placeholder="أ/ الاسم"
                   value={formData.lawyer_name}
                   onChange={(e) => handleInputChange('lawyer_name', e.target.value)}
                 />
               </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>
-                  الصفة القانونية / الدرجة
-                </label>
+              <div className="form-group">
+                <label className="form-label">الصفة أو الدرجة</label>
                 <input
                   type="text"
                   required
                   className="form-input"
-                  placeholder="مثال: محامون ومستشارون قانونيون"
+                  placeholder="محامون ومستشارون قانونيون"
                   value={formData.lawyer_title}
                   onChange={(e) => handleInputChange('lawyer_title', e.target.value)}
                 />
               </div>
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>
-                شعار أو عبارة المكتب
-              </label>
+            <div className="form-group">
+              <label className="form-label">عبارة المكتب (اختياري)</label>
               <input
                 type="text"
                 className="form-input"
-                placeholder="مثال: الالتزام .. خبرة .. نتائج"
                 value={formData.slogan}
                 onChange={(e) => handleInputChange('slogan', e.target.value)}
               />
             </div>
           </div>
 
-          {/* Card 2: Contact Details & Location */}
-          <div className="card" style={{ padding: '1.4rem', display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.6rem' }}>
-              <Phone size={18} color="var(--primary-700)" />
-              <h3 style={{ fontSize: '1rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-                بيانات التواصل والعنوان
-              </h3>
-            </div>
+          <div className="card profile-card">
+            <h3 className="card-heading">التواصل والعنوان</h3>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>
-                العنوان والمحافظة
-              </label>
+            <div className="form-group">
+              <label className="form-label">العنوان</label>
               <input
                 type="text"
                 className="form-input"
-                placeholder="مثال: العنوان أو المدينة - مصر"
                 value={formData.address}
                 onChange={(e) => handleInputChange('address', e.target.value)}
               />
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>
-                رقم الهاتف / الواتساب الرسمي
-              </label>
+            <div className="form-group">
+              <label className="form-label">الهاتف / واتساب</label>
               <input
                 type="text"
                 dir="ltr"
-                className="form-input"
-                style={{ textAlign: 'right' }}
+                className="form-input input-rtl-align"
                 placeholder="+20 01000000000"
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
               />
             </div>
 
-            <div>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '700', marginBottom: '0.4rem', color: 'var(--text-secondary)' }}>
-                البريد الإلكتروني الرسمي
-              </label>
+            <div className="form-group">
+              <label className="form-label">البريد الإلكتروني</label>
               <input
                 type="email"
                 dir="ltr"
-                className="form-input"
-                style={{ textAlign: 'right' }}
+                className="form-input input-rtl-align"
                 placeholder="info@lawfirm.com"
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
@@ -350,134 +262,54 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Card 3: Logo Management with Smart Compression */}
-        <div className="card" style={{ padding: '1.4rem', marginBottom: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.6rem', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <Sparkles size={18} color="var(--accent-gold)" />
-              <h3 style={{ fontSize: '1rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-                شعار المكتب
-              </h3>
-            </div>
-            {logoSizeKb && (
-              <span className="badge" style={{ background: 'var(--primary-100)', color: 'var(--primary-800)', fontWeight: '700' }}>
-                حجم الشعار: {logoSizeKb} كيلوبايت فقط (خفيف جداً)
-              </span>
-            )}
+        <div className="card profile-card">
+          <div className="card-title-row">
+            <h3 className="card-heading">الشعار</h3>
+            {logoSizeKb && <span className="cell-sub">{logoSizeKb} ك.ب بعد الضغط</span>}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-            {/* Logo Preview Box */}
-            <div style={{
-              width: '90px',
-              height: '90px',
-              borderRadius: '50%',
-              border: '2px solid #37040a',
-              boxShadow: '0 4px 12px rgba(55, 4, 10, 0.15)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: '#ffffff',
-              overflow: 'hidden',
-              flexShrink: 0,
-            }}>
+          <div className="logo-row">
+            <div className="logo-preview">
               {formData.logo_url ? (
-                <img
-                  src={formData.logo_url}
-                  alt="لوجو المكتب"
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                />
+                <img src={formData.logo_url} alt="شعار المكتب" />
               ) : (
-                <div style={{ textAlign: 'center', padding: '0.2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-                  <LawFirmDefaultLogo size={52} color="#37040a" />
-                  <div style={{ fontSize: '0.62rem', fontWeight: '700', color: '#37040a', marginTop: '0.1rem' }}>الافتراضي</div>
+                <div className="logo-default">
+                  <LawFirmDefaultLogo size={52} color="#111827" />
+                  <span>الافتراضي</span>
                 </div>
               )}
             </div>
 
-            {/* Upload Controls */}
-            <div style={{ flex: 1, minWidth: '220px' }}>
-              <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept="image/*"
-                  style={{ display: 'none' }}
-                  onChange={handleLogoUpload}
-                />
-
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem' }}
-                  onClick={() => fileInputRef.current?.click()}
-                >
+            <div className="logo-controls">
+              <input type="file" ref={fileInputRef} accept="image/*" hidden onChange={handleLogoUpload} />
+              <div className="logo-buttons">
+                <button type="button" className="btn btn-secondary" onClick={() => fileInputRef.current?.click()}>
                   <Upload size={16} />
-                  <span>{formData.logo_url ? 'تغيير الشعار' : 'رفع شعار من الجهاز'}</span>
+                  <span>{formData.logo_url ? 'تغيير الشعار' : 'رفع شعار'}</span>
                 </button>
-
                 {formData.logo_url && (
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', fontSize: '0.85rem', color: '#dc2626' }}
-                    onClick={handleRemoveLogo}
-                  >
+                  <button type="button" className="btn btn-secondary btn-danger-text" onClick={handleRemoveLogo}>
                     <Trash2 size={16} />
-                    <span>العودة لشعار ميزان العدل الافتراضي</span>
+                    <span>استخدام الشعار الافتراضي</span>
                   </button>
                 )}
               </div>
-
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0.5rem 0 0 0', lineHeight: 1.5 }}>
-                • يتم ضغط أي صورة ترفعها تلقائياً بتقنية Canvas WebP لأقل من 20 كيلوبايت لتوفير مساحة قاعدة البيانات وحفظها بسرعة فائقة.
-                <br />
-                • إذا لم ترفع صورة مخصصة، سيتم اعتماد أيقونة ميزان العدالة الملكي المحاطة بالغار كشعار رسمي أنيق.
-              </p>
+              <p className="hint">تُضغط الصورة تلقائياً قبل الحفظ. إن لم ترفع شعاراً يُستخدم شعار الميزان الافتراضي.</p>
             </div>
           </div>
         </div>
 
-        {/* Live Preview Card */}
-        <div className="card" style={{ padding: '1.4rem', marginBottom: '1.5rem', background: '#ffffff', color: '#24070b' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-            <Eye size={18} color="#37040a" />
-            <h3 style={{ fontSize: '1.05rem', fontWeight: '800', margin: 0, color: '#37040a' }}>
-              معاينة حية لترويسة المطبوعات الرسمية
-            </h3>
-          </div>
-
-          <div style={{
-            border: '1.5px dashed #e5c4c8',
-            borderRadius: '10px',
-            padding: '1.25rem',
-            background: '#ffffff',
-            overflowX: 'auto',
-          }}>
+        <div className="card profile-card profile-preview">
+          <h3 className="card-heading">معاينة الترويسة</h3>
+          <div className="profile-preview-frame">
             <LawFirmPrintHeader customProfile={formData} />
-            <div style={{ textAlign: 'center', padding: '1rem 0', color: '#6b4c51', fontSize: '0.82rem' }}>
-              [ هنا ستظهر محتويات المستند: كشف الحساب / رول الجلسات / الفواتير ]
-            </div>
+            <div className="profile-preview-body">محتوى المستند: كشف حساب أو رول جلسات أو فاتورة</div>
           </div>
         </div>
 
-        {/* Bottom Actions */}
-        <div style={{ display: 'flex', justifyContent: 'flex-start', gap: '1rem' }}>
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={isSaving}
-            style={{
-              padding: '0.75rem 2rem',
-              fontSize: '0.95rem',
-              fontWeight: '800',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-            }}
-          >
-            <FileCheck size={18} />
-            <span>{isSaving ? 'جارٍ الحفظ...' : 'حفظ هوية المكتب'}</span>
+        <div className="form-actions">
+          <button type="submit" className="btn btn-primary" disabled={isSaving}>
+            {isSaving ? 'جارٍ الحفظ…' : 'حفظ هوية المكتب'}
           </button>
         </div>
       </form>

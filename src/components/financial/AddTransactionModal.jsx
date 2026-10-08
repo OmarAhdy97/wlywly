@@ -7,6 +7,8 @@ import {
   isDebitTransaction
 } from '../../lib/financialCalculations';
 import { formatCurrencyToArabic } from '../../lib/numberToArabicWords';
+import Select from '../common/Select';
+import DateInput from '../common/DateInput';
 
 const DEFAULT_DESCRIPTIONS = {
   payment: 'دفعة من الموكل',
@@ -173,7 +175,7 @@ export default function AddTransactionModal({
               </div>
               <div className="form-group">
                 <label className="form-label sd-label">تاريخ الحركة *</label>
-                <input type="date" required className="form-input" value={date} onChange={(e) => setDate(e.target.value)} />
+                <DateInput required className="form-input" value={date} onChange={(e) => setDate(e.target.value)} />
               </div>
             </div>
 
@@ -185,29 +187,29 @@ export default function AddTransactionModal({
 
             <div className="form-group">
               <label className="form-label sd-label">القضية المرتبطة</label>
-              <select className="form-select" value={caseId} onChange={(e) => setCaseId(e.target.value)}>
+              <Select className="form-select" value={caseId} onChange={(e) => setCaseId(e.target.value)}>
                 <option value="">عام (بدون ربط بقضية معينة)</option>
                 {clientCases.map(c => (
                   <option key={c.id} value={c.id}>دعوى {c.case_number}/{c.case_year} — {c.case_title || c.court_name}</option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {!isDebit && (
               <div className="form-group">
                 <label className="form-label sd-label">طريقة السداد / التحصيل</label>
-                <select className="form-select" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
+                <Select className="form-select" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}>
                   {PAYMENT_METHODS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-                </select>
+                </Select>
               </div>
             )}
 
             {isExpense && (
               <div className="form-group">
                 <label className="form-label sd-label">تصنيف المصروف المحتسب على الموكل</label>
-                <select className="form-select" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}>
+                <Select className="form-select" value={expenseCategory} onChange={(e) => setExpenseCategory(e.target.value)}>
                   {EXPENSE_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                </select>
+                </Select>
                 <div className="sd-help fin-hint"><Info size={14} /> يُحتسب هذا المصروف مديونية على الموكل ويظهر في كشف حسابه الرسمي.</div>
               </div>
             )}

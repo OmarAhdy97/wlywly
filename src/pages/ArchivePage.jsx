@@ -1,220 +1,190 @@
-import React, { useState } from 'react';
-import { Archive, Search, RotateCcw, Trash2, Eye, X, FileText, CheckCircle } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Search, RotateCcw, Trash2, X, History } from 'lucide-react';
 import { useData } from '../context/DataContext';
 import { CASE_TYPES, COURT_LEVELS } from '../lib/supabase';
+import { takeFocusTarget, onFocusTarget } from '../lib/focusTarget';
 import RowAction, { RowActions } from '../components/common/RowAction';
+import { confirmDialog } from '../lib/dialog';
+import { buildTimeline, CaseTimeline } from '../components/history/CaseTimeline';
+
+const fmt = (d) => (d ? new Date(d).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }) : '—');
 
 export default function ArchivePage() {
-  const { cases, updateCase, deleteCase } = useData();
+  const { cases, clients, sessions, appeals, adminTasks, adminTaskUpdates, updateCase, deleteCase } = useData();
+  const [openHistory, setOpenHistory] = useState(() => new Set());
+  const toggleHistory = (id) => setOpenHistory((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCase, setSelectedCase] = useState(null);
 
-  const archivedCases = cases.filter(c => c.is_archived);
+  const archivedCases = cases.filter((c) => c.is_archived);
 
-  const filtered = archivedCases.filter(c => {
-    return (
-      (c.case_number && c.case_number.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (c.case_title && c.case_title.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (c.plaintiff_name && c.plaintiff_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (c.defendant_name && c.defendant_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (c.court_name && c.court_name.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  });
+  useEffect(() => {
+    const open = (t) => {
+      const found = archivedCases.find((c) => c.id === t.id);
+      if (found) setSelectedCase(found);
+    };
+    const pending = takeFocusTarget('case');
+    if (pending) open(pending);
+    return onFocusTarget('case', open);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cases]);
+
+  const q = searchTerm.trim().toLowerCase();
+  const filtered = archivedCases.filter(
+    (c) =>
+      !q ||
+      [c.case_number, c.case_title, c.plaintiff_name, c.defendant_name, c.court_name, c.case_year].some(
+        (v) => v && String(v).toLowerCase().includes(q)
+      )
+  );
 
   const handleRestore = async (id) => {
-    if (window.confirm('هل تريد استعادة هذه القضية إلى القضايا النشطة المتداولة؟')) {
+    if (await confirmDialog('هل تريد إعادة هذه القضية إلى القضايا الجارية؟')) {
       await updateCase(id, { is_archived: false, archive_date: null });
       if (selectedCase?.id === id) setSelectedCase(null);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('تحذير: سيتم حذف القضية من الأرشيف نهائياً!')) {
+    if (await confirmDialog('تحذير: سيتم حذف القضية من الأرشيف نهائياً.', { danger: true, confirmLabel: 'حذف' })) {
       await deleteCase(id);
       if (selectedCase?.id === id) setSelectedCase(null);
     }
   };
 
-  return (
-    <div className="page-wrapper" style={{ maxWidth: '1400px' }}>
-      {/* Top Header */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '1.25rem',
-        flexWrap: 'wrap',
-        gap: '1rem',
-        borderBottom: '1px solid var(--border-subtle)',
-        paddingBottom: '1rem'
-      }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent-gold)' }}></span>
-            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
-              السجلات المؤرشفة والقضايا المنتهية
-            </span>
-          </div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-            أرشيف القضايا المنتهية
-          </h1>
-        </div>
+  const facts = selectedCase && [
+    ['نوع الدعوى', CASE_TYPES[selectedCase.case_type] || selectedCase.case_type],
+    ['درجة التقاضي', COURT_LEVELS[selectedCase.court_level] || selectedCase.court_level],
+    ['المحكمة', selectedCase.court_name],
+    ['المدعي', selectedCase.plaintiff_name],
+    ['المدعى عليه', selectedCase.defendant_name],
+    ['تاريخ الأرشفة', selectedCase.archive_date ? fmt(selectedCase.archive_date) : ''],
+  ];
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span className="badge" style={{ background: 'var(--bg-card-subtle)', color: 'var(--text-main)', border: '1px solid var(--border-color)', fontWeight: '700', padding: '0.4rem 0.85rem', fontSize: '0.82rem' }}>
-            {filtered.length} قضية مؤرشفة
-          </span>
+  return (
+    <div className="page-wrapper">
+      <div className="page-head">
+        <div>
+          <h1>أرشيف القضايا</h1>
+          <p className="page-sub">{archivedCases.length} قضية مؤرشفة</p>
         </div>
       </div>
 
-      {/* Search */}
-      <div className="card" style={{ marginBottom: '1.25rem', padding: '0.9rem 1.15rem', borderRadius: '14px' }}>
-        <div className="header-search" style={{ width: '100%', minHeight: '40px', borderRadius: '10px' }}>
-          <Search size={17} style={{ color: 'var(--text-subtle)' }} />
-          <input 
-            type="text" 
-            placeholder="بحث في الأرشيف برقم القضية، السنة، أو أسماء الخصوم..." 
+      <div className="page-toolbar">
+        <div className="page-search">
+          <Search size={16} />
+          <input
+            type="text"
+            className="form-input"
+            placeholder="رقم القضية، السنة، الخصوم، المحكمة"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ fontSize: '0.88rem' }}
           />
         </div>
       </div>
 
-      {/* Archive Table */}
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3.5rem 1.5rem', color: 'var(--text-muted)' }}>
-            <Archive size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.4rem' }}>لا توجد قضايا مؤرشفة</h3>
-            <p style={{ fontSize: '0.9rem' }}>يمكنك أرشفة أي قضية منتهية من صفحة إدارة القضايا لتظهر هنا.</p>
-          </div>
-        ) : (
-          <div className="table-container" style={{ border: 'none' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>رقم الدعوى والسنة</th>
-                  <th className="cell-wide">موضوع الدعوى</th>
-                  <th>المحكمة</th>
-                  <th>المدعي والخصم</th>
-                  <th>تاريخ الأرشفة</th>
-                  <th className="cell-actions">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(c => (
-                  <tr key={c.id}>
-                    <td>
-                      <div className="cell-stack">
-                        <span className="case-no"><strong>{c.case_number}</strong> / {c.case_year}</span>
-                        <span className="cell-sub">{CASE_TYPES[c.case_type] || c.case_type}</span>
-                      </div>
-                    </td>
-                    <td className="cell-wide">
-                      <div className="cell-stack">
-                        <div className="case-title-cell" title={c.case_title || ''}>{c.case_title || '—'}</div>
-                        <span className="cell-sub">{COURT_LEVELS[c.court_level] || c.court_level}</span>
-                      </div>
-                    </td>
-                    <td><div className="cell-stack"><span>{c.court_name}</span></div></td>
-                    <td>
-                      <div className="cell-stack">
-                        <span>{c.plaintiff_name}</span>
-                        <span className="cell-sub">ضد: {c.defendant_name}</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="cell-stack">
-                        <span>{c.archive_date ? new Date(c.archive_date).toLocaleDateString('ar-EG') : '—'}</span>
-                      </div>
-                    </td>
-                    <td className="cell-actions">
-                      <RowActions>
-                        <RowAction icon={Eye} label="عرض التفاصيل" onClick={() => setSelectedCase(c)} />
-                        <RowAction icon={RotateCcw} label="استعادة للقضايا النشطة" tone="primary" onClick={() => handleRestore(c.id)} />
-                        <RowAction icon={Trash2} label="حذف نهائي" tone="danger" onClick={() => handleDelete(c.id)} />
-                      </RowActions>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      {filtered.length === 0 ? (
+        <div className="card empty-block">
+          <h3>{archivedCases.length === 0 ? 'الأرشيف فارغ' : 'لا توجد نتائج'}</h3>
+          <p>{archivedCases.length === 0 ? 'القضايا المنتهية التي تنقلها إلى الأرشيف تظهر هنا.' : 'جرّب كلمة بحث أخرى.'}</p>
+        </div>
+      ) : (
+        <div className="card row-list">
+          {filtered.map((c) => {
+            const isOpen = openHistory.has(c.id);
+            const history = isOpen ? buildTimeline({ current: c, sessions, appeals, adminTasks, adminTaskUpdates }).items : [];
+            const client = (clients || []).find((k) => k.id === c.client_id);
+            return (
+              <article key={c.id} className={`list-row ${isOpen ? 'is-open' : ''}`}>
+                <div className="list-row-main">
+                  <div className="list-row-body is-clickable" onClick={() => setSelectedCase(c)}>
+                    <div className="list-row-top">
+                      <button type="button" className="row-title row-title-link">
+                        <span className="row-key">{c.case_number}/{c.case_year}</span>
+                        <span className="row-title-text" title={c.case_title || ''}>{c.case_title || CASE_TYPES[c.case_type] || 'قضية'}</span>
+                      </button>
+                      <span className="status-chip" style={{ '--dot': 'var(--text-subtle)' }}>مؤرشفة</span>
+                    </div>
+                    <p className="list-row-sub">
+                      {[CASE_TYPES[c.case_type] || c.case_type, COURT_LEVELS[c.court_level] || c.court_level, c.court_name].filter(Boolean).join(' · ')}
+                    </p>
+                    <p className="row-parties">
+                      <span className="row-party"><small>المدعي</small>{c.plaintiff_name || '—'}</span>
+                      <span className="row-vs">ضد</span>
+                      <span className="row-party"><small>المدعى عليه</small>{c.defendant_name || '—'}</span>
+                    </p>
+                  </div>
 
-      {/* Case Details Modal */}
+                  <dl className="list-row-facts">
+                    <div><dt>تاريخ الأرشفة</dt><dd>{c.archive_date ? new Date(c.archive_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</dd></div>
+                    <div>
+                      <dt>الموكل</dt>
+                      <dd className="row-owner">
+                        {client ? (<>{client.name}</>) : <span className="cell-sub">غير مرتبط</span>}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div className="list-row-actions">
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleRestore(c.id)}>
+                      <RotateCcw size={14} /> إعادة للجارية
+                    </button>
+                    <RowActions>
+                      <RowAction icon={History} label={isOpen ? 'إخفاء السجل' : 'سجل القضية'} onClick={() => toggleHistory(c.id)} />
+                      <RowAction icon={Trash2} label="حذف نهائي" tone="danger" onClick={() => handleDelete(c.id)} />
+                    </RowActions>
+                  </div>
+                </div>
+
+                {isOpen && (
+                  <div className="list-row-extra">
+                    {history.length === 0
+                      ? <p className="empty-line">لا توجد جلسات أو قرارات مسجلة لهذه القضية.</p>
+                      : <CaseTimeline items={history} />}
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      )}
+
       {selectedCase && (
         <div className="modal-backdrop" onClick={() => setSelectedCase(null)}>
-          <div className="modal-dialog" style={{ maxWidth: '780px', maxHeight: '92vh', display: 'flex', flexDirection: 'column', borderRadius: '16px', overflow: 'hidden' }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <div style={{ width: '38px', height: '38px', borderRadius: '8px', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-accent)', flexShrink: 0 }}>
-                  <Archive size={20} />
-                </div>
-                <h3 style={{ fontSize: '1.25rem', fontWeight: '900', margin: 0, color: 'var(--text-main)' }}>
-                  ملف القضية المؤرشفة رقم {selectedCase.case_number}/{selectedCase.case_year}
-                </h3>
+          <div className="modal-dialog case-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div className="case-dialog-title">
+                <h3>قضية {selectedCase.case_number} / {selectedCase.case_year}</h3>
+                <span className="status-chip" style={{ '--dot': 'var(--text-subtle)' }}>مؤرشفة</span>
               </div>
-              <button className="btn btn-secondary btn-icon" style={{ borderRadius: '8px', width: '36px', height: '36px', padding: 0 }} onClick={() => setSelectedCase(null)}>
+              <button type="button" className="icon-btn" onClick={() => setSelectedCase(null)} aria-label="إغلاق">
                 <X size={18} />
               </button>
             </div>
 
-            <div className="modal-body" style={{ overflowY: 'auto', padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
-              <div style={{ padding: '1.25rem', background: 'var(--bg-card)', borderRadius: '12px', border: '1px solid var(--border-color)', boxShadow: 'var(--shadow-sm)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.8rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                    <FileText size={20} color="var(--primary-800)" style={{ flexShrink: 0 }} />
-                    <h4 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, color: 'var(--text-main)', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                      {selectedCase.case_title || `دعوى رقم ${selectedCase.case_number}`}
-                    </h4>
-                  </div>
-                  <span className="badge" style={{ background: 'var(--status-dismissed-bg)', color: 'var(--status-dismissed)', fontWeight: '700', padding: '0.35rem 0.85rem' }}>
-                    مؤرشفة
-                  </span>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 120px), 1fr))', gap: '1rem', textAlign: 'center', padding: '0.5rem 0' }}>
-                  <div>
-                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>نوع الدعوى</span>
-                    <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>{CASE_TYPES[selectedCase.case_type] || selectedCase.case_type || '—'}</div>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>درجة التقاضي</span>
-                    <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>{COURT_LEVELS[selectedCase.court_level] || selectedCase.court_level || '—'}</div>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المحكمة</span>
-                    <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>{selectedCase.court_name || '—'}</div>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المدعي</span>
-                    <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>{selectedCase.plaintiff_name || '—'}</div>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>المدعى عليه</span>
-                    <div style={{ fontWeight: '700', fontSize: '0.95rem' }}>{selectedCase.defendant_name || '—'}</div>
-                  </div>
-                </div>
-              </div>
-
+            <div className="modal-body case-dialog-body">
+              {selectedCase.case_title && <p className="case-subject">{selectedCase.case_title}</p>}
+              <dl className="facts">
+                {facts.filter(([, v]) => v).map(([k, v]) => (
+                  <div key={k}><dt>{k}</dt><dd>{v}</dd></div>
+                ))}
+              </dl>
               {selectedCase.ruling_text && (
-                <div style={{ padding: '1.25rem', background: 'var(--status-judgment-bg)', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                  <strong style={{ fontSize: '1rem', color: 'var(--status-judgment)' }}>منطوق الحكم النهائي الصادر:</strong>
-                  <p style={{ marginTop: '0.5rem', lineHeight: '1.6', fontSize: '0.95rem' }}>{selectedCase.ruling_text}</p>
+                <div className="ruling-box">
+                  <strong>منطوق الحكم</strong>
+                  <p>{selectedCase.ruling_text}</p>
                 </div>
               )}
             </div>
 
-            <div className="modal-footer" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', padding: '1rem 1.5rem', borderTop: '1px solid var(--border-color)' }}>
-              <button className="btn btn-secondary" style={{ borderRadius: '8px', padding: '0.55rem 1.5rem', fontWeight: '700' }} onClick={() => setSelectedCase(null)}>
-                إغلاق
-              </button>
-              <button className="btn btn-primary" style={{ background: 'var(--accent)', borderRadius: '8px', padding: '0.55rem 1.35rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }} onClick={() => handleRestore(selectedCase.id)}>
-                <RotateCcw size={16} />
-                <span>استعادة إلى القضايا المتداولة</span>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setSelectedCase(null)}>إغلاق</button>
+              <button type="button" className="btn btn-primary" onClick={() => handleRestore(selectedCase.id)}>
+                <RotateCcw size={16} /> إعادة إلى القضايا الجارية
               </button>
             </div>
           </div>

@@ -1,20 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import {
-  X,
-  Clock,
-  CheckCircle2,
-  AlertTriangle,
-  RotateCcw,
-  Ban,
-  Calendar,
-  UserCheck,
-  FileText,
-  Briefcase,
-  User,
-  ArrowRight,
-  Info
-} from 'lucide-react';
+import { X, Clock, CheckCircle2, AlertTriangle, RotateCcw, Ban } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import Select from './Select';
+import DateInput from './DateInput';
 
 export const ADMIN_TASK_STATUSES = {
   pending: {
@@ -52,8 +40,8 @@ export const ADMIN_TASK_STATUSES = {
   completed: {
     key: 'completed',
     label: 'تم التنفيذ',
-    color: 'var(--status-active)',
-    bg: 'var(--status-active-bg)',
+    color: 'var(--success)',
+    bg: 'var(--success-bg)',
     border: 'transparent',
     icon: CheckCircle2
   },
@@ -182,429 +170,133 @@ export default function AdministrativeTaskUpdateModal({
     }
   };
 
+  const noteLabel = {
+    postponed: 'سبب التأجيل (إلزامي)',
+    completed: 'ما تم تنفيذه (إلزامي)',
+    cancelled: 'سبب الإلغاء (إلزامي)',
+    waiting: 'ما الذي تنتظره المهمة (إلزامي)',
+  }[newStatus] || 'ملاحظات التحديث';
+
+  const notePlaceholder = {
+    postponed: 'تم التواصل مع الخبير وطلب التأجيل لعدم ورود ملف القضية',
+    completed: 'تم استلام أصل تقرير الخبير وتسليمه للمحامي المسؤول',
+    cancelled: 'ألغي الإجراء لانتفاء الحاجة بتوجيه من المحامي',
+    waiting: 'سُددت أمانة الخبير وبانتظار تحديد موعد المعاينة',
+  }[newStatus] || 'اكتب ما تم من إجراءات ليُسجل في السجل';
+
   return (
-    <div className="modal-backdrop" onClick={onClose} style={{ zIndex: 1050 }}>
-      <div
-        className="modal-dialog"
-        style={{
-          maxWidth: '640px',
-          maxHeight: '92vh',
-          display: 'flex',
-          flexDirection: 'column',
-          borderRadius: '16px',
-          overflow: 'hidden'
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Modal Header */}
-        <div
-          className="modal-header"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '1.1rem 1.4rem',
-            borderBottom: '1px solid var(--border-color)',
-            background: 'var(--bg-card)'
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                background: 'var(--accent)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'var(--on-accent)',
-                border: '1px solid var(--accent-gold)'
-              }}
-            >
-              <Clock size={19} />
-            </div>
-            <div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
-                تحديث مسار وسجل العمل الإداري
-              </h3>
-              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                تسجيل حركة جديدة في السجل الزمني وحفظ التعديلات الحالية
-              </span>
-            </div>
-          </div>
-          <button
-            type="button"
-            className="btn btn-secondary btn-icon"
-            style={{ borderRadius: '8px', width: '34px', height: '34px', padding: 0 }}
-            onClick={onClose}
-          >
+    <div className="modal-backdrop update-backdrop" onClick={onClose}>
+      <div className="modal-dialog task-dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>تحديث العمل الإداري</h3>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="إغلاق">
             <X size={18} />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div
-          className="modal-body"
-          style={{
-            overflowY: 'auto',
-            padding: '1.2rem 1.4rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1.1rem'
-          }}
-        >
-          {/* 1. Context Summary Card (المهمة الحالية ومحدداتها لمنع الالتباس) */}
-          <div
-            style={{
-              background: 'var(--bg-card-subtle)',
-              border: '1px solid var(--border-subtle)',
-              borderRadius: '12px',
-              padding: '0.9rem 1.1rem',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '0.6rem'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <div>
-                <span style={{ fontSize: '0.78rem', fontWeight: '700', color: 'var(--primary-700)', textTransform: 'uppercase' }}>
-                  موضوع العمل الإداري
-                </span>
-                <h4 style={{ fontSize: '1.05rem', fontWeight: '800', margin: '0.15rem 0 0', color: 'var(--text-main)' }}>
-                  {task.title}
-                </h4>
-              </div>
-
-              {/* Current Status Pill */}
-              <span
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.35rem',
-                  padding: '0.25rem 0.7rem',
-                  borderRadius: '16px',
-                  fontSize: '0.8rem',
-                  fontWeight: '700',
-                  background: currentStatusObj.bg,
-                  color: currentStatusObj.color,
-                  border: `1px solid ${currentStatusObj.border}`
-                }}
-              >
-                <span>الحالة الحالية: {currentStatusObj.label}</span>
+        <div className="modal-body task-form-body">
+          <div className="update-summary">
+            <div className="update-summary-top">
+              <strong>{task.title}</strong>
+              <span className="status-chip" style={{ '--dot': currentStatusObj.color }}>
+                {currentStatusObj.label}
               </span>
             </div>
-
-            {/* Context Grid: Case, Client, Assignee, Current Due Date */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                gap: '0.65rem',
-                fontSize: '0.82rem',
-                borderTop: '1px dashed var(--border-subtle)',
-                paddingTop: '0.55rem',
-                color: 'var(--text-main)'
-              }}
-            >
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.74rem' }}>القضية المرتبطة:</span>
-                <strong>{relatedCase ? `دعوى ${relatedCase.case_number}/${relatedCase.case_year}` : 'عمل إداري عام'}</strong>
-              </div>
-
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.74rem' }}>الموكل:</span>
-                <strong>{task.client_name || 'غير محدد'}</strong>
-              </div>
-
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.74rem' }}>المسؤول الحالي:</span>
-                <strong>{currentAssignedMember ? `أ/ ${currentAssignedMember.name}` : 'غير مسند'}</strong>
-              </div>
-
-              <div>
-                <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.74rem' }}>الموعد الحالي:</span>
-                <strong style={{ color: task.execution_date ? 'var(--primary-800)' : 'var(--text-muted)' }}>
-                  {currentDateFormatted}
-                </strong>
-              </div>
-            </div>
+            <dl className="facts facts-flat update-facts">
+              <div><dt>القضية</dt><dd>{relatedCase ? `دعوى ${relatedCase.case_number}/${relatedCase.case_year}` : 'عمل عام'}</dd></div>
+              <div><dt>الموكل</dt><dd>{task.client_name || 'غير محدد'}</dd></div>
+              <div><dt>المسؤول</dt><dd>{currentAssignedMember ? `أ/ ${currentAssignedMember.name}` : 'غير مسند'}</dd></div>
+              <div><dt>الموعد الحالي</dt><dd>{currentDateFormatted}</dd></div>
+            </dl>
           </div>
 
-          {/* Error Message */}
           {errorMessage && (
-            <div
-              style={{
-                background: 'var(--status-dismissed-bg)',
-                border: '1px solid transparent',
-                borderRadius: '10px',
-                padding: '0.75rem 0.9rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.86rem',
-                color: '#dc2626',
-                fontWeight: '700'
-              }}
-            >
-              <AlertTriangle size={17} style={{ flexShrink: 0 }} />
-              <span>{errorMessage}</span>
-            </div>
+            <div className="auth-alert is-error" role="alert">{errorMessage}</div>
           )}
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* 2. Status Selector (ما تحديث المهمة؟) */}
-            <div>
-              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.92rem', marginBottom: '0.55rem', color: 'var(--text-main)' }}>
-                ما هو تحديث حالة المهمة الآن؟
-              </label>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(135px, 1fr))',
-                  gap: '0.5rem'
-                }}
-              >
+          <form onSubmit={handleSubmit} className="task-form-fields">
+            <div className="form-group">
+              <label className="form-label">حالة المهمة بعد التحديث</label>
+              <div className="status-choices" role="radiogroup">
                 {Object.values(ADMIN_TASK_STATUSES).map((st) => {
                   const isSelected = newStatus === st.key;
-                  const Icon = st.icon;
-
                   return (
                     <button
                       key={st.key}
                       type="button"
+                      role="radio"
+                      aria-checked={isSelected}
+                      className={`status-choice ${isSelected ? 'is-selected' : ''}`}
+                      style={isSelected ? { '--choice': st.color, '--choice-bg': st.bg } : undefined}
                       onClick={() => handleStatusSelect(st.key)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.45rem',
-                        padding: '0.6rem 0.75rem',
-                        borderRadius: '10px',
-                        fontSize: '0.86rem',
-                        fontWeight: '700',
-                        cursor: 'pointer',
-                        border: isSelected ? `2px solid ${st.color}` : '1px solid var(--border-color)',
-                        background: isSelected ? st.bg : 'var(--bg-card)',
-                        color: isSelected ? st.color : 'var(--text-main)',
-                        boxShadow: isSelected ? '0 2px 8px rgba(0,0,0,0.06)' : 'none',
-                        transition: 'all 0.15s ease'
-                      }}
                     >
-                      <Icon size={16} color={st.color} style={{ flexShrink: 0 }} />
-                      <span>{st.label}</span>
+                      {st.label}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Special Notice for Postponement */}
             {newStatus === 'postponed' && (
-              <div
-                style={{
-                  background: 'var(--status-adjourned-bg)',
-                  border: '1px solid #ffedd5',
-                  borderRadius: '10px',
-                  padding: '0.65rem 0.85rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  fontSize: '0.82rem',
-                  color: '#c2410c'
-                }}
-              >
-                <AlertTriangle size={16} style={{ flexShrink: 0 }} />
-                <span>
-                  تنبيه: عند اختيار <strong>تأجيل</strong>، يلزم إدخال موعد المتابعة القادم وسيتم حفظ الموعد القديم في السجل التاريخي تلقائياً.
-                </span>
-              </div>
+              <p className="update-hint">عند التأجيل يلزم تحديد موعد المتابعة القادم، ويُحفظ الموعد القديم في السجل تلقائياً.</p>
             )}
 
-            {/* 3. Follow-up Date Row */}
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.4rem',
-                background: 'var(--bg-card-subtle)',
-                padding: '0.85rem 1rem',
-                borderRadius: '10px',
-                border: '1px solid var(--border-subtle)'
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <label style={{ fontWeight: '800', fontSize: '0.88rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Calendar size={16} color="var(--primary-700)" />
-                  <span>موعد المتابعة القادم:</span>
-                  {newStatus === 'postponed' && (
-                    <span style={{ color: '#dc2626', fontSize: '0.8rem' }}>(مطلوب إلزامي)</span>
-                  )}
+            <div className="form-row">
+            <div className="form-group">
+              <div className="update-date-head">
+                <label className="form-label">
+                  موعد المتابعة القادم
+                  {newStatus === 'postponed' && <span className="update-required"> (إلزامي)</span>}
                 </label>
-
                 {newStatus !== 'postponed' && (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.78rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={clearDueDate}
-                      onChange={(e) => setClearDueDate(e.target.checked)}
-                    />
-                    <span>بدون موعد متابعة</span>
+                  <label className="update-inline-check">
+                    <input type="checkbox" checked={clearDueDate} onChange={(e) => setClearDueDate(e.target.checked)} />
+                    <span>بدون موعد</span>
                   </label>
                 )}
               </div>
-
               {!clearDueDate && (
-                <input
-                  type="date"
+                <DateInput
                   value={newDueDate}
                   onChange={(e) => {
                     setNewDueDate(e.target.value);
                     setClearDueDate(false);
                   }}
-                  className="form-control"
-                  style={{
-                    padding: '0.6rem 0.8rem',
-                    fontSize: '0.9rem',
-                    borderRadius: '8px',
-                    border: newStatus === 'postponed' && !newDueDate ? '1.5px solid #dc2626' : '1px solid var(--border-color)',
-                    background: 'var(--bg-card)',
-                    color: 'var(--text-main)'
-                  }}
-                />
+                  className={`form-input ${newStatus === 'postponed' && !newDueDate ? 'is-invalid' : ''}`} />
               )}
             </div>
 
-            {/* 4. Reassignment Row (إسناد إلى / تغيير المسؤول) */}
-            <div
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '0.35rem'
-              }}
-            >
-              <label style={{ fontWeight: '800', fontSize: '0.88rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <UserCheck size={16} color="var(--primary-700)" />
-                <span>المسؤول المكلف بالمتابعة:</span>
-              </label>
-
-              <select
-                value={newAssignedTo}
-                onChange={(e) => setNewAssignedTo(e.target.value)}
-                className="form-control"
-                style={{
-                  padding: '0.6rem 0.8rem',
-                  fontSize: '0.9rem',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color)',
-                  background: 'var(--bg-card)',
-                  color: 'var(--text-main)'
-                }}
-              >
+            <div className="form-group">
+              <label className="form-label">المسؤول عن المتابعة</label>
+              <Select value={newAssignedTo} onChange={(e) => setNewAssignedTo(e.target.value)} className="form-select">
                 <option value="">بدون تكليف محدد</option>
                 {team.map((member) => (
                   <option key={member.id} value={member.id}>
                     الأستاذ / {member.name} {member.role ? `(${member.role})` : ''}
                   </option>
                 ))}
-              </select>
-
+              </Select>
               {newAssignedTo && task.assigned_to && newAssignedTo !== task.assigned_to && (
-                <div style={{ fontSize: '0.78rem', color: 'var(--primary-800)', display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.15rem' }}>
-                  <ArrowRight size={13} />
-                  <span>سيتم تسجيل إعادة الإسناد في السجل التاريخي للمهمة.</span>
-                </div>
+                <span className="hint">ستُسجَّل إعادة الإسناد في سجل المهمة.</span>
               )}
             </div>
+            </div>
 
-            {/* 5. Update Notes / Details (تفاصيل التحديث / سبب التأجيل / تقرير الإتمام) */}
-            <div>
-              <label style={{ display: 'block', fontWeight: '800', fontSize: '0.88rem', marginBottom: '0.35rem', color: 'var(--text-main)' }}>
-                {newStatus === 'postponed'
-                  ? 'سبب التأجيل وتفاصيل المتابعة (إلزامي):'
-                  : newStatus === 'completed'
-                  ? 'تفاصيل وملاحظات إتمام العمل (إلزامي):'
-                  : newStatus === 'cancelled'
-                  ? 'سبب إلغاء المهمة (إلزامي):'
-                  : newStatus === 'waiting'
-                  ? 'تفاصيل ما تنتظره المهمة (إلزامي):'
-                  : 'ملاحظات وتفاصيل التحديث:'}
-              </label>
-
+            <div className="form-group">
+              <label className="form-label">{noteLabel}</label>
               <textarea
                 rows={3}
                 value={updateText}
                 onChange={(e) => setUpdateText(e.target.value)}
-                placeholder={
-                  newStatus === 'postponed'
-                    ? 'مثال: تم التواصل مع الخبير وطلب التأجيل لعدم ورود ملف القضية...'
-                    : newStatus === 'completed'
-                    ? 'مثال: تم استلام أصل تقرير الخبير وتسليمه للمحامي المسؤول بالملف...'
-                    : newStatus === 'cancelled'
-                    ? 'مثال: تم إلغاء الإجراء لانتفاء الحاجة بناءً على توجيه المحامي...'
-                    : newStatus === 'waiting'
-                    ? 'مثال: تم سداد أمانة الخبير وبانتظار تحديد موعد المعاينة من مكتب الخبراء...'
-                    : 'اكتب أي ملاحظات أو إجراءات تمت لتسجيلها في السجل التاريخي...'
-                }
-                className="form-control"
-                style={{
-                  width: '100%',
-                  padding: '0.65rem 0.8rem',
-                  fontSize: '0.88rem',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-color)',
-                  background: 'var(--bg-card)',
-                  color: 'var(--text-main)',
-                  resize: 'vertical'
-                }}
+                placeholder={notePlaceholder}
+                className="form-textarea"
               />
             </div>
 
-            {/* Modal Actions Footer */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '0.65rem',
-                marginTop: '0.5rem',
-                paddingTop: '0.9rem',
-                borderTop: '1px solid var(--border-subtle)'
-              }}
-            >
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={onClose}
-                disabled={isSaving}
-                style={{ borderRadius: '8px', padding: '0.55rem 1.2rem', fontWeight: '700' }}
-              >
-                إلغاء
-              </button>
-
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={isSaving}
-                style={{
-                  background: 'var(--accent)',
-                  color: 'var(--on-accent)',
-                  borderRadius: '8px',
-                  padding: '0.55rem 1.4rem',
-                  fontWeight: '800',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.45rem',
-                  border: '1px solid var(--accent-gold)'
-                }}
-              >
-                {isSaving ? (
-                  <span>جاري الحفظ...</span>
-                ) : (
-                  <>
-                    <CheckCircle2 size={16} />
-                    <span>حفظ التحديث وتوثيق السجل</span>
-                  </>
-                )}
+            <div className="update-actions">
+              <button type="button" className="btn btn-secondary" onClick={onClose} disabled={isSaving}>إلغاء</button>
+              <button type="submit" className="btn btn-primary" disabled={isSaving}>
+                {isSaving ? 'جارٍ الحفظ…' : 'حفظ التحديث'}
               </button>
             </div>
           </form>

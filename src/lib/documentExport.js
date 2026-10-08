@@ -85,8 +85,8 @@ export function exportDocumentToDocx(documentData) {
     .join('\n');
 
   const lawyerHeader = officeProfile.lawyer_name
-    ? `<div style="text-align: right; border-bottom: 2px solid #37040a; padding-bottom: 6pt; margin-bottom: 18pt;">
-        <p style="font-size: 16pt; font-weight: bold; color: #37040a; margin: 0;">${officeProfile.office_name || 'مكتب المحاماة'}</p>
+    ? `<div style="text-align: right; border-bottom: 2px solid #111827; padding-bottom: 6pt; margin-bottom: 18pt;">
+        <p style="font-size: 16pt; font-weight: bold; color: #111827; margin: 0;">${officeProfile.office_name || 'مكتب المحاماة'}</p>
         <p style="font-size: 12pt; color: #555; margin: 2pt 0 0 0;">الأستاذ/ ${officeProfile.lawyer_name} - ${officeProfile.lawyer_title || 'محامٍ ومستشار قانوني'}</p>
        </div>`
     : '';
