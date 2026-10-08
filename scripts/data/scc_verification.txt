@@ -13,7 +13,7 @@ year | official | ours (unique) | duplicate rows the portal itself returns | sta
 1981 | 40 | 40 | 0 | OK
 1982 | 24 | 24 | 0 | OK
 1983 | 40 | 40 | 0 | OK
-1984 | 81 | 65 | 0 | MISMATCH
+1984 | 81 | 81 | 50 | OK (within dup)
 1985 | 219 | 196 | 0 | MISMATCH
 1986 | 75 | 75 | 0 | OK
 1987 | 75 | 75 | 0 | OK
@@ -41,19 +41,19 @@ year | official | ours (unique) | duplicate rows the portal itself returns | sta
 2009 | 194 | 194 | 0 | OK
 2010 | 254 | 254 | 0 | OK
 2011 | 255 | 255 | 0 | OK
-2012 | 363 | 186 | 25 | MISMATCH
-2013 | 284 | 0 | 0 | MISMATCH
-2014 | 272 | 0 | 0 | MISMATCH
-2015 | 363 | 0 | 0 | MISMATCH
-2016 | 264 | 0 | 0 | MISMATCH
-2017 | 272 | 0 | 0 | MISMATCH
-2018 | 240 | 0 | 0 | MISMATCH
-2019 | 267 | 0 | 0 | MISMATCH
-2020 | 195 | 0 | 0 | MISMATCH
-2021 | 177 | 0 | 0 | MISMATCH
-2022 | 103 | 0 | 0 | MISMATCH
-2023 | 110 | 0 | 0 | MISMATCH
-2024 | 159 | 0 | 0 | MISMATCH
-2025 | 214 | 0 | 0 | MISMATCH
-2026 | 120 | 0 | 0 | MISMATCH
-total ours=4942, year mismatches=18
+2012 | 363 | 363 | 25 | OK (within dup)
+2013 | 284 | 284 | 0 | OK
+2014 | 272 | 272 | 0 | OK
+2015 | 363 | 363 | 0 | OK
+2016 | 264 | 264 | 0 | OK
+2017 | 272 | 272 | 0 | OK
+2018 | 240 | 240 | 0 | OK
+2019 | 267 | 267 | 0 | OK
+2020 | 195 | 195 | 0 | OK
+2021 | 177 | 177 | 0 | OK
+2022 | 103 | 103 | 0 | OK
+2023 | 110 | 110 | 0 | OK
+2024 | 159 | 159 | 0 | OK
+2025 | 214 | 214 | 0 | OK
+2026 | 120 | 120 | 0 | OK
+total ours=8175, year mismatches=2

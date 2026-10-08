@@ -5434,3 +5434,16 @@ button.client-stat:hover { border-color: var(--text-subtle); }
 *::-webkit-scrollbar-thumb:hover { background: var(--sb-thumb-hover); background-clip: content-box; }
 .select-list { padding-inline-end: 0.2rem; scrollbar-gutter: stable; }
 .select-list::-webkit-scrollbar { width: 8px; }
+
+/* Phones: a field under 16px makes iOS/Android browsers zoom the page on focus. Keep every field at 16px. */
+@media (max-width: 820px), (hover: none) and (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+  select,
+  textarea,
+  .form-input,
+  .form-textarea,
+  .select-search input {
+    font-size: 16px !important;
+  }
+  textarea, .form-textarea { line-height: 1.6; }
+}
