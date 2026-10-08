@@ -38,3 +38,5 @@ scripts/data/crawl_stdout.txt
 scripts/data/scc_crawl.log
 صيغ الدعاوي/
 ~$*
+
+.env
